@@ -2,3 +2,4 @@ gyp_build/
 test_build/
 bin/
 *.pyc
+source/external
