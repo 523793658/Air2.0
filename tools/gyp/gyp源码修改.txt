@@ -1,0 +1,9 @@
+".\src\pylib\gyp\generator\android.py"
+
+注释613-630行，添加631-635行，修改输出库的文件名
+
+注释892行，原因：ndk中没有base_rules.mk这个文件
+
+
+注意：在windows下对于只有一个源文件的项目使用gyp生成的mk文件无法通过ndk-build编译，这是ndk-build的bug，这是源文件路径在mk文件中使用‘\’所造成的。
+目前该代码已经还原，在android编译时候添加一个空文件。

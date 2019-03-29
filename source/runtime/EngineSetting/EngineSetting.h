@@ -1,0 +1,8 @@
+#pragma once
+#include "CoreMinimal.h"
+
+#ifdef ENGINESETTING_SOURCE
+#define ENGINE_SETTING_API	DLLEXPORT
+#else
+#define ENGINE_SETTING_API	DLLIMPORT
+#endif // ENGINESETTING_SOURCE

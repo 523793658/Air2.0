@@ -1,0 +1,156 @@
+{
+	"targets":[
+		{
+			"target_name": "Renderer",
+			'variables': {
+				'outputSubDir': '',
+				"SourceDir": "../source/",
+				"RuntimeSourceDir": "<(SourceDir)runtime/",
+				"LaunchDir": "<(RuntimeSourceDir)launch/",
+				"CoreDir": "<(RuntimeSourceDir)core/",
+				"EngineDir": "<(RuntimeSourceDir)engine/",
+				"RHIDir": "<(RuntimeSourceDir)RHI/",
+				"RendererDir": "<(RuntimeSourceDir)Renderer/",
+				"RenderCoreDir": "<(RuntimeSourceDir)RenderCore/",
+				"CoreObjectDir": "<(RuntimeSourceDir)CoreObject/",
+				"ShaderCoreDir": "<(RuntimeSourceDir)ShaderCore/",
+				"DeveloperSourceDir": "<(SourceDir)developer/",
+				"DerivedDataCacheDir": "<(DeveloperSourceDir)DerivedDataCache/",
+			},
+			"type": "shared_library",
+			"include_dirs":[
+				"<(CoreDir)",
+				"<(EngineDir)",
+				"<(RendererDir)",
+				"<(DerivedDataCacheDir)",
+				"<(ShaderCoreDir)",
+				"<(RHIDir)",
+				"<(RenderCoreDir)",
+				"<(CoreObjectDir)",
+				"<(SourceDir)external",
+			],
+			"dependencies":[
+				"core",
+				"RenderCore",
+				"RHI",
+				"ShaderCore",
+				"engine",
+			],
+			"includes":[
+				"../tools/gyp/common.gypi",
+			],
+			"sources":[
+				"<(RendererDir)RendererInterface.h",
+				"<(RendererDir)RendererMininal.h",
+				"<(RendererDir)RendererModule.h",
+				"<(RendererDir)RendererModule.cpp",
+				"<(RendererDir)Renderer.h",
+				"<(RendererDir)Renderer.cpp",
+				"<(RendererDir)scene.h",
+				"<(RendererDir)scene.cpp",
+				"<(RendererDir)sceneRendering.h",
+				"<(RendererDir)sceneRendering.cpp",
+				"<(RendererDir)DeferredShadingRenderer.h",
+				"<(RendererDir)DeferredShadingRenderer.cpp",
+				"<(RendererDir)BasePassRendering.h",
+				"<(RendererDir)BasePassRendering.cpp",
+				"<(RendererDir)RendererScene.cpp",
+				"<(RendererDir)ScenePrivate.h",
+				"<(RendererDir)ScenePrivate.cpp",
+				"<(RendererDir)SystemTextures.h",
+				"<(RendererDir)SystemTextures.cpp",
+				"<(RendererDir)StaticMeshDrawList.h",
+				"<(RendererDir)StaticMeshDrawList.inl",
+				"<(RendererDir)StaticMeshDrawList.cpp",
+				"<(RendererDir)DepthRendering.h",
+				"<(RendererDir)DepthRendering.cpp",
+				"<(RendererDir)SceneVisibility.cpp",
+				"<(RendererDir)LightSceneInfo.h",
+				"<(RendererDir)LightSceneInfo.cpp",
+				"<(RendererDir)DrawingPolicy.h",
+				"<(RendererDir)DrawingPolicy.cpp",
+				"<(RendererDir)SceneCore.h",
+				"<(RendererDir)SceneCore.cpp",
+				"<(RendererDir)SceneRenderTargetParameters.h",
+				"<(RendererDir)SceneRenderTargetParameters.cpp",
+				"<(RendererDir)PrimitiveSceneInfo.h",
+				"<(RendererDir)PrimitiveSceneInfo.cpp",
+				"<(RendererDir)LightMapRendering.h",
+				"<(RendererDir)LightMapRendering.cpp",
+				"<(RendererDir)ScenePrivateBase.h",
+				"<(RendererDir)ScenePrivateBase.cpp",
+				"<(RendererDir)ShaderBaseClasses.h",
+				"<(RendererDir)ShaderBaseClasses.cpp",
+				"<(RendererDir)LightRendering.h",
+				"<(RendererDir)LightRendering.cpp",
+				"<(RendererDir)LightFunctionRendering.cpp",
+				"<(RendererDir)TiledDeferredLightRendering.cpp",
+				"<(RendererDir)ShadowRendering.h",
+				"<(RendererDir)ShadowRendering.cpp",
+				"<(RendererDir)HdrCustomResolveShaders.h",
+				"<(RendererDir)HdrCustomResolveShaders.cpp",
+				"<(RendererDir)SkyBoxRendering.cpp",
+
+				
+				"<(RendererDir)PostProcess/SceneRenderTargets.h",
+				"<(RendererDir)PostProcess/SceneRenderTargets.cpp",
+				"<(RendererDir)PostProcess/RenderTargetPool.h",
+				"<(RendererDir)PostProcess/RenderTargetPool.cpp",
+				"<(RendererDir)PostProcess/SceneFilterRendering.h",
+				"<(RendererDir)PostProcess/SceneFilterRendering.cpp",
+				"<(RendererDir)PostProcess/PostProcessing.h",
+				"<(RendererDir)PostProcess/PostProcessing.cpp",
+				"<(RendererDir)PostProcess/RenderingCompositionGraph.h",
+				"<(RendererDir)PostProcess/RenderingCompositionGraph.cpp",
+				"<(RendererDir)PostProcess/PostProcessParameters.h",
+				"<(RendererDir)PostProcess/PostProcessParameters.cpp",
+				"<(RendererDir)PostProcess/PostProcessTonemap.h",
+				"<(RendererDir)PostProcess/PostProcessTonemap.cpp",
+				"<(RendererDir)PostProcess/PostProcessInput.h",
+				"<(RendererDir)PostProcess/PostProcessInput.cpp",
+			],
+			"conditions":[
+				[
+					"OS == 'win'",
+					{
+						"msbuild_configuration_attributes":{
+							"CharacterSet": "1",
+						}, 
+						"msbuild_settings":{
+							"ClCompile":{
+								'PreprocessorDefinitions': [
+									"RENDERER_SOURCE",
+								],
+							},
+							'Link': {
+								'AdditionalDependencies':[
+									
+								],
+							},
+						},
+						"configurations":{
+							"Debug":{
+								"msbuild_settings":{
+									"ClCompile":{
+										'RuntimeLibrary': 'MultiThreadedDebugDLL',
+									},
+									'Link': {
+										'GenerateDebugInformation': 'true',
+										'AdditionalDependencies':[
+										],
+									},
+								},
+							},
+							"Release":{
+								"msbuild_settings":{
+									"ClCompile":{
+									},
+								},
+							},
+						},
+					},
+				],
+			],
+		},
+	],
+}

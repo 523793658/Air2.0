@@ -1,0 +1,5 @@
+*.idb
+*.pyc
+pdb/
+bin/
+lib/

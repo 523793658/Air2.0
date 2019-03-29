@@ -1,0 +1,116 @@
+#pragma once
+#include "CoreMinimal.h"
+#include "RenderCore.h"
+#include "Math/Math.h"
+namespace Air
+{
+	struct PackedNormal
+	{
+		union
+		{
+
+			struct
+			{
+#if PLATFORM_LITTLE_ENDIAN
+				uint8 x, y, z, w;
+#else
+				uint8 w, z, y, x;
+#endif
+			};
+			uint32 mPacked;
+		}	Vector;
+
+		PackedNormal() { Vector.mPacked = 0; }
+		PackedNormal(uint32 inPacked) { Vector.mPacked = inPacked; }
+		PackedNormal(const float3& inVector) { *this = inVector; }
+		PackedNormal(uint8 inX, uint8 inY, uint8 inZ, uint8 inW)
+		{
+			Vector.x = inX;
+			Vector.y = inY;
+			Vector.z = inZ;
+			Vector.w = inW;
+		}
+
+		void operator = (const float3& inVector);
+		void operator = (const float4& inVector);
+
+		operator float3() const;
+
+		operator float4() const;
+		VectorRegister getVectorRegister() const;
+
+		void set(const float3& inVector) { *this = inVector; }
+
+		bool operator ==(const PackedNormal& B) const;
+
+		bool operator !=(const PackedNormal& B) const;
+
+		friend RENDER_CORE_API Archive& operator <<(Archive& ar, PackedNormal& n);
+
+		wstring toString() const
+		{
+			return printf(TEXT("X=%d Y=%d Z=%d W=%d"), Vector.x, Vector.y, Vector.z, Vector.w);
+		}
+
+		static RENDER_CORE_API PackedNormal ZeroNormal;
+	};
+
+	extern RENDER_CORE_API const VectorRegister GVectorPackingConstants;
+
+	FORCEINLINE void PackedNormal::operator=(const float3& inVector)
+	{
+		Vector.x = Math::clamp(Math::truncToInt(inVector.x * 127.5f + 127.5f), 0, 255);
+		Vector.y = Math::clamp(Math::truncToInt(inVector.y * 127.5f + 127.5f), 0, 255);
+		Vector.z = Math::clamp(Math::truncToInt(inVector.z * 127.5f + 127.5f), 0, 255);
+		Vector.w = 128;
+	}
+
+	FORCEINLINE void PackedNormal::operator=(const float4& inVector)
+	{
+		Vector.x = Math::clamp(Math::truncToInt(inVector.x * 127.5f + 127.5f), 0, 255);
+		Vector.y = Math::clamp(Math::truncToInt(inVector.y * 127.5f + 127.5f), 0, 255);
+		Vector.z = Math::clamp(Math::truncToInt(inVector.z * 127.5f + 127.5f), 0, 255);
+		Vector.w = Math::clamp(Math::truncToInt(inVector.w * 127.5f + 127.5f), 0, 255);;
+	}
+
+	FORCEINLINE bool PackedNormal::operator==(const PackedNormal& B) const
+	{
+		float3 v1 = *this;
+		float3 v2 = B;
+		if (Math::abs(v1.x - v2.x) > THRESH_NORMALS_ARE_SAME * 4.0f)
+			return 0;
+		if (Math::abs(v1.y - v2.y) > THRESH_NORMALS_ARE_SAME * 4.0f)
+			return 0;
+		if (Math::abs(v1.z - v2.z) > THRESH_NORMALS_ARE_SAME * 4.0f)
+			return 0;
+		return 1;
+	}
+
+	FORCEINLINE bool PackedNormal::operator!=(const PackedNormal& B) const
+	{
+		return !(*this == B);
+	}
+
+	FORCEINLINE PackedNormal::operator float3() const
+	{
+		VectorRegister vectorToUnpack = getVectorRegister();
+		float3 unpackedVector;
+		VectorStoreFloat3(vectorToUnpack, &unpackedVector);
+		return unpackedVector;
+	}
+
+	FORCEINLINE PackedNormal::operator Air::float4() const
+	{
+		VectorRegister vectorToUnpack = getVectorRegister();
+		float4 unpackedVector;
+		VectorStore(vectorToUnpack, &unpackedVector);
+		return unpackedVector;
+	}
+	FORCEINLINE VectorRegister PackedNormal::getVectorRegister() const
+	{
+		VectorRegister vectorToUnpack = VectorLoadByte4(this);
+		vectorToUnpack = VectorMultiplyAdd(vectorToUnpack, VectorReplicate(GVectorPackingConstants, 2), VectorReplicate(GVectorPackingConstants, 3));
+		VectorResetFloatRegisters();
+		return vectorToUnpack;
+	}
+}
