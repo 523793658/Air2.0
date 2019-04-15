@@ -49,6 +49,11 @@ namespace Air
 
 		static wstring gameDir();
 
+		static wstring getAbsolutePath(const wstring& inPath)
+		{
+			return gameDir() + inPath;
+		}
+
 		static FORCEINLINE wstring getPath(const wstring & inPath)
 		{
 			return filesystem::path(inPath).parent_path();

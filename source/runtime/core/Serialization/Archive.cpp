@@ -128,5 +128,7 @@ namespace Air
 		return TEXT("Archive");
 	}
 
+	void Archive::detachBulkData(UntypedBulkData* bulkData, bool bEnsureBulkDataIsLoaded) {}
+
 
 }

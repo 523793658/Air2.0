@@ -5,9 +5,8 @@
 #include "RawMesh.h"
 #include "Components.h"
 #include "Classes/Engine/EngineType.h"
+#include "StaticMeshResources.h"
 
-
-#define MAX_STATIC_MESH_LODS	8
 
 
 namespace Air
@@ -17,6 +16,10 @@ namespace Air
 #if WITH_EDITOR
 		class RawMeshBulkData* mRawMeshBulkData;
 #endif
+		ENGINE_API StaticMeshSourceModel();
+		ENGINE_API ~StaticMeshSourceModel();
+
+
 
 		MeshBuildSettings mBuildttings;
 	};
@@ -98,15 +101,24 @@ namespace Air
 		ENGINE_API void remove(int32 LODIndex, int32 sectionIndex);
 	};
 
-	class RStaticMesh : public Object
+	class ENGINE_API RStaticMesh : public Object
 	{
-		GENERATED_RCLASS_BODY(RStaticMesh, Object);
+		GENERATED_RCLASS_BODY(RStaticMesh, Object)
 	public:
+		virtual void postLoad() override;
+
+		virtual void initResource();
+
+		void updateUVChannelData(bool bRebuildAll);
+	public:
+
 		std::unique_ptr<class StaticMeshRenderData> mRenderData;
 
 #if WITH_EDITORONLY_DATA
 
 		TArray<StaticMeshSourceModel> mSourceModels;
+
+		class AssetImportData* mAssetImportData;
 
 #endif
 

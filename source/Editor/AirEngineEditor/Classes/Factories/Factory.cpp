@@ -1,5 +1,7 @@
 #include "Classes/Factories/Factory.h"
 #include "Modules/ModuleManager.h"
+#include "Misc/Paths.h"
+#include "boost/algorithm/string.hpp"
 namespace Air
 {
 	TMap<wstring, Factory*> Factory::mExtensionMaps;
@@ -19,4 +21,17 @@ namespace Air
 			}
 		}
 	}
+
+	Object* Factory::createFromFile(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
+	{
+		wstring extension = Paths::getExtension(filename);
+		boost::to_lower(extension);
+		Factory* factory = mExtensionMaps.findRef(extension);
+		if (factory == nullptr)
+		{
+			return nullptr;
+		}
+		return factory->createFromFileInner(inObject, filename, name, flags);
+	}
+
 }

@@ -14,7 +14,11 @@ namespace Air
 	class TGenericWindowsTargetPlatform
 		: public TTargetPlatformBase<WindowsPlatformProperties<HAS_EDITOR_DATA, IS_DEDICATED_SERVER, IS_CLIENT_ONLY>>
 	{
-
+	public:
+		virtual bool isRunningPlatform() const override
+		{
+			return PLATFORM_WINDOWS;
+		}
 	};
 
 

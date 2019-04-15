@@ -7,6 +7,7 @@
 #include "FbxStaticMeshImportData.h"
 #include "Classes/Engine/StaticMesh.h"
 #include "FbxImportConfig.h"
+#include "StaticMeshResources.h"
 
 namespace Air
 {
@@ -34,9 +35,9 @@ namespace Air
 	}
 
 
-	Object* FbxFactory::createFromFile(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
+	Object* FbxFactory::createFromFileInner(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
 	{
-		FbxImportConfig* importConfig;
+		FbxImportConfig* importConfig = new FbxImportConfig();
 
 
 		Object* newObject;
@@ -73,7 +74,7 @@ namespace Air
 			bool bCombineMeshes = importConfig->mStaticMeshImportData->bCombineMeshes;
 			bool bCombineMeshesLOD = false;
 
-			if (importConfig->mOriginalImportType == FBXIT_StaticMesh)
+			if (importConfig->mMeshTypeToImport == FBXIT_StaticMesh)
 			{
 				fbxImporter->applyTransformFromSettingsToFbxNode(rootNodeToImport, importConfig->mStaticMeshImportData);
 				if (bCombineMeshes && !bImportStaticMeshLODs)

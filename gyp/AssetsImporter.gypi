@@ -2,7 +2,7 @@
 	"targets":[
 		{
 			"target_name": "AssetsImporter",
-			"type": "executable",
+			"type": "shared_library",
 			'variables': {
                 'outputSubDir': '',
 				"AssetsImporterDir": "<(EditorDir)AssetsImporter/",

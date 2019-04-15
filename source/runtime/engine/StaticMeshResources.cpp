@@ -16,4 +16,12 @@ namespace Air
 	{
 		
 	}
+
+	void StaticMeshRenderData::initResource(RStaticMesh* owner)
+	{
+		for (int32 lodIndex = 0; lodIndex < mLODResources.size(); ++lodIndex)
+		{
+			mLODResources[lodIndex].initResource(owner);
+		}
+	}
 }

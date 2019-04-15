@@ -6,6 +6,8 @@ namespace Air
 	const LinearColor LinearColor::Black(0.0f, 0.0f, 0.0f, 1.0f);
 	const LinearColor LinearColor::Red(1.0f, 0.0f, 0.0f, 1.0f);
 
+
+	const Color Color::White(255, 255, 255, 255);
 	static const float OneOver255 = 1.0f / 255.0f;
 
 	LinearColor::LinearColor(const Color& color)

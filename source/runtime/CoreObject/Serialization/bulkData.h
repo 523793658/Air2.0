@@ -136,26 +136,26 @@ namespace Air
 		virtual void serializeElement(Archive& ar, void* data, int32 elementIndex) = 0;
 	public:
 
-		uint32 mBulkDataFlags;
+		uint32 mBulkDataFlags{ BULKDATA_None };
 
-		uint32 mElementCount;
+		uint32 mElementCount{ 0 };
 
-		int64 mBulkDataOffsetInFile;
+		int64 mBulkDataOffsetInFile{ INDEX_NONE };
 
-		int32 mBulkDataSizeOnDisk;
+		int32 mBulkDataSizeOnDisk{ INDEX_NONE };
 
-		int32 mBulkDataAlignment;
+		int32 mBulkDataAlignment{ DEFAULT_ALIGNMENT };
 
 		AllocatedPtr mBulkData;
 
 		AllocatedPtr mBulkDataAsync;
 
-		uint32 mLockStatus;
+		uint32 mLockStatus{ LOCKSTATUS_Unlocked };
 
 	protected:
 		wstring mFilename;
 #if WITH_EDITOR
-		Archive* mAttachedAr;
+		Archive* mAttachedAr{ nullptr };
 #endif
 	};
 

@@ -16,6 +16,8 @@ namespace Air
 	class FbxImportConfig
 	{
 	public:
+		FbxImportConfig();
+
 		wstring mFileName;
 		
 		TEnumAsByte<enum EFBXImportType> mOriginalImportType;

@@ -19,6 +19,8 @@ namespace Air
 	class FbxStaticMeshImportData : public FbxMeshImportData
 	{
 	public:
+		FbxStaticMeshImportData();
+
 		wstring mStaticMeshLODGroup;
 
 		TEnumAsByte<EVertexColorImportOption::Type> mVertexColorImportOption;

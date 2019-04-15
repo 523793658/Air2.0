@@ -76,6 +76,7 @@
 				"MovieSceneCapture",
 				"engine",
 				"InputCore",
+				"EditorEngine",
 			],
 			"includes":[
 				"../tools/gyp/common.gypi",

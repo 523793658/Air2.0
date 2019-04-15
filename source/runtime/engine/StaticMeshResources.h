@@ -5,8 +5,8 @@
 #include "RawIndexBuffer.h"
 #include "LocalVertexFactory.h"
 #include "Containers/IndirectArray.h"
-#include "Classes/Engine/StaticMesh.h"
 #include "PrimitiveSceneProxy.h"
+#define  MAX_STATIC_MESH_LODS	8
 namespace Air
 {
 	class RStaticMesh;

@@ -1,5 +1,6 @@
 #pragma once
 #include "Classes/GameFramework/Actor.h"
+#include "Classes/Components/StaticMeshComponent.h"
 namespace Air
 {
 	class ENGINE_API AStaticMeshActor : public AActor

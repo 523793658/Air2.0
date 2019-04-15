@@ -25,6 +25,7 @@
 			],
             "include_dirs":[
                 "<(ExternalDir)FBX/2019.2/include",
+                "<(ExternalDir)FBX/2019.2/include/fbxsdk",
             ],
             "dependencies":[
                 "core",
@@ -40,6 +41,11 @@
 					"OS == 'win'",
 					{
                         "msbuild_settings":{
+                            "ClCompile":{
+                                'PreprocessorDefinitions':[
+                                    "FBXSDK_SHARED",
+                                ],
+                            },
                             'Link': {
                                 'AdditionalDependencies':[
                                     "libfbxsdk.lib",

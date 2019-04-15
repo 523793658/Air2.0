@@ -9,7 +9,7 @@ namespace Air
 	class ITargetPlatform;
 	class Property;
 
-	class UntypedBulkData;
+	struct UntypedBulkData;
 
 	class CORE_API Archive
 	{
@@ -123,7 +123,7 @@ namespace Air
 
 		void copyTrivialArchiveStatusMembers(const Archive& archiveToCopy);
 
-		virtual void detachBulkData(UntypedBulkData* bulkData, bool bEnsureBulkDataIsLoaded) {}
+		virtual void detachBulkData(UntypedBulkData* bulkData, bool bEnsureBulkDataIsLoaded);
 	public:
 
 		const struct CustomPropertyListNode* mArCustomPropertyList;

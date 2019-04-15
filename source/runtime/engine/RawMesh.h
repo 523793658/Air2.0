@@ -34,12 +34,14 @@ namespace Air
 
 		ENGINE_API bool isValid() const;
 
+		ENGINE_API bool isValidOrFixable() const;
+
 		FORCEINLINE float3 getWedgePosition(int32 wedgeIndex) const
 		{
 			return mVertexPositions[mWedgeIndices[wedgeIndex]];
 		}
 
-		void compactMaterialIndices();
+		ENGINE_API void compactMaterialIndices();
 	};
 
 

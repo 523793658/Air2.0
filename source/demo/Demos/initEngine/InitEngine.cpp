@@ -7,6 +7,7 @@
 #include "Classes/GameFramework/SpectatorPawn.h"
 #include "Texture.h"
 #include "Classes/Materials/Material.h"
+#include "Classes/Factories/Factory.h"
 #include "Classes/Materials/MaterialInstanceDynamic.h"
 namespace Demo
 {
@@ -49,6 +50,10 @@ namespace Demo
 
 		materialInstance->setScalarParameterValue(TEXT("BaseColor"), 0.1f);
 		component->setMaterial(0, materialInstance);
+
+		RStaticMesh* mesh = newObject<RStaticMesh>(nullptr);
+		Factory::createFromFile(mesh, TEXT("assets/meshes/test.FBX"), TEXT("Test"), EObjectFlags::RF_NoFlags);
+		mesh->postLoad();
 	}
 
 	void DemoInitEngine::init(DemoEngine* inEngine)

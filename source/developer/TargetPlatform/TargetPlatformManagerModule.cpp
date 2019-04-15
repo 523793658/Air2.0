@@ -138,8 +138,9 @@ namespace Air
 		{
 			if (mPlatforms.size() == 0 || bForceCacheUpdate)
 			{
-				diso
+				//diso
 			}
+			return mPlatforms;
 		}
 
 		TArray<ITargetPlatform*> mPlatforms;

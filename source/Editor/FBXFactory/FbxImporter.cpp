@@ -8,12 +8,15 @@
 #include "Classes/Engine/StaticMesh.h"
 #include "FbxStaticMeshImportData.h"
 #include "StaticMeshResources.h"
+#include "Misc/FileHelper.h"
 
 namespace AirFbx
 {
 	static const int32 LARGE_MESH_MATERIAL_INDEX_THRESHOLD = 64;
 
 	std::shared_ptr<AFbxImporter> AFbxImporter::mInstances[MAX_FBXInstantce];
+
+	FbxAMatrix FbxDataConverter::mJointPostConversionMatrix;
 
 	struct FFBXUVs
 	{
@@ -267,7 +270,8 @@ namespace AirFbx
 		{
 			mImporter->ParseForStatistics(true);
 		}
-		const bool bImportStatus = mImporter->Initialize(TCHAR_TO_UTF8(filename.c_str()));
+		wstring abs = Paths::getAbsolutePath(filename);
+		const bool bImportStatus = mImporter->Initialize(TCHAR_TO_UTF8(abs.c_str()));
 		if (!bImportStatus)
 		{
 			AIR_LOG(logFBX, Error, TEXT("Call to FbxImporter::Initialize() failed."));

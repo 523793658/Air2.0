@@ -33,7 +33,7 @@ namespace Air
 			}
 #endif
 		}
-		else if (mLockStatus & LOCK_READ_ONLY)
+		else if (lockFlags & LOCK_READ_ONLY)
 		{
 			mLockStatus = LOCKSTATUS_ReadOnlyLock;
 		}

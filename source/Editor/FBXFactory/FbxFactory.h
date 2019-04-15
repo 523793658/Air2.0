@@ -14,7 +14,7 @@ namespace Air
 	public:
 		virtual void getExtensions(TCHAR**& extensions, uint32& num) override;
 
-		virtual Object* createFromFile(Object* inObject, wstring filename, wstring name, EObjectFlags flags) override;
+		virtual Object* createFromFileInner(Object* inObject, wstring filename, wstring name, EObjectFlags flags) override;
 
 	protected:
 

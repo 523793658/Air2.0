@@ -204,7 +204,7 @@ namespace AirFbx
 
 		Object* mParent;
 
-		IMPORTPHASE mCurPhase;
+		IMPORTPHASE mCurPhase{ NOTSTARTED };
 	private:
 		bool bIsBusy = false;
 
