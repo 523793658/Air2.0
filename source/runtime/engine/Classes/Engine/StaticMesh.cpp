@@ -2,8 +2,13 @@
 #include "StaticMeshResources.h"
 #include "SimpleReflection.h"
 #include "Misc/App.h"
+#include "Classes/Engine/TextureStreamingTypes.h"
 namespace Air
 {
+#if WITH_EDITORONLY_DATA
+	const float RStaticMesh::mMinimumAutoLODPixelError = SMALL_NUMBER;
+#endif
+
 	RStaticMesh::RStaticMesh(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
 	{
@@ -20,6 +25,20 @@ namespace Air
 	bool operator !=(const MeshSectionInfo& a, const MeshSectionInfo& b)
 	{
 		return !(a == b);
+	}
+
+	Archive& operator <<(Archive& ar, StaticMaterial& elem)
+	{
+		ar << elem.mMaterialInterface;
+		ar << elem.mMaterialSlotName;
+#if WITH_EDITORONLY_DATA
+		ar << elem.mImportedMaterialSlotName;
+#endif
+		if (!ar.isLoading())
+		{
+			ar << elem.mUVChannelData;
+		}
+		return ar;
 	}
 
 	static uint32 getMeshMaterialKey(int32 LODIndex, int32 sectionIndex)
@@ -49,6 +68,11 @@ namespace Air
 		mMap.emplace(key, info);
 	}
 
+	void MeshSectionInfoMap::serialize(Archive& ar)
+	{
+		ar << mMap;
+	}
+
 	bool operator == (const StaticMaterial& lhs, const StaticMaterial& rhs)
 	{
 		return (lhs.mMaterialInterface == rhs.mMaterialInterface &&
@@ -74,6 +98,99 @@ namespace Air
 		uint32 key = getMeshMaterialKey(LODIndex, sectionIndex);
 		mMap.erase(key);
 	}
+
+	void StaticMeshLODResources::initResources(RStaticMesh* parent)
+	{
+		const auto maxShaderPlatform = GShaderPlatformForFeatureLevel[GMaxRHIFeatureLevel];
+		if (isES2Platform(maxShaderPlatform) && !isMetalPlatform(maxShaderPlatform))
+		{
+			if (mIndexBuffer.is32Bit())
+			{
+				TArray<uint32> indices;
+				mIndexBuffer.getCopy(indices);
+				mIndexBuffer.setIndices(indices, EIndexBufferStride::Force16Bit);
+			}
+		}
+		beginInitResource(&mIndexBuffer);
+		if (mWireframeIndexBuffer.getNumIndices())
+		{
+			beginInitResource(&mWireframeIndexBuffer);
+		}
+		beginInitResource(&mVertexBuffer);
+		beginInitResource(&mPositionVertexBuffer);
+		if (mColorVertexBuffer.getNumVertices() > 0)
+		{
+			beginInitResource(&mColorVertexBuffer);
+		}
+		if (mReversedIndexBuffer.getNumIndices() > 0)
+		{
+			beginInitResource(&mReversedIndexBuffer);
+		}
+		if (mDepthOnlyIndexBuffer.getNumIndices() > 0)
+		{
+			beginInitResource(&mDepthOnlyIndexBuffer);
+		}
+		if (mReversedDepthOnlyIndexBuffer.getNumIndices() > 0)
+		{
+			beginInitResource(&mReversedDepthOnlyIndexBuffer);
+		}
+		if (RHISupportsTessellation(maxShaderPlatform))
+		{
+			beginInitResource(&mAdjacencyIndexBuffer);
+		}
+
+		initVertexFactory(mVertexFactory, parent, false);
+		beginInitResource(&mVertexFactory);
+		initVertexFactory(mVertexFactoryOverrideColorVertexBuffer, parent, true);
+		beginInitResource(&mVertexFactoryOverrideColorVertexBuffer);
+	}
+
+	void StaticMeshLODResources::releaseResource()
+	{
+		beginReleaseResource(&mAdjacencyIndexBuffer);
+		beginReleaseResource(&mIndexBuffer);
+		beginReleaseResource(&mWireframeIndexBuffer);
+		beginReleaseResource(&mVertexBuffer);
+		beginReleaseResource(&mPositionVertexBuffer);
+		beginReleaseResource(&mColorVertexBuffer);
+		beginReleaseResource(&mReversedIndexBuffer);
+		beginReleaseResource(&mDepthOnlyIndexBuffer);
+		beginReleaseResource(&mReversedDepthOnlyIndexBuffer);
+		beginReleaseResource(&mVertexFactory);
+		beginReleaseResource(&mVertexFactoryOverrideColorVertexBuffer);
+	}
+
+	int32 StaticMeshLODResources::getNumTriangles() const
+	{
+		int32 numTriangles = 0;
+		for (int32 sectionIndex = 0; sectionIndex < mSections.size(); sectionIndex++)
+		{
+			numTriangles += mSections[sectionIndex].mNumTriangles;
+		}
+		return numTriangles;
+	}
+
+	int32 StaticMeshLODResources::getNumVertices() const
+	{
+		return mVertexBuffer.getNumVertices();
+	}
+
+	int32 StaticMeshLODResources::getNumTexCoords() const
+	{
+		return mVertexBuffer.getNumVertices();
+	}
+
+	Archive& operator << (Archive& ar, MeshUVChannelInfo& channelInfo)
+	{
+		ar << channelInfo.bInitialized;
+		ar << channelInfo.bOverrideDensities;
+		for (int32 coordIndex = 0; coordIndex < TEXSTREAM_MAX_UVCHANNELS; coordIndex++)
+		{
+			ar << channelInfo.mLocalDensities[coordIndex];
+		}
+		return ar;
+	}
+
 
 	StaticMeshSourceModel::StaticMeshSourceModel()
 	{

@@ -163,6 +163,8 @@
 				"<(EngineDir)MaterialExpressionIO.cpp",
 				"<(EngineDir)RawMesh.h",
 				"<(EngineDir)RawMesh.cpp",
+				"<(EngineDir)StaticMeshVertexData.h",
+				"<(EngineDir)StaticMeshVertexData.cpp",
 				
 				"<(EngineDir)Materials/MeshMaterialShader.h",
 				"<(EngineDir)Materials/MeshMaterialShader.cpp",
@@ -222,6 +224,10 @@
 				"<(EngineDir)Classes/Engine/Light.cpp",
 				"<(EngineDir)Classes/Engine/DirectionalLight.h",
 				"<(EngineDir)Classes/Engine/DirectionalLight.cpp",
+				"<(EngineDir)Classes/Engine/TextureStreamingTypes.h",
+				"<(EngineDir)Classes/Engine/TextureStreamingTypes.cpp",
+				"<(EngineDir)Classes/Engine/MeshMerging.h",
+				"<(EngineDir)Classes/Engine/MeshMerging.cpp",
 				
 
 				

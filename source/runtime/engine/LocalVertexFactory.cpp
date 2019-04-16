@@ -40,26 +40,26 @@ namespace Air
 
 		mColorStreamIndex = elements.last().mStreamIndex;
 
-		if (mData.mTextureCoodinates.size())
+		if (mData.mTextureCoordinates.size())
 		{
 			const int32 baseTexCoordAttribute = 4;
-			for (int32 coordinateIndex = 0; coordinateIndex < mData.mTextureCoodinates.size(); coordinateIndex++)
+			for (int32 coordinateIndex = 0; coordinateIndex < mData.mTextureCoordinates.size(); coordinateIndex++)
 			{
-				elements.add(accessStreamComponent(mData.mTextureCoodinates[coordinateIndex], baseTexCoordAttribute + coordinateIndex));
+				elements.add(accessStreamComponent(mData.mTextureCoordinates[coordinateIndex], baseTexCoordAttribute + coordinateIndex));
 			}
 
-			for (int32 coordinateIndex = mData.mTextureCoodinates.size(); coordinateIndex < MAX_STATIC_TEXCOORDS / 2; coordinateIndex++)
+			for (int32 coordinateIndex = mData.mTextureCoordinates.size(); coordinateIndex < MAX_STATIC_TEXCOORDS / 2; coordinateIndex++)
 			{
-				elements.add(accessStreamComponent(mData.mTextureCoodinates[mData.mTextureCoodinates.size() - 1], baseTexCoordAttribute + coordinateIndex));
+				elements.add(accessStreamComponent(mData.mTextureCoordinates[mData.mTextureCoordinates.size() - 1], baseTexCoordAttribute + coordinateIndex));
 			}
 		}
 		if (mData.mLightMapCoordinateComponent.mVertexBuffer)
 		{
 			elements.add(accessStreamComponent(mData.mLightMapCoordinateComponent, 15));
 		}
-		else if (mData.mTextureCoodinates.size())
+		else if (mData.mTextureCoordinates.size())
 		{
-			elements.add(accessStreamComponent(mData.mTextureCoodinates[0], 15));
+			elements.add(accessStreamComponent(mData.mTextureCoordinates[0], 15));
 		}
 		BOOST_ASSERT(mStreams.size() > 0);
 		initDeclaration(elements);
@@ -71,7 +71,7 @@ namespace Air
 		return true;
 	}
 
-	void LocalVertexFactory::SetData(const DataType& inData)
+	void LocalVertexFactory::setData(const DataType& inData)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		BOOST_ASSERT((inData.mColorComponent.mType == VET_None) || (inData.mColorComponent.mType == VET_Color));

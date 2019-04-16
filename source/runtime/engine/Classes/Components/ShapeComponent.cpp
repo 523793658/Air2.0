@@ -11,11 +11,11 @@ namespace Air
 		BOOST_ASSERT(isInRenderingThread());
 		DataType newData;
 		newData.mPositionComponents = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(vertexBuffer, DynamicMeshVertex, mPosition, VET_Float3);
-		newData.mTextureCoodinates.add(VertexStreamComponent(vertexBuffer, STRUCT_OFFSET(DynamicMeshVertex, mTextureCoordinate), sizeof(DynamicMeshVertex), VET_Float2));
+		newData.mTextureCoordinates.add(VertexStreamComponent(vertexBuffer, STRUCT_OFFSET(DynamicMeshVertex, mTextureCoordinate), sizeof(DynamicMeshVertex), VET_Float2));
 		newData.mTangentBasisComponents[0] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(vertexBuffer, DynamicMeshVertex, mNormal, VET_PackedNormal);
 		newData.mTangentBasisComponents[1] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(vertexBuffer, DynamicMeshVertex, mTangent, VET_PackedNormal);
 		newData.mColorComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT(vertexBuffer, DynamicMeshVertex, mColor, VET_Color);
-		SetData(newData);
+		setData(newData);
 	}
 
 

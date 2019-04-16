@@ -100,6 +100,10 @@ typedef WindowsPlatformTypes PlatformTypes;
 #error	"Unsupported compiler version."
 #endif
 
+#ifdef __clang__
+#define  A 1
+#endif
+
 #if !defined(__clang__)
 #define PRAGMA_DISABLE_OPTIMIZATION_ACTUAL __pragma(optimize("",off))
 #define PRAGMA_ENABLE_OPTIMIZATION_ACTUAL  __pragma(optimize("",on))

@@ -135,6 +135,8 @@
 				"<(CoreDir)Misc/Parse.cpp",
 				"<(CoreDir)Misc/Util.h",
 				"<(CoreDir)Misc/Util.cpp",
+				"<(CoreDir)Misc/DateTime.h",
+				"<(CoreDir)Misc/DateTime.cpp",
 				
 				"<(CoreDir)Windows/WindowsPlatformCompilerPreSetup.h",
 				"<(CoreDir)Windows/WindowsPlatform.h",
@@ -325,6 +327,8 @@
 				"<(CoreDir)Math/TransformCalculus2D.h",
 				"<(CoreDir)Math/Sphere.h",
 				"<(CoreDir)Math/Sphere.cpp",
+				"<(CoreDir)Math/Float16.h",
+				"<(CoreDir)Math/Float32.h",
 				
 				
 				"<(CoreDir)Features/IModularFeature.h",

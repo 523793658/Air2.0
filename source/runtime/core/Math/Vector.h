@@ -5,6 +5,7 @@
 #include "Misc/CoreMiscDefines.h"
 #include "Serialization/Archive.h"
 #include "Math/Color.h"
+#include "Math/Float16.h"
 namespace Air
 {
 	template<typename T>
@@ -185,6 +186,16 @@ namespace Air
 			const float scale = Math::InvSqrt(squareSum);
 			return Vector3(x * scale, y * scale, z * scale);
 
+		}
+
+		static FORCEINLINE float distSquared(const Vector3& v, const Vector3& v2)
+		{
+			return Math::square(v2.x - v.x) + Math::square(v2.y - v.y) + Math::square(v2.z - v.z);
+		}
+
+		static FORCEINLINE float dist(const Vector3& v1, const Vector3& v2)
+		{
+			return Math::sqrt(Vector3::distSquared(v1, v2));
 		}
 
 		FORCEINLINE static Vector3 crossProduct(const Vector3& a, const Vector3 & b)
@@ -478,6 +489,7 @@ namespace Air
 
 	typedef Vector3<float> float3;
 	typedef Vector3<int> int3;
+	typedef Vector3<float16> half2;
 
 	typedef Vector2<float> float2;
 	typedef Vector2<uint32> uint2;

@@ -2,6 +2,7 @@
 #include "RenderResource.h"
 #include "DynamicRHI.h"
 #include "RHICommandList.h"
+#include "PackedNormal.h"
 namespace Air
 {
 	PixelFormatInfo GPixelFormats[PF_MAX] =
@@ -209,5 +210,14 @@ namespace Air
 	int2 calcMipMapExtent(uint32 textureWidth, uint32 textureHeight, EPixelFormat format, uint32 mipIndex)
 	{
 		return int2(Math::max<uint32>(textureWidth >> mipIndex, GPixelFormats[format].BlockSizeX), Math::max<uint32>(textureHeight >> mipIndex, GPixelFormats[format].BlockSizeY));
+	}
+
+	Archive& operator <<(Archive& ar, PackagedRGBA16N& n)
+	{
+		ar << n.mX;
+		ar << n.mY;
+		ar << n.mZ;
+		ar << n.mW;
+		return ar;
 	}
 }

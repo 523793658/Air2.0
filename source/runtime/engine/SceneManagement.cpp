@@ -33,4 +33,12 @@ namespace Air
 		mSamplerStateRHI = RHICreateSamplerState(samplerStateInitializer);
 	}
 
+
+	float computeBoundsScreenSize(const float4& boundsOrigin, const float sphereRadius, const float4& viewOrigin, const Matrix&projMatrix)
+	{
+		const float dist = float3::dist(boundsOrigin, viewOrigin);
+		const float screenMultiple = Math::max(0.5f * projMatrix.M[0][0], 0.5f * projMatrix.M[1][1]);
+		const float screenRadius = screenMultiple * sphereRadius / Math::max(1.0f, dist);
+		return screenRadius * 2.0f;
+	}
 }

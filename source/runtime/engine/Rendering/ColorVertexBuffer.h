@@ -5,13 +5,29 @@ namespace Air
 {
 	class ColorVertexBuffer : public VertexBuffer
 	{
+	public:
+		ENGINE_API ColorVertexBuffer();
+		ENGINE_API ~ColorVertexBuffer();
+		FORCEINLINE uint8 getStride() const
+		{
+			return mStride;
+		}
+
+		void cleanUp();
+
+		void serialize(Archive& ar, bool bNeedsCPUAccess);
+
+		FORCEINLINE int32 getNumVertices() const
+		{
+			return mNumVertex;
+		}
 	private:
-		class ColorVertexData*	mVertexData;
-		uint8* mData;
+		class ColorVertexData*	mVertexData{ nullptr };
+		uint8* mData{ nullptr };
 
-		uint32 mStride;
+		uint32 mStride{ 0 };
 
-		uint32 mNumVertex;
+		uint32 mNumVertex{ 0 };
 
 		void allocateData(bool bNeedsCPUAccess = true);
 

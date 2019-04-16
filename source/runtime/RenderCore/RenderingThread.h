@@ -240,7 +240,57 @@ namespace Air
 	ENQUEUE_UNIQUE_RENDER_COMMAND_THREEPARAMETER_CREATE(TypeName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3)
 
 
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_DECLARE_OPTTYPENAME(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, OptTypename, code)	  \
+	class EURCMacro_##TypeName : public RenderCommand	\
+	{	\
+	public:	\
+		EURCMacro_##TypeName(OptTypename boost::call_traits<ParamType1>::value_type in##ParamName1, OptTypename boost::call_traits<ParamType2>::value_type in##ParamName2, OptTypename boost::call_traits<ParamType3>::value_type in##ParamName3, OptTypename boost::call_traits<ParamType4>::value_type in##ParamName4) :	 \
+			ParamName1(in##ParamName1),\
+			ParamName2(in##ParamName2),	\
+			ParamName3(in##ParamName3),	\
+			ParamName4(in##ParamName4) \
+		{}\
+		TASK_FUNCTION(code)\
+		TASKNAME_FUNCTION(TypeName)	\
+	private:	\
+		ParamType1	ParamName1;	\
+		ParamType2	ParamName2;	\
+		ParamType3	ParamName3;	\
+		ParamType4	ParamName4;	\
+	};
 
+
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_DECLARE(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, code)\
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_DECLARE_OPTTYPENAME(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ,code)
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_CREATE(TypeName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4)	\
+	{\
+		if(shouldExecuteOnRenderThread())	\
+		{	\
+			checkNotBlockedOnRenderThread();	\
+			GraphTask<EURCMacro_##TypeName>::createTask().constructAndDispatchWhenReady(ParamValue1, ParamValue2, ParamValue3, ParamValue4);\
+		}\
+		else \
+		{	\
+			EURCMacro_##TypeName TempCommand(ParamValue1, ParamValue2, ParamValue3, ParamValue4);	\
+			TempCommand.doTask(ENamedThreads::GameThread, GraphEventRef());  \
+		}	\
+	}
+
+
+
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, code)	\
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_DECLARE(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, code)	  \
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_CREATE(TypeName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4)
+
+#define  ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_DECLARE_TEMPLATE(TypeName, TemplateParamName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, Code) \
+	template <typename TemplateParamName> \
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_DECLARE_OPTTYPENAME(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, typename, Code)
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_CREATE_TEMPLATE(TypeName, TemplateParameterName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4) \
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER_CREATE(TypeName<TemplateParameterName>, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4)
 
 
 

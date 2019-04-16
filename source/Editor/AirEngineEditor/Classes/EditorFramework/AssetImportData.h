@@ -2,6 +2,7 @@
 #include "EditorConfig.h"
 #include "Misc/Optional.h"
 #include "Misc/SecureHash.h"
+#include "Misc/DateTime.h"
 namespace Air
 {
 	struct EDITOR_ENGINE_API AssetImportInfo
@@ -15,7 +16,7 @@ namespace Air
 
 			}
 
-			
+			DateTime mTimestamp;
 			wstring mRelativeFilename;
 			MD5Hash mFileHash;
 		};

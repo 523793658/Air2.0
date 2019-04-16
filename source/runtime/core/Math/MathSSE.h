@@ -125,7 +125,24 @@ FORCEINLINE VectorRegister VectorReciprocalSqrtAccurate(const VectorRegister& ve
 
 }
 
+FORCEINLINE VectorRegisterInt makeVectorRegisterInt(int32 x, int32 y, int32 z, int32 w)
+{
+	return _mm_setr_epi32(x, y, z, w);
+}
 
+FORCEINLINE VectorRegister vectorLoadURGBA16N(void* ptr)
+{
+	VectorRegisterDouble tmp0 = _mm_load1_pd(reinterpret_cast<const double*>(ptr));
+	VectorRegisterInt mask = makeVectorRegisterInt(0x0000ffff, 0x0000ffff, 0xffff0000, 0xffff0000);
+	VectorRegisterInt flipSign = makeVectorRegisterInt(0, 0, 0x80000000, 0x80000000);
+	VectorRegister temp = _mm_and_ps(reinterpret_cast<const VectorRegister*>(&tmp0)[0],
+		reinterpret_cast<const VectorRegister*>(&mask)[0]);
+	temp = _mm_xor_ps(temp, reinterpret_cast<const VectorRegister*>(&flipSign)[0]);
+	temp = _mm_cvtepi32_ps(reinterpret_cast<const VectorRegisterInt*>(&temp)[0]);
+	temp = _mm_add_ps(temp, MakeVectorRegister(0.0f, 0.0f, 32768.0f * 65536.0f, 32768.0f * 65536.0f));
+	temp = _mm_mul_ps(temp, MakeVectorRegister(1.0f / 65535.0f, 1.0f / 65535.0f, 1.0f / (65535.0f * 65535.0f), 1.0f / (65535.0f * 65535.0f)));
+	return _mm_shuffle_ps(temp, temp, _MM_SHUFFLE(3, 1, 2, 0));
+}
 
 FORCEINLINE VectorRegister vectorQuaternionMultiply2(const VectorRegister& quat1, const VectorRegister& quat2)
 {

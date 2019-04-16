@@ -6,7 +6,7 @@
 #include "Components.h"
 #include "Classes/Engine/EngineType.h"
 #include "StaticMeshResources.h"
-
+#include "Classes/Engine/MeshMerging.h"
 
 
 namespace Air
@@ -19,7 +19,9 @@ namespace Air
 		ENGINE_API StaticMeshSourceModel();
 		ENGINE_API ~StaticMeshSourceModel();
 
+		MeshReductionSettings mReductionSettings;
 
+		float mScreenSize;
 
 		MeshBuildSettings mBuildttings;
 	};
@@ -118,11 +120,15 @@ namespace Air
 
 		TArray<StaticMeshSourceModel> mSourceModels;
 
+		static const float mMinimumAutoLODPixelError;
+
 		class AssetImportData* mAssetImportData;
 
 #endif
 
 		uint32 bLODsShareStaticLighting : 1;
+
+		uint32 bAutoComputeLODScreenSize : 1;
 
 		Guid mLightingGuid;
 
@@ -130,5 +136,6 @@ namespace Air
 
 		MeshSectionInfoMap mSectionInfoMap;
 
+		bool bAllowCPUAccess;
 	};
 }

@@ -264,6 +264,8 @@ namespace Air
 
 	extern ENGINE_API void initializeSharedSamplerStates();
 
+	float ENGINE_API computeBoundsScreenSize(const float4& boundsOrigin, const float sphereRadius, const float4& viewOrigin, const Matrix&projMatrix);
+
 	class StaticPrimitiveDrawInterface
 	{
 	public:

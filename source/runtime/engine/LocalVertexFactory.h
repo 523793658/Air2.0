@@ -19,7 +19,7 @@ namespace Air
 
 			VertexStreamComponent mTangentBasisComponents[2];
 
-			TArray<VertexStreamComponent, TFixedAllocator<MAX_STATIC_TEXCOORDS / 2>> mTextureCoodinates;
+			TArray<VertexStreamComponent, TFixedAllocator<MAX_STATIC_TEXCOORDS / 2>> mTextureCoordinates;
 
 			VertexStreamComponent mLightMapCoordinateComponent;
 
@@ -45,7 +45,7 @@ namespace Air
 			RHICmdList.setStreamSource(mColorStreamIndex, colorVertexBuffer->mVertexBufferRHI, mData.mColorComponent.mStride, 0);
 		}
 
-		void SetData(const DataType& inData);
+		void setData(const DataType& inData);
 
 	protected:
 		DataType mData;
