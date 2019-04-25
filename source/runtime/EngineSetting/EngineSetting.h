@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 
-#ifdef ENGINESETTING_SOURCE
+#ifdef EngineSetting_EXPORTS
 #define ENGINE_SETTING_API	DLLEXPORT
 #else
 #define ENGINE_SETTING_API	DLLIMPORT

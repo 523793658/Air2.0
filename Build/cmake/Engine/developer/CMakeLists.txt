@@ -1,0 +1,5 @@
+ADD_SUBDIRECTORY("windows")
+ADD_SUBDIRECTORY("ShaderCompilerCommon")
+ADD_SUBDIRECTORY("ShaderPreprocessor")
+ADD_SUBDIRECTORY("TargetPlatform")
+ADD_SUBDIRECTORY("DerivedDataCache")

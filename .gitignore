@@ -3,3 +3,4 @@ test_build/
 bin/
 *.pyc
 source/external
+lib/

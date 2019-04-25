@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreType.h"
-#include "WindowsPlatformCompilerPreSetup.h"
+#include "WindowsPlatformCompilerSetup.h"
 #include "Windows/MinimalWindowsApi.h"
 
 #define SAFE_RELEASE(p) {if(p){(p)->Release(); p = NULL;}}

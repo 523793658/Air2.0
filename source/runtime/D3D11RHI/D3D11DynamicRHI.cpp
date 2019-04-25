@@ -57,6 +57,8 @@ namespace Air
 
 #if DO_CHECK
 #define VALIDATE_BOUND_SHADER(s) validateBoundShader(mStateCache, s)
+#else 
+#define VALIDATE_BOUND_SHADER(s)
 #endif
 
 	bool D3D11RHI_ShouldCreateWithD3DDebug()

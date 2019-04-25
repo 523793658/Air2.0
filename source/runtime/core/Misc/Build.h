@@ -8,6 +8,7 @@
 #define IS_MONOLITHIC	1
 #endif
 
+
 #ifndef WITH_EDITOR
 #define WITH_EDITOR	0
 #endif
@@ -37,4 +38,8 @@
 
 #if BUILD_DEBUG
 #define DO_CHECK				1
+#endif
+
+#ifndef HACK_HEADER_GENERATOR
+#define HACK_HEADER_GENERATOR 0
 #endif

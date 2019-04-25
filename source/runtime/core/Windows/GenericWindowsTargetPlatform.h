@@ -4,7 +4,7 @@
 #include "windows/WindowsPlatformProperties.h"
 namespace Air
 {
-#ifdef WINDOWS_TARGET_PLATFORM_RESOURCE
+#ifdef WindowsTargetPlatformModule_EXPORTS
 #define WINDOWS_TARGET_PLATFORM_API	DLLEXPORT
 #else
 #define WINDOWS_TARGET_PLATFORM_API	DLLIMPORT

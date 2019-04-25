@@ -3,13 +3,24 @@
 #include <tchar.h>
 #include <stdio.h>
 #include <stdarg.h>
+#if !USE_SECURE_CRT
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#pragma warning(disable : 4995)
+#endif
+
+
 namespace Air
 {
 	struct MicrosoftPlatformString : public GenericPlatformString
 	{
 		static FORCEINLINE int32 getVarArgs(WIDECHAR* dest, SIZE_T destSize, int32 count, const WIDECHAR*& fmt, va_list argPtr)
 		{
+#if USE_SECURE_CRT
+			int32 result = _vsntprintf_s(dest, destSize, count, fmt, argPtr);
+#else
 			int32 result = _vsntprintf(dest, count, fmt, argPtr);
+#endif
 			va_end(argPtr);
 			return result;
 		}

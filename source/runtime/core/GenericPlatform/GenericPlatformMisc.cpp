@@ -31,7 +31,7 @@ namespace Air
 		static wstring engineDirectory = L"";
 		if (engineDirectory.length() == 0)
 		{
-			wstring defaultEngineDir = TEXT("../../../");
+			wstring defaultEngineDir = TEXT("../../");
 #if PLATFORM_DESKTOP
 			PlatformProcess::setCurrentWorkingDirectoryToBaseDir();
 			if (Paths::directoryExists(defaultEngineDir + TEXT("bin")))

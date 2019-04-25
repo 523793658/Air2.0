@@ -3,7 +3,7 @@
 #include "ShaderCore.h"
 namespace Air
 {
-#ifdef _SHADER_PREPROCESSOR_
+#ifdef ShaderPreprocessor_EXPORTS
 #define SHADERPREPROCESSOR_API DLLEXPORT
 #else
 #define SHADERPREPROCESSOR_API DLLIMPORT

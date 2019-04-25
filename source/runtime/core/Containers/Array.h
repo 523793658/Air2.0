@@ -50,7 +50,7 @@ namespace Air
 		int32			initialNum;
 		FORCEINLINE friend bool operator != (const TCheckedPointerIterator & lhs, const TCheckedPointerIterator & rhs)
 		{
-			BOOST_ASSERT(lhs.currentNum == lhs.initialNum, TEXT("array has changed during ranged-for interation"));
+			BOOST_ASSERT(lhs.currentNum == lhs.initialNum);
 			return lhs.ptr != rhs.ptr;
 		}
 	};
@@ -865,7 +865,7 @@ namespace Air
 
 		FORCEINLINE void checkAddress(const ElementType* addr) const
 		{
-			BOOST_ASSERT(addr < getData() || addr >= (getData() + mArrayMax), "attempting to add a container element which already comes from the container");
+			BOOST_ASSERT(addr < getData() || addr >= (getData() + mArrayMax));
 		}
 
 		template<typename... ArgsType>
@@ -1011,7 +1011,7 @@ namespace Air
 			checkInvariants();
 			if (Allocator::RequireRangeCheck)
 			{
-				BOOST_ASSERT((index >= 0) & (index < mArrayNum), TEXT("Array index out of bounds"));
+				BOOST_ASSERT((index >= 0) & (index < mArrayNum));
 			}
 		}
 

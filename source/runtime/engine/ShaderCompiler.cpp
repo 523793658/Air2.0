@@ -82,7 +82,7 @@ namespace Air
 		const ConstantBufferStruct* InstanceView = nullptr;
 		for (TLinkedList<ConstantBufferStruct*>::TIterator structIt(ConstantBufferStruct::getStructList()); structIt; structIt.next())
 		{
-			if (structIt->getShaderVariableName() == TEXT("InstancedView"))
+			if (CString::strcmp(structIt->getShaderVariableName(), TEXT("InstancedView")) == 0)
 			{
 				InstanceView = *structIt;
 				break;

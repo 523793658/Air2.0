@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 
-#ifdef RENDERER_SOURCE
+#ifdef Renderer_EXPORTS
 #define RENDERER_API	DLLEXPORT
 #else
 #define RENDERER_API	DLLIMPORT

@@ -464,9 +464,9 @@ namespace Air
 	const TCHAR* WindowsPlatformProcess::getBinariesSubDirectory()
 	{
 #if PLATFORM_64BITS
-		return TEXT("x64");
+		return TEXT("win_x64");
 #else
-		return TEXT("Win32");
+		return TEXT("win_x86");
 #endif
 
 	}

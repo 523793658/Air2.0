@@ -5,7 +5,7 @@
 #include "Features/IModularFeatures.h"
 namespace Air
 {
-#ifdef HEADMOUNTEDDISPLAY_SOURCE
+#ifdef HeadMountedDisplay_EXPORTS
 #define HEADMOUNTEDDISPLAY_API DLLEXPORT
 #else
 #define HEADMOUNTEDDISPLAY_API DLLIMPORT

@@ -2,7 +2,7 @@
 #include "DynamicRHI.h"
 #include "D3D11Typedefs.h"
 #include "D3D11Resource.h"
-#ifdef D3D11RHI_SOURCE
+#ifdef D3D11RHI_EXPORTS
 #define D3D11RHI_API	DLLEXPORT
 #else
 #define D3D11RHI_API	DLLIMPORT

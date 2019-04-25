@@ -1,0 +1,349 @@
+SET(LIB_NAME engine)
+
+SET(SOURCE_FILE
+    ${engine_SOURCE_DIR}/AirEngine.cpp
+    ${engine_SOURCE_DIR}/AirEngine.h
+    ${engine_SOURCE_DIR}/PixelFormat.h
+    ${engine_SOURCE_DIR}/HardwareInfo.h
+    ${engine_SOURCE_DIR}/HardwareInfo.cpp
+    ${engine_SOURCE_DIR}/EngineMininal.h
+    ${engine_SOURCE_DIR}/AirClient.h
+    ${engine_SOURCE_DIR}/AirClient.cpp
+    ${engine_SOURCE_DIR}/RenderTarget.h
+    ${engine_SOURCE_DIR}/RenderTarget.cpp
+    ${engine_SOURCE_DIR}/Viewport.h
+    ${engine_SOURCE_DIR}/Viewport.cpp
+    ${engine_SOURCE_DIR}/CanvasType.h
+    ${engine_SOURCE_DIR}/CanvasType.cpp
+    ${engine_SOURCE_DIR}/SceneView.h
+    ${engine_SOURCE_DIR}/SceneView.cpp
+    ${engine_SOURCE_DIR}/EngineModule.h
+    ${engine_SOURCE_DIR}/EngineGlobal.cpp
+    ${engine_SOURCE_DIR}/SceneInterface.h
+    ${engine_SOURCE_DIR}/ShowFlags.h
+    ${engine_SOURCE_DIR}/ShowFlags.cpp
+    ${engine_SOURCE_DIR}/ShowFlagsValues.inl
+    ${engine_SOURCE_DIR}/SceneViewExtension.h
+    ${engine_SOURCE_DIR}/SceneViewExtension.cpp
+    ${engine_SOURCE_DIR}/SceneManagement.h
+    ${engine_SOURCE_DIR}/SceneManagement.cpp
+    ${engine_SOURCE_DIR}/SceneTypes.h
+    ${engine_SOURCE_DIR}/SceneTypes.cpp
+    ${engine_SOURCE_DIR}/EngineDefines.h
+    ${engine_SOURCE_DIR}/ConvexVolume.h
+    ${engine_SOURCE_DIR}/ConvexVolume.cpp
+    ${engine_SOURCE_DIR}/URL.cpp
+    ${engine_SOURCE_DIR}/Model.h
+    ${engine_SOURCE_DIR}/Model.cpp
+    ${engine_SOURCE_DIR}/HitProxies.h
+    ${engine_SOURCE_DIR}/HitProxies.cpp
+    ${engine_SOURCE_DIR}/GlobalShader.h
+    ${engine_SOURCE_DIR}/GlobalShader.cpp
+    ${engine_SOURCE_DIR}/ShaderCompiler.h
+    ${engine_SOURCE_DIR}/ShaderCompiler.cpp
+    ${engine_SOURCE_DIR}/MeshBatch.h
+    ${engine_SOURCE_DIR}/MeshBatch.cpp
+    ${engine_SOURCE_DIR}/PrimitiveConstantShaderParameters.h
+    ${engine_SOURCE_DIR}/PrimitiveConstantShaderParameters.cpp
+    ${engine_SOURCE_DIR}/PrimitiveSceneProxy.h
+    ${engine_SOURCE_DIR}/PrimitiveSceneProxy.cpp
+    ${engine_SOURCE_DIR}/MaterialShared.h
+    ${engine_SOURCE_DIR}/MaterialShared.cpp
+    ${engine_SOURCE_DIR}/MaterialShaderType.h
+    ${engine_SOURCE_DIR}/MaterialShaderType.cpp
+    ${engine_SOURCE_DIR}/DebugViewModeHelpers.h
+    ${engine_SOURCE_DIR}/DebugViewModeHelpers.cpp
+    ${engine_SOURCE_DIR}/LightMap.h
+    ${engine_SOURCE_DIR}/LightMap.cpp
+    ${engine_SOURCE_DIR}/MeshMaterialShaderType.h
+    ${engine_SOURCE_DIR}/SceneUtils.h
+    ${engine_SOURCE_DIR}/SceneUtils.cpp
+    ${engine_SOURCE_DIR}/ParameterCollection.h
+    ${engine_SOURCE_DIR}/ParameterCollection.cpp
+    ${engine_SOURCE_DIR}/Texture.h
+    ${engine_SOURCE_DIR}/Texture.cpp
+    ${engine_SOURCE_DIR}/Texture2D.h
+    ${engine_SOURCE_DIR}/Texture2D.cpp
+    ${engine_SOURCE_DIR}/TextureCube.h
+    ${engine_SOURCE_DIR}/TextureCube.cpp
+    ${engine_SOURCE_DIR}/TextureInterface.inl
+    ${engine_SOURCE_DIR}/StaticParameterSet.h
+    ${engine_SOURCE_DIR}/StaticParameterSet.cpp
+    ${engine_SOURCE_DIR}/TextureResource.h
+    ${engine_SOURCE_DIR}/TextureResource.cpp
+    ${engine_SOURCE_DIR}/TickTaskManager.cpp
+    ${engine_SOURCE_DIR}/TickTaskManagerInterface.h
+    ${engine_SOURCE_DIR}/StaticMeshRenderData.h
+    ${engine_SOURCE_DIR}/StaticMeshRenderData.cpp
+    ${engine_SOURCE_DIR}/StaticMeshResources.h
+    ${engine_SOURCE_DIR}/StaticMeshResources.cpp
+    ${engine_SOURCE_DIR}/RawIndexBuffer.h
+    ${engine_SOURCE_DIR}/RawIndexBuffer.cpp
+    ${engine_SOURCE_DIR}/LocalVertexFactory.h
+    ${engine_SOURCE_DIR}/LocalVertexFactory.cpp
+    ${engine_SOURCE_DIR}/Components.h
+    ${engine_SOURCE_DIR}/Components.cpp
+    ${engine_SOURCE_DIR}/SimpleShapeActor.h
+    ${engine_SOURCE_DIR}/SimpleShapeActor.cpp
+    ${engine_SOURCE_DIR}/MaterialCompiler.h
+    ${engine_SOURCE_DIR}/ComponentRecreteRenderStateContext.h
+    ${engine_SOURCE_DIR}/DynamicMeshBuild.h
+    ${engine_SOURCE_DIR}/DynamicMeshBuild.cpp
+    ${engine_SOURCE_DIR}/PrimitiveViewRelevance.h
+    ${engine_SOURCE_DIR}/SceneViewBuffer.h
+    ${engine_SOURCE_DIR}/StaticBoundShaderState.h
+    ${engine_SOURCE_DIR}/StaticBoundShaderState.cpp
+    ${engine_SOURCE_DIR}/ScreenRendering.h
+    ${engine_SOURCE_DIR}/ScreenRendering.cpp
+    ${engine_SOURCE_DIR}/EngineUtils.h
+    ${engine_SOURCE_DIR}/EngineUtils.cpp
+    ${engine_SOURCE_DIR}/GenericOctree.h
+    ${engine_SOURCE_DIR}/GenericOctree.cpp
+    ${engine_SOURCE_DIR}/GenericOctree.inl
+    ${engine_SOURCE_DIR}/MaterialExpressionIO.h
+    ${engine_SOURCE_DIR}/MaterialExpressionIO.cpp
+    ${engine_SOURCE_DIR}/RawMesh.h
+    ${engine_SOURCE_DIR}/RawMesh.cpp
+    ${engine_SOURCE_DIR}/StaticMeshVertexData.h
+    ${engine_SOURCE_DIR}/StaticMeshVertexData.cpp
+    )
+SET(Materials_Source
+    ${engine_SOURCE_DIR}/Materials/MeshMaterialShader.h
+    ${engine_SOURCE_DIR}/Materials/MeshMaterialShader.cpp
+    ${engine_SOURCE_DIR}/Materials/MaterialShader.h
+    ${engine_SOURCE_DIR}/Materials/MaterialShader.cpp
+    ${engine_SOURCE_DIR}/Materials/MaterialInstanceSupport.h
+    ${engine_SOURCE_DIR}/Materials/MaterialInstanceSupport.cpp
+    ${engine_SOURCE_DIR}/Materials/MaterialConstantExpressions.h
+    ${engine_SOURCE_DIR}/Materials/MaterialConstantExpressions.cpp
+    )
+SOURCE_GROUP(Materials FILES ${Materials_Source})
+    
+SET(Rendering_Source
+    ${engine_SOURCE_DIR}/Rendering/ColorVertexBuffer.h
+    ${engine_SOURCE_DIR}/Rendering/ColorVertexBuffer.cpp
+    )
+SOURCE_GROUP(Rendering FILES ${Rendering_Source})
+
+SET(ResLoader_Source
+    ${engine_SOURCE_DIR}/ResLoader/ResLoader.h
+    ${engine_SOURCE_DIR}/ResLoader/ResLoader.cpp
+    )
+SOURCE_GROUP(ResLoader FILES ${ResLoader_Source})
+    
+SET(Slate_Source
+    ${engine_SOURCE_DIR}/Slate/SGameLayerManager.h
+    ${engine_SOURCE_DIR}/Slate/SGameLayerManager.cpp
+    ${engine_SOURCE_DIR}/Slate/SceneViewport.h
+    ${engine_SOURCE_DIR}/Slate/SceneViewport.cpp
+    ${engine_SOURCE_DIR}/Slate/SlateRenderTargetRHI.h
+    ${engine_SOURCE_DIR}/Slate/SlateRenderTargetRHI.cpp
+    )
+SOURCE_GROUP(Slate FILES ${Slate_Source})
+
+SET(UserInterface_Source
+    ${engine_SOURCE_DIR}/UserInterface/PlayerInput.h
+    ${engine_SOURCE_DIR}/UserInterface/PlayerInput.cpp
+)
+SOURCE_GROUP(UserInterface FILES ${UserInterface_Source})
+    
+SET(Classes_Engine_Source
+    ${engine_SOURCE_DIR}/Classes/Engine/ScriptViewportClient.h
+    ${engine_SOURCE_DIR}/Classes/Engine/GameViewportClient.h
+    ${engine_SOURCE_DIR}/Classes/Engine/GameViewportClient.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/Engine.h
+    ${engine_SOURCE_DIR}/Classes/Engine/Engine.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/GameEngine.h
+    ${engine_SOURCE_DIR}/Classes/Engine/GameEngine.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/GameInstance.h
+    ${engine_SOURCE_DIR}/Classes/Engine/GameInstance.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/WorldContext.h
+    ${engine_SOURCE_DIR}/Classes/Engine/WorldContext.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/World.h
+    ${engine_SOURCE_DIR}/Classes/Engine/World.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/LevelTick.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/LocalPlayer.h
+    ${engine_SOURCE_DIR}/Classes/Engine/LocalPlayer.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/Player.h
+    ${engine_SOURCE_DIR}/Classes/Engine/Player.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/EngineType.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/EngineType.h
+    ${engine_SOURCE_DIR}/Classes/Engine/EngineBaseTypes.h
+    ${engine_SOURCE_DIR}/Classes/Engine/Level.h
+    ${engine_SOURCE_DIR}/Classes/Engine/Level.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/StaticMeshActor.h
+    ${engine_SOURCE_DIR}/Classes/Engine/StaticMeshActor.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/StaticMesh.h
+    ${engine_SOURCE_DIR}/Classes/Engine/StaticMesh.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/Light.h
+    ${engine_SOURCE_DIR}/Classes/Engine/Light.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/DirectionalLight.h
+    ${engine_SOURCE_DIR}/Classes/Engine/DirectionalLight.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/TextureStreamingTypes.h
+    ${engine_SOURCE_DIR}/Classes/Engine/TextureStreamingTypes.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/MeshMerging.h
+    ${engine_SOURCE_DIR}/Classes/Engine/MeshMerging.cpp
+    )
+SOURCE_GROUP(Classes\\Engine FILES ${Classes_Engine_Source})
+    
+
+    
+SET(Classes_Components_Source
+    ${engine_SOURCE_DIR}/Classes/Components/ActorComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/ActorComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/SceneComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/SceneComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/PrimitiveComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/PrimitiveComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/MeshComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/MeshComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/StaticMeshComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/StaticMeshComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/ChildActorComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/ChildActorComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/SphereComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/SphereComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/CubeComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/CubeComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/ShapeComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/ShapeComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/InputComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/InputComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/MovementComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/MovementComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/NavMovementComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/NavMovementComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/PawnMovementComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/PawnMovementComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/FloatingPawnMovement.h
+    ${engine_SOURCE_DIR}/Classes/Components/FloatingPawnMovement.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/LightComponentBase.h
+    ${engine_SOURCE_DIR}/Classes/Components/LightComponentBase.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/DirectionalLightComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/DirectionalLightComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/LightComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/LightComponent.cpp
+    )
+SOURCE_GROUP(Classes\\Components FILES ${Classes_Components_Source})
+    
+SET(Classes_GameFrameWork_Source
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Actor.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Actor.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/PlayerController.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/PlayerController.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Controller.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Controller.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/WorldSettings.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/WorldSettings.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/GameModeBase.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/GameModeBase.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Info.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Info.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/InputSettings.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/InputSettings.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Pawn.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/Pawn.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/SpectatorPawn.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/SpectatorPawn.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/DefaultPawn.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/DefaultPawn.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/GameStateBase.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/GameStateBase.cpp
+    ${engine_SOURCE_DIR}/Classes/GameFramework/PlayerState.h
+    ${engine_SOURCE_DIR}/Classes/GameFramework/PlayerState.cpp
+    )
+SOURCE_GROUP(Classes\\GameFramework FILES ${Classes_GameFrameWork_Source})
+
+SET(Classes_Kismet_Source
+    ${engine_SOURCE_DIR}/Classes/Kismet/GameplayStatics.h
+    ${engine_SOURCE_DIR}/Classes/Kismet/GameplayStatics.cpp
+    )
+SOURCE_GROUP(Classes\\Kismet FILES ${Classes_Kismet_Source})
+    
+SET(Classes_Camera_Source
+    ${engine_SOURCE_DIR}/Classes/Camera/CameraTypes.h
+    ${engine_SOURCE_DIR}/Classes/Camera/CameraTypes.cpp
+    ${engine_SOURCE_DIR}/Classes/Camera/PlayerCameraManager.h
+    ${engine_SOURCE_DIR}/Classes/Camera/PlayerCameraManager.cpp
+    ${engine_SOURCE_DIR}/Classes/Camera/flyCameraController.h
+    ${engine_SOURCE_DIR}/Classes/Camera/flyCameraController.cpp
+    ${engine_SOURCE_DIR}/Classes/Camera/CameraActor.h
+    ${engine_SOURCE_DIR}/Classes/Camera/CameraActor.cpp
+    )
+SOURCE_GROUP(Classes\\Camera FILES ${Classes_Camera_Source})
+    
+SET(Classes_Materials_Source
+    ${engine_SOURCE_DIR}/Classes/Materials/Material.h
+    ${engine_SOURCE_DIR}/Classes/Materials/Material.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInterface.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInterface.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstance.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstance.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/HLSLMaterialTranslator.h
+    ${engine_SOURCE_DIR}/Classes/Materials/HLSLMaterialTranslator.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/XMLMaterialTranslator.h
+    ${engine_SOURCE_DIR}/Classes/Materials/XMLMaterialTranslator.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollection.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstanceDynamic.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstanceDynamic.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstanceConstant.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstanceConstant.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstanceBasePropertyOverrides.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialInstanceBasePropertyOverrides.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionCustom.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionCustomOutput.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpression.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpression.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionMaterialFunctionCall.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialFunction.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialFunction.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionFunctionInput.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionFunctionOutput.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionScalarParameter.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionParameter.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollectionInstance.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollectionInstance.cpp
+    )
+SOURCE_GROUP(Classes\\Materials FILES ${Classes_Materials_Source})
+
+SET(ResImporter_Source
+    ${engine_SOURCE_DIR}/ResImporter/TextureImporter.h
+    ${engine_SOURCE_DIR}/ResImporter/TextureImporter.cpp
+    ${engine_SOURCE_DIR}/ResImporter/TextureImporterDDS.h
+    ${engine_SOURCE_DIR}/ResImporter/TextureImporterDDS.cpp
+    ${engine_SOURCE_DIR}/ResImporter/ImporterMamanger.h
+    ${engine_SOURCE_DIR}/ResImporter/ImporterMamanger.cpp
+)
+
+SOURCE_GROUP(ResImporter FILES ${ResImporter_Source})
+
+ADD_LIBRARY(${LIB_NAME} ${AIR_PREFERRED_LIB_TYPE} 
+    ${SOURCE_FILE}
+    ${Materials_Source}
+    ${Rendering_Source}
+    ${ResLoader_Source}
+    ${Slate_Source}
+    ${UserInterface_Source}
+    ${Classes_Engine_Source}
+    ${Classes_Components_Source}
+    ${Classes_GameFrameWork_Source}
+    ${Classes_Kismet_Source}
+    ${Classes_Camera_Source}
+    ${Classes_Materials_Source}
+    ${ResImporter_Source}
+)
+SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES FOLDER Engine/Runtime)
+target_link_libraries(${LIB_NAME} 
+    core
+    SlateCore
+    Slate
+    RHI
+    RenderCore
+    CoreObject
+    EngineSetting
+    ShaderCore
+    InputCore
+    MovieSceneCapture
+    )
+    
+INCLUDE(${AIR_CMAKE_MODULE_DIR}/TargetsCommonSetting.cmake)

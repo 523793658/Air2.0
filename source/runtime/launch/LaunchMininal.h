@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#ifdef LAUNCH_RESOURCE
+#ifdef launch_EXPORTS
 #define LAUNCH_API	DLLEXPORT
 #else
 #define LAUNCH_API	DLLIMPORT

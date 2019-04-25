@@ -16,7 +16,7 @@ namespace Air
 	bool Paths::directoryExists(const wstring& inPath)
 	{
 		filesystem::path new_path(inPath);
-		return !new_path.empty();
+		return filesystem::exists(new_path);
 	}
 
 	void Paths::normalizeDirectoryName(wstring& inPath)

@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 
-#ifdef SLATE_CORE_RESOURCE
+#ifdef SlateCore_EXPORTS
 #define SLATE_CORE_API DLLEXPORT
 #else
 #define SLATE_CORE_API DLLIMPORT

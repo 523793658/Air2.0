@@ -15,7 +15,7 @@ namespace Air
 }
 
 
-LAUNCH_API int guardedMainWrapper(const TCHAR* cmdline, HINSTANCE hINInstatance, HINSTANCE hPrevInstance, int nCmdShow)
+int guardedMainWrapper(const TCHAR* cmdline, HINSTANCE hINInstatance, HINSTANCE hPrevInstance, int nCmdShow)
 {
 	int ErrorLevel = 0;
 	if (GEnableInnerException)
@@ -44,7 +44,7 @@ void setupWindowsEnvironment(void)
 	_set_invalid_parameter_handler(invalidParameterHandler);
 }
 
-LAUNCH_API int LaunchMain(int argc, char* argv[])
+int LaunchMain(int argc, char* argv[])
 {
 	_CrtDumpMemoryLeaks();
 	setupWindowsEnvironment();

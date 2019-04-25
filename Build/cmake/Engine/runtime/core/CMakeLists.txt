@@ -1,0 +1,385 @@
+SET(LIB_NAME core)
+
+SET(CORE_FILE
+    ${CORE_SOURCE_DIR}/CoreMinimal.h 
+    ${CORE_SOURCE_DIR}/CoreType.h 
+    ${CORE_SOURCE_DIR}/CoreGlobals.h 
+    ${CORE_SOURCE_DIR}/CoreGlobals.cpp 
+    ${CORE_SOURCE_DIR}/CoreFwd.h)
+    
+    
+SET(CORE_HAL_FILE
+    ${CORE_SOURCE_DIR}/HAL/Platform.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformCrt.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformProcess.h 
+    ${CORE_SOURCE_DIR}/HAL/ThreadHeartBeat.h 
+    ${CORE_SOURCE_DIR}/HAL/ThreadHeartBeat.cpp 
+    ${CORE_SOURCE_DIR}/HAL/PlatformProperties.h 
+    ${CORE_SOURCE_DIR}/HAL/Runnable.h 
+    ${CORE_SOURCE_DIR}/HAL/Runnable.cpp 
+    ${CORE_SOURCE_DIR}/HAL/PlatformTLS.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformIncludes.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformTime.h 
+    ${CORE_SOURCE_DIR}/HAL/ThreadSafeCounter.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformAtomics.h 
+    ${CORE_SOURCE_DIR}/HAL/MemoryBase.h 
+    ${CORE_SOURCE_DIR}/HAL/MemoryBase.cpp 
+    ${CORE_SOURCE_DIR}/HAL/MallocAnsi.h 
+    ${CORE_SOURCE_DIR}/HAL/MallocAnsi.cpp 
+    ${CORE_SOURCE_DIR}/HAL/PlatformMemory.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformMisc.h 
+    ${CORE_SOURCE_DIR}/HAL/AirMemory.h 
+    ${CORE_SOURCE_DIR}/HAL/AirMemory.cpp 
+    ${CORE_SOURCE_DIR}/HAL/RunnableThread.h 
+    ${CORE_SOURCE_DIR}/HAL/RunnableThread.cpp 
+    ${CORE_SOURCE_DIR}/HAL/RunnableThreadCPP11.h 
+    ${CORE_SOURCE_DIR}/HAL/RunnableThreadCPP11.cpp 
+    ${CORE_SOURCE_DIR}/HAL/PlatformAffinity.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformAffinity.cpp 
+    ${CORE_SOURCE_DIR}/HAL/ThreadingBase.cpp 
+    ${CORE_SOURCE_DIR}/HAL/Event.h 
+    ${CORE_SOURCE_DIR}/HAL/Event.cpp 
+    ${CORE_SOURCE_DIR}/HAL/EventCPP11.h 
+    ${CORE_SOURCE_DIR}/HAL/EventCPP11.cpp 
+    ${CORE_SOURCE_DIR}/HAL/ThreadManager.h 
+    ${CORE_SOURCE_DIR}/HAL/ThreadManager.cpp 
+    ${CORE_SOURCE_DIR}/HAL/IConsoleManager.h 
+    ${CORE_SOURCE_DIR}/HAL/StringView.h 
+    ${CORE_SOURCE_DIR}/HAL/Memory.inl 
+    ${CORE_SOURCE_DIR}/HAL/FileManager.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformMath.h 
+    ${CORE_SOURCE_DIR}/HAL/FileManagerGeneric.h 
+    ${CORE_SOURCE_DIR}/HAL/FileManagerGeneric.cpp 
+    ${CORE_SOURCE_DIR}/HAL/PlatformString.h 
+    ${CORE_SOURCE_DIR}/HAL/CriticalSection.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformFileManager.h 
+    ${CORE_SOURCE_DIR}/HAL/PlatformFileManager.cpp 
+    ${CORE_SOURCE_DIR}/HAL/ThreadSingleton.h 
+    ${CORE_SOURCE_DIR}/HAL/TIsAutoCleanup.h)
+SOURCE_GROUP("HAL" FILES ${CORE_HAL_FILE})
+
+SET(CORE_MISC_FILE
+    ${CORE_SOURCE_DIR}/Misc/Build.h 
+    ${CORE_SOURCE_DIR}/Misc/Exec.h 
+    ${CORE_SOURCE_DIR}/Misc/EventPool.h 
+    ${CORE_SOURCE_DIR}/Misc/EventPool.cpp 
+    ${CORE_SOURCE_DIR}/Misc/CoreMisc.h 
+    ${CORE_SOURCE_DIR}/Misc/CoreMisc.cpp 
+    ${CORE_SOURCE_DIR}/Misc/NoopCounter.h 
+    ${CORE_SOURCE_DIR}/Misc/Paths.h 
+    ${CORE_SOURCE_DIR}/Misc/Paths.cpp 
+    ${CORE_SOURCE_DIR}/Misc/App.h 
+    ${CORE_SOURCE_DIR}/Misc/App.cpp 
+    ${CORE_SOURCE_DIR}/Misc/CoreMiscDefines.h 
+    ${CORE_SOURCE_DIR}/Misc/ScopedEvent.h 
+    ${CORE_SOURCE_DIR}/Misc/ScopedEvent.cpp 
+    ${CORE_SOURCE_DIR}/Misc/MemStack.h 
+    ${CORE_SOURCE_DIR}/Misc/MemStack.cpp 
+    ${CORE_SOURCE_DIR}/Misc/VarArgs.h 
+    ${CORE_SOURCE_DIR}/Misc/VarArgs.cpp 
+    ${CORE_SOURCE_DIR}/Misc/CString.cpp 
+    ${CORE_SOURCE_DIR}/Misc/CString.h 
+    ${CORE_SOURCE_DIR}/Misc/Crc.h 
+    ${CORE_SOURCE_DIR}/Misc/Crc.cpp 
+    ${CORE_SOURCE_DIR}/Misc/SecureHash.h 
+    ${CORE_SOURCE_DIR}/Misc/SecureHash.cpp 
+    ${CORE_SOURCE_DIR}/Misc/ByteSwap.h 
+    ${CORE_SOURCE_DIR}/Misc/ByteSwap.cpp 
+    ${CORE_SOURCE_DIR}/Misc/ScopedSlowTask.h 
+    ${CORE_SOURCE_DIR}/Misc/ScopedSlowTask.cpp 
+    ${CORE_SOURCE_DIR}/Misc/SlowTask.h 
+    ${CORE_SOURCE_DIR}/Misc/SlowTask.cpp 
+    ${CORE_SOURCE_DIR}/Misc/Char.h 
+    ${CORE_SOURCE_DIR}/Misc/Char.cpp 
+    ${CORE_SOURCE_DIR}/Misc/FileHelper.h 
+    ${CORE_SOURCE_DIR}/Misc/FileHelper.cpp 
+    ${CORE_SOURCE_DIR}/Misc/ScopeLock.h 
+    ${CORE_SOURCE_DIR}/Misc/ScopeLock.cpp 
+    ${CORE_SOURCE_DIR}/Misc/IQueuedWork.h 
+    ${CORE_SOURCE_DIR}/Misc/QueuedThreadPool.h 
+    ${CORE_SOURCE_DIR}/Misc/QueuedThreadPool.cpp 
+    ${CORE_SOURCE_DIR}/Misc/Compression.h 
+    ${CORE_SOURCE_DIR}/Misc/Compression.cpp 
+    ${CORE_SOURCE_DIR}/Misc/EnumClassFlags.h 
+    ${CORE_SOURCE_DIR}/Misc/Guid.h 
+    ${CORE_SOURCE_DIR}/Misc/Guid.cpp 
+    ${CORE_SOURCE_DIR}/Misc/Optional.h 
+    ${CORE_SOURCE_DIR}/Misc/Optional.cpp 
+    ${CORE_SOURCE_DIR}/Misc/AssertionMacros.h 
+    ${CORE_SOURCE_DIR}/Misc/ConfigCacheIni.h 
+    ${CORE_SOURCE_DIR}/Misc/ConfigCacheIni.cpp 
+    ${CORE_SOURCE_DIR}/Misc/Parse.h 
+    ${CORE_SOURCE_DIR}/Misc/Parse.cpp 
+    ${CORE_SOURCE_DIR}/Misc/Util.h 
+    ${CORE_SOURCE_DIR}/Misc/Util.cpp 
+    ${CORE_SOURCE_DIR}/Misc/DateTime.h 
+    ${CORE_SOURCE_DIR}/Misc/DateTime.cpp)
+SOURCE_GROUP("Misc" FILES ${CORE_MISC_FILE})
+    
+SET(WINDOWS_FILE
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformCompilerPreSetup.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformCompilerSetup.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatform.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsHWrapper.h 
+    ${CORE_SOURCE_DIR}/Windows/MinWindows.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsSystemIncludes.h 
+    ${CORE_SOURCE_DIR}/Windows/MinimalWindowsApi.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformMisc.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformMisc.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformTime.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformTime.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformProcess.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformProcess.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformTLS.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformTLS.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformAtomics.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformAtomics.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformMemory.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformMemory.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformProperties.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformProperties.cpp 
+    ${CORE_SOURCE_DIR}/Windows/GenericWindowsTargetPlatform.h 
+    ${CORE_SOURCE_DIR}/Windows/AllowWindowsPlatformTypes.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformAffinity.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformAffinity.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsRunnableThread.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsRunnableThread.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsEvent.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsEvent.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsApplication.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsApplication.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsWindow.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsWindow.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformMath.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformString.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformString.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsCriticalSection.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsCriticalSection.cpp 
+    ${CORE_SOURCE_DIR}/Windows/PreWindowsApi.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformFile.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsPlatformFile.cpp 
+    ${CORE_SOURCE_DIR}/Windows/WindowsCursor.h 
+    ${CORE_SOURCE_DIR}/Windows/WindowsCursor.cpp)
+SOURCE_GROUP("Windows" FILES ${WINDOWS_FILE})
+    
+SET(LOGGIN_FILE 
+    ${CORE_SOURCE_DIR}/Logging/LogMacros.h)
+SOURCE_GROUP("Logging" FILES ${LOCATION})    
+    
+SET(CONTAINERS_FILE 
+    ${CORE_SOURCE_DIR}/Containers/Ticker.h 
+    ${CORE_SOURCE_DIR}/Containers/Ticker.cpp 
+    ${CORE_SOURCE_DIR}/Containers/Array.h 
+    ${CORE_SOURCE_DIR}/Containers/LockFreeVoidPointerListBase.h 
+    ${CORE_SOURCE_DIR}/Containers/LockFreeListImpl.h 
+    ${CORE_SOURCE_DIR}/Containers/LockFreeFixedSizeAllocator.h 
+    ${CORE_SOURCE_DIR}/Containers/String.h 
+    ${CORE_SOURCE_DIR}/Containers/String.cpp 
+    ${CORE_SOURCE_DIR}/Containers/StringUtil.h 
+    ${CORE_SOURCE_DIR}/Containers/StringUtil.cpp 
+    ${CORE_SOURCE_DIR}/Containers/LinkList.h 
+    ${CORE_SOURCE_DIR}/Containers/LinkList.cpp 
+    ${CORE_SOURCE_DIR}/Containers/BitArray.h 
+    ${CORE_SOURCE_DIR}/Containers/EnumAsByte.h 
+    ${CORE_SOURCE_DIR}/Containers/ResourceArray.h 
+    ${CORE_SOURCE_DIR}/Containers/ResourceArray.cpp 
+    ${CORE_SOURCE_DIR}/Containers/StaticArray.h 
+    ${CORE_SOURCE_DIR}/Containers/StaticArray.cpp 
+    ${CORE_SOURCE_DIR}/Containers/ContainerAllocationPolicies.h 
+    ${CORE_SOURCE_DIR}/Containers/ContainerAllocationPolicies.cpp 
+    ${CORE_SOURCE_DIR}/Containers/Map.h 
+    ${CORE_SOURCE_DIR}/Containers/StringConv.h 
+    ${CORE_SOURCE_DIR}/Containers/Set.h 
+    ${CORE_SOURCE_DIR}/Containers/Set.cpp 
+    ${CORE_SOURCE_DIR}/Containers/SparseArray.h 
+    ${CORE_SOURCE_DIR}/Containers/SparseArray.cpp 
+    ${CORE_SOURCE_DIR}/Containers/OrderedUniqueContainer.h 
+    ${CORE_SOURCE_DIR}/Containers/OrderedUniqueContainer.cpp 
+    ${CORE_SOURCE_DIR}/Containers/IndirectArray.h 
+    ${CORE_SOURCE_DIR}/Containers/LockFreeList.cpp 
+    ${CORE_SOURCE_DIR}/Containers/DynamicRHIResourceArray.h 
+    ${CORE_SOURCE_DIR}/Containers/DynamicRHIResourceArray.cpp)
+SOURCE_GROUP("Containers" FILES ${CONTAINERS_FILE})
+    
+SET(GenericPlatform_File 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatform.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatform.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformTime.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformTime.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformProcess.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformProcess.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformTLS.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformTLS.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformAtomics.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformAtomics.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformMemory.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformMemory.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformMisc.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformMisc.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformAffinity.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformAffinity.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformProperties.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformProperties.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericWindows.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericWindows.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericWindowDefinition.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericApplication.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericApplication.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/genericPlatformDriver.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformMath.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/MicrosoftPlatformString.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/MicrosoftPlatformString.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformString.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformString.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformFile.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericPlatformFile.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericApplicationMessageHandler.h 
+    ${CORE_SOURCE_DIR}/GenericPlatform/GenericApplicationMessageHandler.cpp 
+    ${CORE_SOURCE_DIR}/GenericPlatform/ICursor.h)
+SOURCE_GROUP("GenericPlatform" FILES ${GenericPlatform_File})
+    
+SET(Delegates_File 
+    ${CORE_SOURCE_DIR}/Delegates/IDelegateInstance.h 
+    ${CORE_SOURCE_DIR}/Delegates/IDelegateInstance.cpp 
+    ${CORE_SOURCE_DIR}/Delegates/DelegateCombinations.h 
+    ${CORE_SOURCE_DIR}/Delegates/DelegateCombinations.cpp 
+    ${CORE_SOURCE_DIR}/Delegates/Delegate.h 
+    ${CORE_SOURCE_DIR}/Delegates/Delegate.cpp 
+    ${CORE_SOURCE_DIR}/Delegates/DelegateSignatureImpl.inl 
+    ${CORE_SOURCE_DIR}/Delegates/DelegateBase.h 
+    ${CORE_SOURCE_DIR}/Delegates/DelegateBase.cpp)
+SOURCE_GROUP("Delegates" FILES ${Delegates_File})
+    
+SET(Async_File 
+    ${CORE_SOURCE_DIR}/Async/TaskGraphInterfaces.h 
+    ${CORE_SOURCE_DIR}/Async/TaskGraphInterfaces.cpp 
+    ${CORE_SOURCE_DIR}/Async/TaskGraph.h 
+    ${CORE_SOURCE_DIR}/Async/TaskGraph.cpp 
+    ${CORE_SOURCE_DIR}/Async/ParallelFor.h 
+    ${CORE_SOURCE_DIR}/Async/AsyncWork.h 
+    ${CORE_SOURCE_DIR}/Async/AsyncWork.cpp)
+SOURCE_GROUP("Async" FILES ${Async_File})
+    
+SET(Modules_File 
+    ${CORE_SOURCE_DIR}/Modules/ModuleInterface.h 
+    ${CORE_SOURCE_DIR}/Modules/ModuleManager.h 
+    ${CORE_SOURCE_DIR}/Modules/ModuleManager.cpp)
+SOURCE_GROUP("Modules" FILES ${Modules_File})
+    
+    
+SET(Template_File 
+    ${CORE_SOURCE_DIR}/Template/AirTemplate.h 
+    ${CORE_SOURCE_DIR}/Template/TypeCompatibleBytes.h 
+    ${CORE_SOURCE_DIR}/Template/AlignOf.h 
+    ${CORE_SOURCE_DIR}/Template/IsClass.h 
+    ${CORE_SOURCE_DIR}/Template/ChooseClass.h 
+    ${CORE_SOURCE_DIR}/Template/RefCounting.h 
+    ${CORE_SOURCE_DIR}/Template/IntegralConstant.h 
+    ${CORE_SOURCE_DIR}/Template/MemoryOps.h 
+    ${CORE_SOURCE_DIR}/Template/AlignmentTemplates.h 
+    ${CORE_SOURCE_DIR}/Template/AirTypeTraits.h 
+    ${CORE_SOURCE_DIR}/Template/SharePointer.h 
+    ${CORE_SOURCE_DIR}/Template/TypeHash.h 
+    ${CORE_SOURCE_DIR}/Template/Sorting.h 
+    ${CORE_SOURCE_DIR}/Template/Less.h 
+    ${CORE_SOURCE_DIR}/Template/PointerIsConvertibleFromTo.h)
+SOURCE_GROUP("Template" FILES ${Template_File})
+    
+SET(Math_File 
+    ${CORE_SOURCE_DIR}/Math/Vector.h 
+    ${CORE_SOURCE_DIR}/Math/Vector.cpp 
+    ${CORE_SOURCE_DIR}/Math/Math.h 
+    ${CORE_SOURCE_DIR}/Math/Math.cpp 
+    ${CORE_SOURCE_DIR}/Math/Matrix.hpp 
+    ${CORE_SOURCE_DIR}/Math/Matrix.cpp 
+    ${CORE_SOURCE_DIR}/Math/Matrix.inl 
+    ${CORE_SOURCE_DIR}/Math/Color.h 
+    ${CORE_SOURCE_DIR}/Math/Color.cpp 
+    ${CORE_SOURCE_DIR}/Math/Plane.h 
+    ${CORE_SOURCE_DIR}/Math/Plane.cpp 
+    ${CORE_SOURCE_DIR}/Math/ScaleMatrix.h 
+    ${CORE_SOURCE_DIR}/Math/ScaleMatrix.cpp 
+    ${CORE_SOURCE_DIR}/Math/PlatformMathSSE.h 
+    ${CORE_SOURCE_DIR}/Math/MathSSE.h 
+    ${CORE_SOURCE_DIR}/Math/MathVectorConstants.h 
+    ${CORE_SOURCE_DIR}/Math/MathUtility.h 
+    ${CORE_SOURCE_DIR}/Math/IntRect.h 
+    ${CORE_SOURCE_DIR}/Math/VectorRegister.h 
+    ${CORE_SOURCE_DIR}/Math/MathVectorCommon.h 
+    ${CORE_SOURCE_DIR}/Math/Rotator.h 
+    ${CORE_SOURCE_DIR}/Math/Rotator.cpp 
+    ${CORE_SOURCE_DIR}/Math/Quaternion.h 
+    ${CORE_SOURCE_DIR}/Math/Quaternion.cpp 
+    ${CORE_SOURCE_DIR}/Math/Axis.h 
+    ${CORE_SOURCE_DIR}/Math/Axis.cpp 
+    ${CORE_SOURCE_DIR}/Math/TransformVectorized.h 
+    ${CORE_SOURCE_DIR}/Math/TransformVectorized.cpp 
+    ${CORE_SOURCE_DIR}/Math/BoxSphereBounds.h 
+    ${CORE_SOURCE_DIR}/Math/BoxSphereBounds.cpp 
+    ${CORE_SOURCE_DIR}/Math/Box.h 
+    ${CORE_SOURCE_DIR}/Math/Box.cpp 
+    ${CORE_SOURCE_DIR}/Math/ScalarRegister.h 
+    ${CORE_SOURCE_DIR}/Math/TransformCalculus.h 
+    ${CORE_SOURCE_DIR}/Math/TransformCalculus2D.h 
+    ${CORE_SOURCE_DIR}/Math/Sphere.h 
+    ${CORE_SOURCE_DIR}/Math/Sphere.cpp 
+    ${CORE_SOURCE_DIR}/Math/Float16.h 
+    ${CORE_SOURCE_DIR}/Math/Float32.h)
+SOURCE_GROUP("Math" FILES ${Math_File})
+    
+SET(FeaTures_File 
+    ${CORE_SOURCE_DIR}/Features/IModularFeature.h 
+    ${CORE_SOURCE_DIR}/Features/IModularFeatures.h 
+    ${CORE_SOURCE_DIR}/Features/ModularFeatures.h 
+    ${CORE_SOURCE_DIR}/Features/ModularFeatures.cpp)
+SOURCE_GROUP("Features" FILES ${FeaTures_File})
+    
+SET(Internaltionalization_File 
+    ${CORE_SOURCE_DIR}/Internaltionalization/Text.h 
+    ${CORE_SOURCE_DIR}/Internaltionalization/Text.cpp 
+    ${CORE_SOURCE_DIR}/Internaltionalization/ITextData.h 
+    ${CORE_SOURCE_DIR}/Internaltionalization/ITextData.cpp 
+    ${CORE_SOURCE_DIR}/Internaltionalization/TextData.h 
+    ${CORE_SOURCE_DIR}/Internaltionalization/TextData.cpp 
+    ${CORE_SOURCE_DIR}/Internaltionalization/TextLocalizationManager.h 
+    ${CORE_SOURCE_DIR}/Internaltionalization/TextLocalizationManager.cpp 
+    ${CORE_SOURCE_DIR}/Internaltionalization/TextHistory.h 
+    ${CORE_SOURCE_DIR}/Internaltionalization/TextHistory.cpp)
+SOURCE_GROUP("Internaltionalization" FILES ${Internaltionalization_File})
+    
+SET(Serialization_File 
+    ${CORE_SOURCE_DIR}/Serialization/MemoryReader.h 
+    ${CORE_SOURCE_DIR}/Serialization/MemoryReader.cpp 
+    ${CORE_SOURCE_DIR}/Serialization/Archive.h 
+    ${CORE_SOURCE_DIR}/Serialization/Archive.cpp 
+    ${CORE_SOURCE_DIR}/Serialization/MemoryArchive.h 
+    ${CORE_SOURCE_DIR}/Serialization/MemoryArchive.cpp 
+    ${CORE_SOURCE_DIR}/Serialization/CustomVersion.h 
+    ${CORE_SOURCE_DIR}/Serialization/CustomVersion.cpp 
+    ${CORE_SOURCE_DIR}/Serialization/BufferReader.h 
+    ${CORE_SOURCE_DIR}/Serialization/BufferReader.cpp 
+    ${CORE_SOURCE_DIR}/Serialization/MemoryWriter.h 
+    ${CORE_SOURCE_DIR}/Serialization/MemoryWriter.cpp 
+    ${CORE_SOURCE_DIR}/Serialization/ArchiveProxy.h 
+    ${CORE_SOURCE_DIR}/Serialization/ArchiveProxy.cpp)
+SOURCE_GROUP("Serialization" FILES ${Serialization_File})
+
+ADD_LIBRARY(${LIB_NAME} ${AIR_PREFERRED_LIB_TYPE} ${CORE_FILE}
+    ${Serialization_File}
+    ${Internaltionalization_File}
+    ${Math_File}
+    ${FeaTures_File}
+    ${Template_File}
+    ${Modules_File}
+    ${Async_File}
+    ${Delegates_File}
+    ${GenericPlatform_File}
+    ${CONTAINERS_FILE}
+    ${LOCATION}
+    ${WINDOWS_FILE}
+    ${CORE_MISC_FILE}
+    ${CORE_HAL_FILE}
+)
+SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES FOLDER "Engine/Runtime")
+INCLUDE(${AIR_CMAKE_MODULE_DIR}/TargetsCommonSetting.cmake)
+

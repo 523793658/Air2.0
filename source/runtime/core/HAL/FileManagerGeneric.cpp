@@ -110,7 +110,7 @@ namespace Air
 		TCHAR finalPath[512];
 		if (!Paths::isAbsolute(filename) && !Paths::fileExists(filename))
 		{
-			String::printf_b(finalPath, TEXT("%s/../../../%s"), PlatformProcess::baseDir(), filename);
+			String::printf_b(finalPath, TEXT("%s/../../%s"), PlatformProcess::baseDir(), filename);
 			if (!Paths::fileExists(finalPath))
 			{
 				return nullptr;

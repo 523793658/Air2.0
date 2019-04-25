@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#ifdef _DEMO_
+#ifdef Demo_EXPORTS
 #define DEMO_API	DLLEXPORT
 #else
 #define DEMO_API	DLLIMPORT

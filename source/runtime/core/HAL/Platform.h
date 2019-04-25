@@ -156,3 +156,8 @@ namespace Air
 #else
 #error "UnKnown CPU endian."
 #endif
+
+
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsPlatformCompilerSetup.h"
+#endif
