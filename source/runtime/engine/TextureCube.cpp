@@ -41,7 +41,10 @@ namespace Air
 				}
 			}
 
-			SamplerStateInitializerRHI samplerStateInitializer;
+			SamplerStateInitializerRHI samplerStateInitializer(SF_Bilinear,
+				AM_Clamp,
+				AM_Clamp,
+				AM_Clamp);
 			mSamplerStateRHI = RHICreateSamplerState(samplerStateInitializer);
 			EPixelFormat pixelFormat = mOwner->getPixelFormat();
 			bGreyScaleFormat = (pixelFormat == PF_G8) || (pixelFormat == PF_BC4);

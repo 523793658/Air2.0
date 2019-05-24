@@ -48,6 +48,11 @@ namespace Air
 
 		ENGINE_API void verifyUsedMaterial(const class MaterialRenderProxy* materialRenderProxy) const;
 
+		inline const TConstantBuffer<PrimitiveConstantShaderParameters>& getConstantBuffer() const
+		{
+			return mConstantBuffer;
+		}
+
 		virtual void getDynamicMeshElements(const TArray<const SceneView*>& views, const SceneViewFamily& viewFamily, uint32 VisibilityMap, class MeshElementCollector& collector) const {}
 
 		virtual void drawStaticElements(StaticPrimitiveDrawInterface* PDI) {}
@@ -56,7 +61,18 @@ namespace Air
 			return bStaticElementsAlwaysUseProxyPrimitiveConstantBuffer;
 		}
 
+		inline bool isLocalToWorldDeterminantNegative() const { return bIsLocalToWorldDeterminatantNegative; }
+
+		inline bool isMovable() const
+		{
+			return mMobility == EComponentMobility::Movable || mMobility == EComponentMobility::Stationary;
+		}
+
 		ENGINE_API virtual PrimitiveViewRelevance getViewRelevance(const SceneView* view) const;
+
+		ENGINE_API bool isShown(const SceneView* view) const;
+
+		inline bool isStaticPathAvailable() const { return !bDisableStaticPath; }
 	private:
 		friend class Scene;
 		Matrix mLocalToWorld;
@@ -66,7 +82,7 @@ namespace Air
 		TArray<const AActor*> mOwners;
 		SceneInterface* mScene;
 		
-
+		EComponentMobility::Type mMobility;
 		PrimitiveComponentId mPrimitiveComponentId;
 		PrimitiveSceneInfo* mPrimitiveSceneInfo;
 		
@@ -77,8 +93,10 @@ namespace Air
 		float mMaxDrawDistance;
 		int32 mVisibilityId;
 		uint32 bRenderInMainPass : 1;
-
+		uint32 bIsLocalToWorldDeterminatantNegative : 1;
+		uint32 bDrawInGame : 1;
 		uint32 bStaticElementsAlwaysUseProxyPrimitiveConstantBuffer : 1;
+		uint32 bDisableStaticPath : 1;
 	};
 
 	class SimpleLightEntry

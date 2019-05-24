@@ -14,6 +14,13 @@ namespace Air
 		SCS_BaseColor
 	};
 
+	enum ESceneDepthPriorityGroup
+	{
+		SDPG_World,
+		SDPG_Foreground,
+		SDPG_MAX,
+	};
+
 	enum ESceneCaptureCompositeMode
 	{
 		SCCM_Overrite,
@@ -528,22 +535,22 @@ namespace Air
 
 	struct MeshBuildSettings
 	{
-		bool bUseMikkTSpace;
+		bool bUseMikkTSpace{ false };
 
-		bool bRecomputeNormals;
+		bool bRecomputeNormals{ true };
 
-		bool bRecomputeTangents;
+		bool bRecomputeTangents{ true };
 
-		bool bRemoveDegenerates;
+		bool bRemoveDegenerates{ true };
 
-		bool bBuildAdjacencyBuffer;
+		bool bBuildAdjacencyBuffer{ true };
 
-		bool bBuildReversedIndexBuffer;
+		bool bBuildReversedIndexBuffer{ true };
 
-		bool bUseHighPrecisionTangentBasis;
+		bool bUseHighPrecisionTangentBasis{ false };
 
-		bool bUseFullPrecisionUVs;
+		bool bUseFullPrecisionUVs{ false };
 
-		float3 mBuildScale3D;
+		float3 mBuildScale3D{ float3::One };
 	};
 }

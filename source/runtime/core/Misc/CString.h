@@ -15,6 +15,8 @@ namespace Air
 		
 		static FORCEINLINE int32 strcmp(const CharType* string1, const CharType* string2);
 
+		static FORCEINLINE int32 stricmp(const CharType* string1, const CharType* string2);
+
 		static FORCEINLINE int32 strncmp(const CharType* string1, const CharType* string2, SIZE_T count);
 
 		static FORCEINLINE int32 strnicmp(const CharType* string1, const CharType* string2, SIZE_T count);
@@ -27,6 +29,14 @@ namespace Air
 		static FORCEINLINE CharType* strcpy(CharType(&dest)[destCount], const CharType* src)
 		{
 			return strcpy(dest, destCount, src);
+		}
+
+		static FORCEINLINE CharType* strcat(CharType* dest, SIZE_T destCount, const CharType* src);
+
+		template<SIZE_T DestCount>
+		static FORCEINLINE CharType* strcat(CharType(&dest)[DestCount], const CharType* src)
+		{
+			return strcat(dest, DestCount, src);
 		}
 
 		static FORCEINLINE const CharType* strchr(const CharType* string, CharType c);
@@ -111,6 +121,12 @@ namespace Air
 		return PlatformString::strcpy(dest, destCount, src);
 	}
 
+	template<typename T> FORCEINLINE
+		typename TCString<T>::CharType* TCString<T>::strcat(CharType* dest, SIZE_T destCount, const CharType* src)
+	{
+		return PlatformString::strcat(dest, destCount, src);
+	}
+
 
 
 	template<> FORCEINLINE bool TCString<ANSICHAR>::isPureAnsi(const ANSICHAR* str)
@@ -171,6 +187,11 @@ namespace Air
 		return PlatformString::strcmp(string1, string2);
 	}
 
+	template<typename T> FORCEINLINE
+		int32 TCString<T>::stricmp(const CharType* string1, const CharType* string2)
+	{
+		return PlatformString::stricmp(string1, string2);
+	}
 
 	template<typename T> FORCEINLINE
 		const typename TCString<T>::CharType* TCString<T>::strchr(const CharType* string, CharType c)

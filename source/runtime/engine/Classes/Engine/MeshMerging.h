@@ -7,5 +7,6 @@ namespace Air
 		float mPercentTriangles{ 1.0f };
 		float mMaxDeviation{ 0.0f };
 		float mPixelError{ 8.0f };
+		int32 mBaseLODModel;
 	};
 }

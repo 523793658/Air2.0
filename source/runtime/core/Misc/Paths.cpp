@@ -5,9 +5,83 @@
 #include "Misc/CString.h"
 #include "Misc/App.h"
 #include "boost/algorithm/string.hpp"
-
+#include "Math/Math.h"
+#include "Containers/StringUtil.h"
 namespace Air
 {
+	namespace Paths_Private
+	{
+		wstring convertRelativePathToFullInternal(wstring&& basePath, wstring&& inPath)
+		{
+			wstring fullPathed;
+			if (Paths::isAbsolute(inPath.c_str()))
+			{
+				fullPathed = inPath;
+			}
+			else
+			{
+				fullPathed = basePath + inPath;
+			}
+
+			Paths::normalizeFilename(fullPathed);
+			Paths::collapseRelativeDirectories(fullPathed);
+			if (fullPathed.length() == 0)
+			{
+				fullPathed = TEXT("/");
+			}
+			return fullPathed;
+		}
+	}
+
+	bool Paths::collapseRelativeDirectories(wstring& inPath)
+	{
+		const TCHAR parentDir[] = TEXT("/..");
+		const int32 parentDirLength = ARRAY_COUNT(parentDir) - 1;
+
+		for (;;)
+		{
+			if (inPath.empty())
+			{
+				break;
+			}
+
+			if (boost::starts_with(inPath, TEXT("..")) || boost::starts_with(inPath, parentDir))
+			{
+				return false;
+			}
+
+			const int32 index = inPath.find(parentDir);
+			if (index == -1)
+			{
+				break;
+			}
+
+			int32 previousSeparatorIndex = index;
+			for (;;)
+			{
+				previousSeparatorIndex = Math::max<int32>(0, StringUtil::find(inPath, TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromEnd, previousSeparatorIndex - 1));
+				if (previousSeparatorIndex == 0)
+				{
+					break;
+				}
+				if ((index - previousSeparatorIndex) > 1 && (inPath[previousSeparatorIndex + 1] != TEXT('.') || inPath[previousSeparatorIndex + 2] != TEXT('/')))
+				{
+					break;
+				}
+			}
+			int32 colon = StringUtil::find(inPath, TEXT(":"), ESearchCase::CaseSensitive, ESearchDir::FromStart, previousSeparatorIndex);
+			if (colon >= 0 && colon < index)
+			{
+				return false;
+			}
+			inPath.erase(previousSeparatorIndex, index - previousSeparatorIndex + parentDirLength);
+		}
+		boost::replace_all(inPath, TEXT("./"), TEXT(""));
+		boost::trim(inPath);
+		return true;
+	}
+
+
 	wstring Paths::engineDir()
 	{
 		return PlatformMisc::engineDir();
@@ -17,6 +91,21 @@ namespace Air
 	{
 		filesystem::path new_path(inPath);
 		return filesystem::exists(new_path);
+	}
+
+	wstring Paths::engineConfigDir()
+	{
+		return Paths::engineDir() + TEXT("Config/");
+	}
+
+	wstring Paths::sourceConfigDir()
+	{
+		return Paths::engineDir() + TEXT("Config/");
+	}
+
+	wstring Paths::generateConfigDir()
+	{
+		return Paths::gameSaveDir() + TEXT("Config/");
 	}
 
 	void Paths::normalizeDirectoryName(wstring& inPath)
@@ -99,7 +188,7 @@ namespace Air
 
 	wstring Paths::convertRelativePathToFull(const wstring& path)
 	{
-		return path;
+		return Paths_Private::convertRelativePathToFullInternal(PlatformProcess::baseDir(), wstring(path));
 	}
 
 	wstring Paths::rootDir()
@@ -191,6 +280,11 @@ namespace Air
 		{
 			outPath /= pathes[i];
 		}
+	}
+
+	wstring Paths::getAbsolutePath(const wstring& inPath)
+	{
+		return Paths_Private::convertRelativePathToFullInternal(Paths::rootDir(), wstring(inPath));
 	}
 
 	

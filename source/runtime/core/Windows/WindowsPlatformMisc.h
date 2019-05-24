@@ -38,6 +38,10 @@ namespace Air
 	
 		static uint32 getCharKeyMap(uint32* keyCodes, wstring* keyNames, uint32 maxMappings);
 		static uint32 getKeyMap(uint32* keyCodes, wstring* keyNames, uint32 maxMappings);
+
+		static void getEnvironmentVariable(const TCHAR* variableName, TCHAR* result, int32 resultLength);
+
+		static void setEnvironmentVar(const TCHAR* variableName, const TCHAR* value);
 	};
 
 	typedef WindowsPlatformMisc PlatformMisc;

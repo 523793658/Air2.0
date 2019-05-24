@@ -24,7 +24,7 @@ namespace std
 
 #include "boost/algorithm/string.hpp"
 
-
+#define COPYBLOCKSIZE 32768
 namespace Air
 {
 	using namespace std::experimental;
@@ -110,7 +110,7 @@ namespace Air
 		TCHAR finalPath[512];
 		if (!Paths::isAbsolute(filename) && !Paths::fileExists(filename))
 		{
-			String::printf_b(finalPath, TEXT("%s/../../%s"), PlatformProcess::baseDir(), filename);
+			String::printf_b(finalPath, TEXT("%s../../%s"), PlatformProcess::baseDir(), filename);
 			if (!Paths::fileExists(finalPath))
 			{
 				return nullptr;
@@ -324,6 +324,123 @@ namespace Air
 	wstring FileManagerGeneric::convertToAbsolutePathForExternalApplForWrite(const TCHAR* filename)
 	{
 		return getLowLevel().convertToAbsolutePathForExternalAppForWrite(filename);
+	}
+
+	uint32 FileManagerGeneric::copy(const TCHAR* dest, const TCHAR* src, bool replace /* = true */, bool evenIfReadOnly /* = false */, bool attributes /* = false */, CopyProgress* progress /* = nullptr */, EFileRead readflags /* = FILEREAD_None */, EFileWrite writeFlags /* = FILEWRITE_None */)
+	{
+		uint32 result = COPY_OK;
+		if (Paths::convertRelativePathToFull(dest) == Paths::convertRelativePathToFull(src))
+		{
+			result = COPY_Fail;
+		}
+		else if (progress)
+		{
+			result = copyWithProgress(dest, dest, replace, evenIfReadOnly, attributes, progress, readflags, writeFlags);
+		}
+		else if (!replace && getLowLevel().fileExists(dest))
+		{
+			result = COPY_Fail;
+		}
+		else
+		{
+			if (evenIfReadOnly)
+			{
+				getLowLevel().setReadOnly(dest, false);
+			}
+			makeDirectory(Paths::getPath(dest).c_str(), true);
+			EPlatformFileRead platformFileRead = (readflags & FILEREAD_AllowWrite) ? EPlatformFileRead::AllowWrite : EPlatformFileRead::None;
+			EPlatformFileWrite platformFileWrite = (writeFlags & FILEWRITE_AllowRead) ? EPlatformFileWrite::AllowRead : EPlatformFileWrite::None;
+			if (!getLowLevel().copyFile(dest, src, platformFileRead, platformFileWrite))
+			{
+				result = COPY_Fail;
+			}
+		}
+		if (result == COPY_OK && attributes)
+		{
+			getLowLevel().setReadOnly(dest, getLowLevel().isReadOnly(src));
+		}
+		return result;
+	}
+
+	uint32 FileManagerGeneric::copyWithProgress(const TCHAR* inDestFile, const TCHAR* inSrcFile, bool replaceExisting, bool eventIfReadOnly, bool attrubtes, CopyProgress* progress, EFileRead readFlags, EFileWrite writeFlags)
+	{
+		uint32 result = COPY_OK;
+
+		if (progress->poll(0.0))
+		{
+			wstring srcFile = inSrcFile;
+			wstring destFile = inDestFile;
+
+			Archive* src = createFileReader(srcFile.c_str(), readFlags);
+			if (!src)
+			{
+				result = COPY_Fail;
+			}
+			else
+			{
+				Archive* dest = createFileWriter(destFile.c_str(), (replaceExisting ? 0 : FILEWRITE_NoReplaceExisting) | (eventIfReadOnly ? FILEWRITE_EvenIfReadOnly : 0) | writeFlags);
+				if (!dest)
+				{
+					result = COPY_Fail;
+				}
+				else
+				{
+					int64 size = src->totalSize();
+					int64 percent = 0, newPercent = 0;
+					uint8* buffer = new uint8[COPYBLOCKSIZE];
+					for (int64 total = 0; total < size; total += sizeof(buffer))
+					{
+						int64 count = Math::min(size - total, (int64)sizeof(buffer));
+						src->serialize(buffer, count);
+						if (src->isError())
+						{
+							result = COPY_Fail;
+							break;
+						}
+						dest->serialize(buffer, count);
+						if (dest->isError())
+						{
+							result = COPY_Fail;
+							break;
+						}
+
+						newPercent = total * 100 / size;
+						if (progress && percent != newPercent && !progress->poll((float)newPercent / 100.f))
+						{
+							result = COPY_Canceled;
+							break;
+						}
+						percent = newPercent;
+					}
+					delete[] buffer;
+					if (result == COPY_OK && !dest->close())
+					{
+						result = COPY_Fail;
+					}
+					delete dest;
+					if (result != COPY_OK)
+					{
+						del(destFile.c_str());
+					}
+				}
+				if (result == COPY_OK && !src->close())
+				{
+					result = COPY_Fail;
+				}
+				delete src;
+			}
+			if (progress && result == COPY_OK && !progress->poll(1.0))
+			{
+				result = COPY_Canceled;
+			}
+
+
+		}
+		else
+		{
+			result = COPY_Canceled;
+		}
+		return result;
 	}
 
 	ArchiveFileReaderGeneric::ArchiveFileReaderGeneric(IFileHandle* inHandle, const TCHAR* inFilename, int64 inSize)

@@ -19,10 +19,22 @@ namespace Air
 	{
 		FILEWRITE_None				=0x00,
 		FILEWRITE_NoFail			=0x01,
-		FILEWRITE_NoPreplaceExisting = 0x02,
+		FILEWRITE_NoReplaceExisting = 0x02,
 		FILEWRITE_EvenIfReadOnly	 = 0x04,
 		FILEWRITE_Append			=0x08,
 		FILEWRITE_AllowRead			=0x10,
+	};
+
+	enum ECopyResult
+	{
+		COPY_OK						=0x00,
+		COPY_Fail					= 0x01,
+		COPY_Canceled				= 0x02,
+	};
+
+	struct CopyProgress
+	{
+		virtual bool poll(float fraction) = 0;
 	};
 
 	class CORE_API IFileManager
@@ -57,5 +69,7 @@ namespace Air
 		virtual bool deleteDirectory(const TCHAR* path, bool requireExists = 0, bool tree = 0) = 0;
 
 		virtual bool directoryExist(const TCHAR* path) = 0;
+
+		virtual uint32 copy(const TCHAR* dest, const TCHAR* src, bool replace = true, bool evenIfReadOnly = false, bool attributes = false, CopyProgress* progress = nullptr, EFileRead readflags = FILEREAD_None, EFileWrite writeFlags = FILEWRITE_None) = 0;
 	};
 }

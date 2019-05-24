@@ -1,8 +1,26 @@
 #pragma once
 #include "CoreType.h"
 #include "Containers/String.h"
+#include "Misc/EnumClassFlags.h"
 namespace Air
 {
+
+	enum class EPlatformFileRead : uint8
+	{
+		None = 0x0,
+		AllowWrite = 0x01
+	};
+
+	ENUM_CLASS_FLAGS(EPlatformFileRead);
+
+	enum class EPlatformFileWrite : uint8
+	{
+		None = 0x0,
+		AllowRead = 0x01,
+	};
+
+	ENUM_CLASS_FLAGS(EPlatformFileWrite);
+
 	class CORE_API IFileHandle
 	{
 	public:
@@ -38,6 +56,8 @@ namespace Air
 
 		virtual bool setReadOnly(const TCHAR* filename, bool bNewReadOnlyValue) = 0;
 
+		virtual bool isReadOnly(const TCHAR* filename) = 0;
+
 		virtual bool fileExists(const TCHAR* filename);
 
 		virtual bool deleteFile(const TCHAR* filename);
@@ -51,6 +71,10 @@ namespace Air
 		virtual bool directoryExists(const TCHAR* directory);
 
 		virtual bool deleteDirectory(const TCHAR* directory);
+
+		virtual bool copyFile(const TCHAR* to, const TCHAR* from, EPlatformFileRead readFlags = EPlatformFileRead::None, EPlatformFileWrite writeFlags = EPlatformFileWrite::None);
+
+
 	};
 
 	class CORE_API IPhysicalPlatformFile : public IPlatformFile

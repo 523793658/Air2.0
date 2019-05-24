@@ -5,9 +5,23 @@ namespace Air
 
 	PrimitiveSceneProxy::PrimitiveSceneProxy(const PrimitiveComponent* inComponent, wstring inResourceName)
 		:bRenderInMainPass(inComponent->bRenderInMainPass)
+		,mScene(inComponent->getScene())
+		, mMobility(inComponent->mMobility)
+		, bDrawInGame(inComponent->isVisible())
+		, mPrimitiveSceneInfo(nullptr)
+		, bDisableStaticPath(false)
 	{
 		beginInitResource(&mConstantBuffer);
 
+	}
+
+	bool PrimitiveSceneProxy::isShown(const SceneView* view) const
+	{
+		if (!bDrawInGame)
+		{
+			return false;
+		}
+		return true;
 	}
 	PrimitiveViewRelevance PrimitiveSceneProxy::getViewRelevance(const SceneView* view) const
 	{

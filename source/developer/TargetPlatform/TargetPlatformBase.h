@@ -7,7 +7,14 @@ namespace Air
 	class TargetPlatformBase
 		: public ITargetPlatform
 	{
+	public:
+		virtual const Name_PlatformInfo::PlatformInfo& getPlatformInfo() const override
+		{
+			return *mPlatformInfo;
+		}
 
+	protected:
+		const Name_PlatformInfo::PlatformInfo *mPlatformInfo;
 	};
 
 
@@ -15,6 +22,10 @@ namespace Air
 	class TTargetPlatformBase
 		: public TargetPlatformBase
 	{
-
+	public:
+		virtual wstring platformName() const override
+		{
+			return PlatformProperties::platformName();
+		}
 	};
 }

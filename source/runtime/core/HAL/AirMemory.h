@@ -43,7 +43,7 @@ namespace Air
 		template<class T>
 		static FORCEINLINE void memzero(T& src)
 		{
-			static_assert(!std::_Is_pointer<T>::value, "For pointers use the two parameters function");
+			static_assert(!std::is_pointer<T>::value, "For pointers use the two parameters function");
 			memzero(&src, sizeof(T));
 		}
 
@@ -65,7 +65,7 @@ namespace Air
 		template<typename T>
 		static FORCEINLINE void memcpy(T& dest, const T& src)
 		{
-			static_assert(!std::_Is_pointer<T>::value, "For pointers use the three parameters function");
+			static_assert(!std::is_pointer<T>::value, "For pointers use the three parameters function");
 			memcpy(&dest, &src, sizeof(T));
 
 		}

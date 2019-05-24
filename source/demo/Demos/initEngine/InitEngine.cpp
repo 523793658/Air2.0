@@ -34,8 +34,8 @@ namespace Demo
 		ActorSpawnParameters spawnInfo;
 
 
-		CubeActor *actor = mWorld->spawnActor<CubeActor>(spawnInfo);
-
+		//CubeActor *actor = mWorld->spawnActor<CubeActor>(spawnInfo);
+		AStaticMeshActor* actor = mWorld->spawnActor<AStaticMeshActor>(spawnInfo);
 		ADirectionalLight* light = mWorld->spawnActor<ADirectionalLight>(spawnInfo);
 
 		light->setLightColor(LinearColor(1.0f, 1.0f, 1.0f, 1.0f));
@@ -45,15 +45,18 @@ namespace Demo
 
 		RMaterial* material = RMaterial::getDefaultMaterial(MD_Surface);
 
-		PrimitiveComponent* component = actor->findComponentByClass<PrimitiveComponent>();
-		auto materialInstance = RMaterialInstanceDynamic::create(material, component);
+		StaticMeshComponent* component = actor->findComponentByClass<StaticMeshComponent>();
+
+		auto materialInstance = RMaterialInstanceDynamic::create(material, nullptr);
 
 		materialInstance->setScalarParameterValue(TEXT("BaseColor"), 0.1f);
+
 		component->setMaterial(0, materialInstance);
 
 		RStaticMesh* mesh = newObject<RStaticMesh>(nullptr);
-		Factory::createFromFile(mesh, TEXT("assets/meshes/test.FBX"), TEXT("Test"), EObjectFlags::RF_NoFlags);
+		Factory::createFromFile(mesh, TEXT("assets/meshes/Shape_Sphere.FBX"), TEXT("Test"), EObjectFlags::RF_NoFlags);
 		mesh->postLoad();
+		component->setStaticMesh(mesh);
 	}
 
 	void DemoInitEngine::init(DemoEngine* inEngine)

@@ -12,7 +12,9 @@ SHOWFLAG_ALWAYS_ACCESSIBLE(LightFunctions, SFG_LightingFeatures)
 
 SHOWFLAG_ALWAYS_ACCESSIBLE(TexturedLightProfiles, SFG_LightingFeatures)
 
-SHOWFLAG_ALWAYS_ACCESSIBLE(PostProcessing, SFG_Hidden);
+SHOWFLAG_ALWAYS_ACCESSIBLE(PostProcessing, SFG_Hidden)
+
+SHOWFLAG_ALWAYS_ACCESSIBLE(StaticMeshes, SFG_Normal)
 
 SHOWFLAG_FIXED_IN_SHIPPING(0, ReflectionOverride, SFG_Hidden)
 

@@ -98,10 +98,14 @@ namespace Air
 
 		virtual wstring convertToRelativePath(const TCHAR* filename) override;
 
+		virtual uint32 copy(const TCHAR* dest, const TCHAR* src, bool replace = true, bool evenIfReadOnly = false, bool attributes = false, CopyProgress* progress = nullptr, EFileRead readflags = FILEREAD_None, EFileWrite writeFlags  = FILEWRITE_None);
+
 	private:
 		wstring defaultConvertToRelativePath(const TCHAR* filename);
 
 		void findFileRecursiveInternal(TArray<wstring>& fileNames, const TCHAR* startDirectory, const TCHAR* fileName, bool files, bool directories);
+
+		uint32 copyWithProgress(const TCHAR* inDestFile, const TCHAR* inSrcFile, bool replaceExisting, bool eventIfReadOnly, bool attrubtes, CopyProgress* progress, EFileRead readFlags, EFileWrite writeFlags);
 	};
 
 	class ArchiveFileWriterGeneric : public Archive

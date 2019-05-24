@@ -1,8 +1,11 @@
+#include "RHIResource.h"
+
 #include "RenderUtils.h"
 #include "RenderResource.h"
 #include "DynamicRHI.h"
 #include "RHICommandList.h"
 #include "PackedNormal.h"
+
 namespace Air
 {
 	PixelFormatInfo GPixelFormats[PF_MAX] =

@@ -1,5 +1,17 @@
 import sys, os, multiprocessing, subprocess, shutil, platform
 
+def LogWarning(message):
+    print("W %s" % message)
+    
+def LogError(message):
+    print("[E] %s" % message)
+    if 0 == sys.platform.find("win"):
+        pause_cmd = "pause"
+    else:
+        pause_cmd = "read"
+    subprocess.call(pause_cmd, shell = True)
+    sys.exit(1)
+
 class CompilerInfo:
 	def __init__(self, arch, gen_name, compiler_root, vcvarsall_path = "", vcvarsall_options = ""):
 		self.arch = arch
@@ -208,11 +220,13 @@ class BuildInfo:
             program_files_folder = self.findProgramFilesFolder()
             if "vc142" == compiler:
                 if project_type == "vs2019":
+                    print("5555555555555")
                     try_folder = self.findVS2019Folder(program_files_folder)
                     if len(try_folder) > 0:
+                        print("666666666666")
                         compiler_root = try_folder
                         vcvarsall_path = "VCVARSALL.BAT"
-                        vcvarsall_options = ""
+                        vcvarsall_options = "amd64_arm64 -vcvars_ver=14.2"
                     else:
                         LogError("Could not find vc142 compiler toolset for vs2019.\n")
                 else:
@@ -297,8 +311,10 @@ class BuildInfo:
         multi_config = False
         compilers = []
         if "vs2019" == project_type:
+            print("22222222222--%s" % compiler)
             self.vs_version = 16
             if "vc142" == compiler:
+                print("3333333333")
                 compiler_name = "vc"
                 compiler_version = 142
             elif "vc141" == compiler:
@@ -311,7 +327,8 @@ class BuildInfo:
                 LogError("Wrong combination of project %s and compiler %s.\n" %(project_type, compiler))
             multi_config = True
             for arch in archs:
-                compiler.append(CompilerInfo(arch, "Visual Studio 16", compiler_root, vcvarsall_path, vcvarsall_options))
+                print("4444444444--%s" % vcvarsall_options)
+                compilers.append(CompilerInfo(arch, "Visual Studio 16", compiler_root, vcvarsall_path, vcvarsall_options))
         elif "vs2017" == project_type:
             self.vs_version = 15
             if "vc141" == compiler:
@@ -560,6 +577,7 @@ class BatchCommand:
         else:
             batch_file += "sh"
         batch_f = open(batch_file, "w")
+        print([cmd_line + "\n" for cmd_line in self.commands_])
         batch_f.writelines([cmd_line + "\n" for cmd_line in self.commands_])
         batch_f.close()
         if "win" == self.host_platform:
@@ -627,18 +645,19 @@ def buildAProject(name, build_path, build_info, compiler_info, additional_option
             if len(compiler_info.compiler_root) > 0:
                 new_path += ";" + compiler_info.compiler_root
             if "win" == build_info.host_platform:
+                
                 cmake_cmd.addCommand('@SET PATH=%s;%%PATH%%' % new_path)
                 if 0 == build_info.project_type.find("vs"):
                     cmake_cmd.addCommand('@CALL "%s%s" %s' % (compiler_info.compiler_root, compiler_info.vcvarsall_path, compiler_info.vcvarsall_options))
                     cmake_cmd.addCommand('@CD /d "%s"' % build_dir)
             cmake_cmd.addCommand('"%s" -G "%s" %s %s ../CMake' % (build_info.cmake_path, compiler_info.generator, toolset_name, additional_options))
+            print("11111111111111111")
             if cmake_cmd.execute() != 0:
                 LogWarning("Config %s failed, retry 1...\n" % name)
                 if cmake_cmd.execute() != 0:
                     LogWarning("Config %s failed, retry 2...\n" % name)
                     if cmake_cmd.execute() != 0:
                         LogError("Config %s failed.\n" % name)
-            
             # build_cmd = BatchCommand(build_info.host_platform)
             # if 0 == build_info.project_type.find("vs"):
                 # build_cmd.addCommand('@CALL "%s%s" %s' % (compiler_info.compiler_root, compiler_info.vcvarsall_path, vc_option))

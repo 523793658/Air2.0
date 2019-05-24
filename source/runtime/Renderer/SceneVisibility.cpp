@@ -193,6 +193,9 @@ namespace Air
 				viewRelevance.bInitializedThisFrame = true;
 				const bool bStaticRelevance = viewRelevance.bStaticRelevance;
 				const bool bDrawRelevance = viewRelevance.bDrawRelevance;
+				const bool bDynamicRelevance = viewRelevance.bDynamicRelevance;
+				const bool bTranslucentRelevance = viewRelevance.hasTranslucency();
+				
 				if (bStaticRelevance && (bDrawRelevance))
 				{
 					mRelevantStaticPrimitives.addPrim(bitIndex);
@@ -202,6 +205,15 @@ namespace Air
 				{
 					mNotDrawRelevant.addPrim(bitIndex);
 					continue;
+				}
+
+				if (bDynamicRelevance)
+				{
+
+				}
+				if (primitiveSceneInfo->needsLazyUpdateForRendering())
+				{
+					mLazyUpdatePrimitives.addPrim(primitiveSceneInfo);
 				}
 
 				mCombinedShadingModelMask |= viewRelevance.mShadingModelMaskRelevance;

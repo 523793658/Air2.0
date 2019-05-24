@@ -16,5 +16,7 @@ namespace Air
 		virtual ITargetPlatform* getRunningTargetPlatform() = 0;
 
 		virtual const TArray<ITargetPlatform*>& getTargetPlatforms() = 0;
+
+		virtual const TArray<ITargetPlatform*>& getActiveTargetPlatforms() = 0;
 	};
 }

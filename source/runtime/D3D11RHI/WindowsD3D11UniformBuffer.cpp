@@ -1,5 +1,7 @@
+#include "RHIResource.h"
 #include "WindowsD3D11UniformBuffer.h"
 #include "D3D11DynamicRHI.h"
+
 namespace Air
 {
 	bool WinD3D11UniformBuffer::commitUniformsToDevice(bool bDiscardSharedConstants)

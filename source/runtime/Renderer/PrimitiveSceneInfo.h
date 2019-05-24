@@ -66,6 +66,11 @@ namespace Air
 			}
 		}
 
+		FORCEINLINE bool needsLazyUpdateForRendering()
+		{
+			return needsConstantBufferUpdate() || needsUpdateStaticMeshes();
+		}
+
 		FORCEINLINE bool needsUpdateStaticMeshes()
 		{
 			return bNeedsStaticMeshUpdate;

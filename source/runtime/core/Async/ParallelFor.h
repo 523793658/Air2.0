@@ -144,7 +144,7 @@ namespace Air
 
 	inline void parallelFor(int32 num, std::function<void(int32)> body, bool bForceSingleThread = false)
 	{
-		BOOST_ASSERT(num > 0);
+		BOOST_ASSERT(num >= 0);
 		int32 anyThreadTasks = 0;
 		if (num > 1 && !bForceSingleThread && App::shouldUseThreadingForPerformance())
 		{

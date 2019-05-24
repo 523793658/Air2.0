@@ -80,6 +80,12 @@ namespace Air
 			return mArMaxSerializeSize;
 		}
 
+		FORCEINLINE bool isError() const
+
+		{
+			return mArIsError;
+		}
+
 		FORCEINLINE bool isForcingUnicode() const
 		{
 			return mArForceUnicode;

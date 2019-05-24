@@ -75,11 +75,13 @@ namespace AirFbx
 
 	struct FBXImporterOptions
 	{
-		bool bConvertScene;
+		bool bConvertScene{ true };
 		bool bUsedAsFullName;
 		bool bCombineToSingle;
 		EVertexColorImportOption::Type mVertexColorImportOption;
 		Color mVertexOverrideColor;
+		bool bTransformVertexToAbsolute;
+		bool bBakePivotInVertex;
 	};
 
 

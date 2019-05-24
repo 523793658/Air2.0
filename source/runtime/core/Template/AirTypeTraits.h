@@ -205,7 +205,7 @@ namespace std
 	template<typename T>
 	struct is_bytewise_comparable
 	{
-		enum {value = TOr<std::is_enum<T>, std::_Is_pointer<T>, std::is_arithmetic<T>>::value};
+		enum {value = TOr<std::is_enum<T>, std::is_pointer<T>, std::is_arithmetic<T>>::value};
 	};
 
 #define ARE_TYPES_EQUAL(A, B) are_types_equal<A, B>::value

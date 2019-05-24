@@ -8,11 +8,110 @@
 #include "PrimitiveSceneProxy.h"
 #include "Classes/Engine/StaticMesh.h"
 #include "PackedNormal.h"
+#include "Classes/Engine/MeshMerging.h"
+#include "RenderUtils.h"
+#include "Classes/Materials/MaterialInterface.h"
 #define  MAX_STATIC_MESH_LODS	8
 namespace Air
 {
 	class RStaticMesh;
 	class Object;
+
+
+	
+
+	
+	enum class EStaticMeshVertexTangentBasisType
+	{
+		Default,
+		HighPrecision
+	};
+
+	enum class EStaticMeshVertexUVType
+	{
+		Default,
+		HighPrecision
+	};
+
+
+
+	class StaticMeshLODGroup
+	{
+	public:
+		StaticMeshLODGroup()
+			:mDefaultNumLODs(1)
+			, mDefaultLightMapResolution(64)
+			, mBasePercentTrianglesMult(1.0f)
+			, mDisplayName(TEXT("None"))
+		{
+			Memory::memzero(mSettingsBias);
+			mSettingsBias.mPercentTriangles = 1.0f;
+		}
+
+		int32 getDefaultNumLODs() const
+		{
+			return mDefaultNumLODs;
+		}
+
+		int32 getDefaultLightMapResolution()
+		{
+			return mDefaultLightMapResolution;
+		}
+
+		MeshReductionSettings getDefaultSettings(int32 LODIndex) const
+		{
+			BOOST_ASSERT(LODIndex >= 0 && LODIndex < MAX_STATIC_MESH_LODS);
+			return mDefualtSettings[LODIndex];
+		}
+
+		ENGINE_API MeshReductionSettings getSettings(const MeshReductionSettings& inSettings, int32 LODIndex) const;
+
+
+
+
+	private:
+		friend class StaticMeshLODSettings;
+
+		int32 mDefaultNumLODs;
+
+		int32 mDefaultLightMapResolution;
+
+		float mBasePercentTrianglesMult;
+
+		wstring mDisplayName;
+
+		MeshReductionSettings mDefualtSettings[MAX_STATIC_MESH_LODS];
+
+		MeshReductionSettings mSettingsBias;
+	};
+
+
+	class StaticMeshLODSettings
+	{
+	public:
+		ENGINE_API void initialize(const ConfigFile& iniFIle);
+
+		const StaticMeshLODGroup& getLODGroup(wstring name) const
+		{
+			auto& it = mGroups.find(name);
+
+			if (it == mGroups.end())
+			{
+				it = mGroups.find(Name_None);
+			}
+			BOOST_ASSERT(it != mGroups.end());
+			return it->second;
+		}
+
+
+		void getLODGroupNames(TArray<wstring>& outNames) const;
+
+		void getLODGroupDisplayNames(TArray<wstring>& outDisplayNames) const;
+	private:
+
+		void readEntry(StaticMeshLODGroup& group, wstring entry);
+		TMap<wstring, StaticMeshLODGroup> mGroups;
+	};
 
 	struct PositionVertex
 	{
@@ -66,6 +165,11 @@ namespace Air
 			bUseHighPrecisionTangentBasis = bUseHighPrecision;
 		}
 
+		FORCEINLINE void setUseFullPrecisionUVs(bool useFull)
+		{
+			bUseFullPrecisionUVs = useFull;
+		}
+
 		FORCEINLINE bool getUseFullPrecisionUVs() const
 		{
 			return bUseFullPrecisionUVs;
@@ -76,20 +180,28 @@ namespace Air
 			return mStride;
 		}
 
+		ENGINE_API void init(const TArray<StaticMeshBuildVertex>& inVertices, uint32 inNumTexCoords);
+
+		FORCEINLINE void setVertexUV(uint32 vertexIndex, uint32 uvIndex, const float2& vec2D);
+
+		FORCEINLINE void setVertexTangents(uint32 vertexIndex, float3 x, float3 y, float3 z);
+
+		virtual void initRHI() override;
+
 	private:
-		StaticMeshVertexDataInterface* mVertexData;
+		StaticMeshVertexDataInterface * mVertexData{ nullptr };
 
-		uint32 mNumTexcoords;
+		uint32 mNumTexcoords{ 0 };
 
-		uint8* mData;
+		uint8* mData{ nullptr };
 
-		uint32 mStride;
+		uint32 mStride{ 0 };
 
-		uint32 mNumVertices;
+		uint32 mNumVertices{ 0 };
 
-		bool bUseFullPrecisionUVs;
+		bool bUseFullPrecisionUVs{ false };
 
-		bool bUseHighPrecisionTangentBasis;
+		bool bUseHighPrecisionTangentBasis{ false };
 
 		void allocateData(bool bNeedsCPUAccess = true);
 	};
@@ -103,6 +215,8 @@ namespace Air
 
 		void cleanUp();
 
+		ENGINE_API void init(const TArray<StaticMeshBuildVertex>& inVertices);
+
 		FORCEINLINE uint32 getStride() const
 		{
 			return mStride;
@@ -113,14 +227,22 @@ namespace Air
 			return mNumVertices;
 		}
 
+		FORCEINLINE float3& vertexPosition(uint32 vertexIndex)
+		{
+			BOOST_ASSERT(vertexIndex < getNumVertices());
+			return ((PositionVertex*)(mData + vertexIndex * mStride))->mPosition;
+		}
+
+		virtual void initRHI() override;
+
 	private:
-		class PositionVertexData* mVertexData;
+		class PositionVertexData* mVertexData{ nullptr };
 
-		uint8* mData;
+		uint8* mData{ nullptr };
 
-		uint32 mStride;
+		uint32 mStride{ 0 };
 
-		uint32 mNumVertices;
+		uint32 mNumVertices{ 0 };
 
 
 	};
@@ -242,7 +364,16 @@ namespace Air
 
 		void computeUVDensities();
 
+		void resolveSectionInfo(RStaticMesh* owner);
 
+#if WITH_EDITORONLY_DATA
+		void cache(RStaticMesh* owner, const StaticMeshLODSettings& LODSettings);
+
+#endif
+
+#if WITH_EDITORONLY_DATA
+		TArray<int32> mWedgeMap;
+#endif
 	};
 
 	class StaticMeshComponent;
@@ -254,26 +385,74 @@ namespace Air
 
 		virtual ~StaticMeshSceneProxy() {}
 
+		virtual void drawStaticElements(StaticPrimitiveDrawInterface* PDI) override;
+
+		virtual int32 getNumMeshBatches() const
+		{
+			return 1;
+		}
+
+		virtual bool getMeshElement(
+			int32 lodIndex,
+			int32 batchIndex,
+			int32 elementIndex,
+			uint8 inDepthPriorityGroup,
+			bool bUseSelectedMaterial,
+			bool bUseHoveredMaterial,
+			bool bAllowPreCulledIndices,
+			MeshBatch& outMeshBatch) const;
+
+		virtual PrimitiveViewRelevance getViewRelevance(const SceneView* view) const override;
+
+	protected:
+		float getScreenSize(int32 lodIndex) const;
+
+		virtual void setIndexSource(int32 lodIndex, int32 elementIndex, MeshBatch& outMeshElement, bool bWireframe, bool bRequiresAdjacencyInformation, bool bUseInversedIndices, bool bAllowPreCulledIndices) const;
+	protected:
+		class LODInfo : public LightCacheInterface
+		{
+		public:
+			struct SectionInfo
+			{
+				MaterialInterface* mMaterial;
+				bool bSelected;
+#if WITH_EDITORONLY_DATA
+				int32 mMaterialIndex;
+#endif
+
+				int32 mFirstPreCulledIndex;
+				int32 mNumPreCulledTriangles;
+			};
+
+			TArray<SectionInfo> mSections;
+			ColorVertexBuffer* mOverrideColorVertexBuffer;
+
+			const RawStaticIndexBuffer* mPreCulledIndexBuffer;
+
+			LODInfo(const StaticMeshComponent* inComponent, int32 inLodIndex, bool bCanLODsShareStaticLighting);
+
+			bool usesMeshModifyingMaterials() const { return bUsesMeshModifyingMaterials; }
+
+
+		private:
+			TArray<Guid> mIrrelevantLights;
+			bool bUsesMeshModifyingMaterials;
+		};
 	protected:
 		AActor* mOwner;
 		const RStaticMesh* mStaticMesh;
 
 		StaticMeshRenderData* mRenderData;
 
+		MaterialRelevance mMaterialRelevance;
+
+		TindirectArray<LODInfo> mLODs;
+
 		uint32 bCastShadow : 1;
+
+		int32 mForcedLodModel;
 	};
 
-	enum class EStaticMeshVertexTangentBasisType
-	{
-		Default,
-		HighPrecision
-	};
-
-	enum class EStaticMeshVertexUVType
-	{
-		Default,
-		HighPrecision
-	};
 
 	template<typename TangentTypeT>
 	struct TStaticMeshVertexTangentDatum
@@ -413,5 +592,50 @@ namespace Air
 			SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::Default,  __VA_ARGS__);\
 			SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::HighPrecision,  __VA_ARGS__);\
 		};\
+	}
+
+
+
+	FORCEINLINE void StaticMeshVertexBuffer::setVertexTangents(uint32 vertexIndex, float3 x, float3 y, float3 z)
+	{
+		BOOST_ASSERT(vertexIndex < getNumVertices());
+		if (getUseHighPrecisionTangentBasis())
+		{
+			reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::Default, 1>*>(mData + vertexIndex * mStride)->setTangents(x, y, z);
+
+		}
+		else
+		{
+			reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::Default, 1>*>(mData + vertexIndex * mStride)->setTangents(x, y, z);
+		}
+	}
+
+	FORCEINLINE void StaticMeshVertexBuffer::setVertexUV(uint32 vertexIndex, uint32 uvIndex, const float2& vec2D)
+	{
+		BOOST_ASSERT(vertexIndex < getNumVertices());
+		BOOST_ASSERT(uvIndex < getNumTexCoords());
+		if (getUseHighPrecisionTangentBasis())
+		{
+			if (getUseFullPrecisionUVs())
+			{
+				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::HighPrecision, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
+			}
+			else
+			{
+				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::Default, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
+			}
+		}
+		else
+		{
+			if (getUseFullPrecisionUVs())
+			{
+				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::HighPrecision, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
+			}
+			else
+			{
+
+				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::Default, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
+			}
+		}
 	}
 }

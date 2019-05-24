@@ -1,11 +1,12 @@
 #pragma once
-#include "CoreType.h"
+#include "CoreMinimal.h"
+#include "RHI.h"
+#include "PackedNormal.h"
 #include "RenderCore.h"
-#include "PixelFormat.h"
 #include "RHIResource.h"
-#include "RHIDefinitions.h"
 namespace Air
 {
+
 	enum PixelFormatFlags
 	{
 		PFF_None = 0,

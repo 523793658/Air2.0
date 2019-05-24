@@ -15,6 +15,31 @@ namespace Air
 		Temporary
 	};
 
+	struct IniFilename
+	{
+		wstring mFilename;
+		bool bRequired;
+		wstring mCacheKey;
+
+		IniFilename(const wstring& inFilename, bool inIsRequired, wstring inCacheKey = TEXT(""))
+			:mFilename(inFilename)
+			, bRequired(inIsRequired)
+			, mCacheKey(inCacheKey)
+		{
+
+		}
+
+
+	};
+
+	enum class EConfigFileHierarchy : uint8
+	{
+		AbsoluteBase = 0,
+		EngineDirBase,
+	};
+
+	typedef TMap<EConfigFileHierarchy, IniFilename> ConfigFileHierarchy;
+
 
 	template<typename KeyType, typename ValueType>
 	Archive& operator << (Archive& ar, multimap<KeyType, ValueType> mulM)
@@ -83,6 +108,14 @@ namespace Air
 			return (mExpandedValue.length() > 0 ? mExpandedValue : mSavedValue);
 		}
 
+		const wstring& getSavedValue() const
+		{
+#if WITH_EDITOR
+			bRead = true;
+#endif
+			return mSavedValue;
+		}
+
 		friend Archive& operator << (Archive& ar, ConfigValue& configSection)
 		{
 			ar << configSection.mSavedValue;
@@ -116,6 +149,47 @@ namespace Air
 	class ConfigSection : public ConfigSectionMap
 	{
 	public:
+		template<typename Allocator>
+		void multiFind(const wstring& key, TArray<ConfigValue, Allocator>& outValues, const bool bMaintainOrder = false) const
+		{
+			auto pair = ConfigSectionMap::equal_range(key);
+			for (auto& bg = pair.first; bg != pair.second; ++bg)
+			{
+				outValues.add(bg->second);
+			}
+		}
+
+		int32 removeSingle(wstring key, ConfigValue inValue)
+		{
+			int32 numRemovedPairs = 0;
+			for (auto it = this->begin(); it != this->end(); it++)
+			{
+				if (it->first == key && it->second == inValue)
+				{
+					erase(it);
+					++numRemovedPairs;
+					break;
+				}
+			}
+			return numRemovedPairs;
+		}
+
+		ConfigValue& addUnique(wstring key, ConfigValue& value)
+		{
+			auto it = this->equal_range(key);
+			for (auto & paireIt = it.first; paireIt != it.second; paireIt++)
+			{
+				if (paireIt->second == value)
+				{
+					return paireIt->second;
+				}
+			}
+			return this->emplace(key, value)->second;
+		}
+
+		void handleAddCommand(wstring key, const wstring & value, bool bAppendValueIfNotArrayOfStructsKeyUsed);
+
+		TMap<wstring, wstring> mArrayOfStructKeys;
 	};
 
 	class ConfigFile : public TMap<wstring, ConfigSection>
@@ -126,6 +200,24 @@ namespace Air
 		void processInputFileContents(const wstring& contents);
 
 		ConfigSection* findOrAddSection(const wstring& sectionName);
+
+
+		bool combine(const wstring& filename);
+
+		void combineFromBuffer(const wstring& buffer);
+
+		void addMissingProperties(const ConfigFile& inSourceFile);
+
+	private:
+		TMap<wstring, TMap<wstring, wstring>> mPerObjectConfigArrayOfStructKeys;
+
+	public:
+		bool mDirty, NoSave;
+		ConfigFileHierarchy mSourceIniHerarchy;
+
+		ConfigFile* mSourceConfigFile;
+
+		wstring mName;
 	};
 
 	class CORE_API ConfigCacheIni : public TMap<wstring, ConfigFile>
@@ -134,12 +226,21 @@ namespace Air
 		bool getSection(const  TCHAR* section, TArray<wstring>& result, const wstring & fileName);
 		ConfigFile* find(const wstring& filename, bool createIfNotFound);
 
+		int32 getArray(const TCHAR* section, const TCHAR* key, TArray<wstring>& outArr, const wstring& filename);
+
 		bool areFileOperationsDisabled();
 
+		static void loadLocalIniFile(ConfigFile& configFile, const TCHAR* iniName, bool bGenerateDestIni, const TCHAR* platform, const bool bForceReload = false);
+
+		static void loadExternalIniFile(ConfigFile& configFile, const TCHAR* iniName, const TCHAR* engineConfigDir, const TCHAR* sourceConfigDir, bool bGenerateDestIni, const TCHAR* platform = nullptr, const bool bForceReload = false);
 	private:
 		bool bAreFileOperationsDisabled;
 
 		bool bIsReadyForUse;
 		EConfigCacheType mType;
 	};
+
+	
+	
+	
 }

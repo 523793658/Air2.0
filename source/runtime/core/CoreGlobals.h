@@ -52,6 +52,8 @@ namespace Air
 
 	extern CORE_API wstring GGameIni;
 
+	extern CORE_API wstring GEngineIni;
+
 	extern CORE_API ConfigCacheIni*		GConfig;
 
 	extern CORE_API bool isInRenderingThread();

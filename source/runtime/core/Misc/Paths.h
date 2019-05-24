@@ -2,6 +2,7 @@
 #include "CoreType.h"
 #include "Containers/String.h"
 #include "HAL/StringView.h"
+#include "HAL/PlatformProcess.h"
 
 #if AIR_TS_LIBRARY_FILESYSTEM_V3_SUPPORT
 #include <experimental/filesystem>
@@ -27,6 +28,10 @@ namespace Air
 	public:
 		static wstring engineDir();
 
+		static wstring engineConfigDir();
+
+		static wstring sourceConfigDir();
+
 		static bool directoryExists(const wstring& inPath);
 
 		static wstring getBaseFilename(const wstring& inPath, bool removePath = true);
@@ -49,10 +54,11 @@ namespace Air
 
 		static wstring gameDir();
 
-		static wstring getAbsolutePath(const wstring& inPath)
-		{
-			return gameDir() + inPath;
-		}
+		static wstring generateConfigDir();
+
+		static wstring getAbsolutePath(const wstring& inPath);
+
+		static bool collapseRelativeDirectories(wstring& inPath);
 
 		static FORCEINLINE wstring getPath(const wstring & inPath)
 		{

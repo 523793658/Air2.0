@@ -54,6 +54,15 @@ namespace Air
 			return LaunchDir;
 		}
 
+		static void getEnvironmentVariable(const TCHAR* variableName, TCHAR* result, int32 resultLength)
+		{
+			*result = 0;
+		}
+
+
+		static void setEnvironmentVar(const TCHAR* variableName, const TCHAR* value);
+
+		static const TCHAR* getPathVarDelimiter();
 		static bool isDebuggerPresent() 
 		{ 
 			return 1;

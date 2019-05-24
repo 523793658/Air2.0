@@ -28,5 +28,5 @@ target_link_libraries(${LIB_NAME}
     ShaderCore
     Slate
     SlateRHIRenderer
-    WindowsTargetPlatformModule
+    WindowsTargetPlatform
     )

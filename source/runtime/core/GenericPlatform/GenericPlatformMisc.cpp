@@ -26,6 +26,16 @@ namespace Air
 		return std::max(std::min(numberOfCores - 1, maxworkerThreadsWanted), 1);
 	}
 
+	void GenericPlatformMisc::setEnvironmentVar(const TCHAR* variableName, const TCHAR* value)
+	{
+
+	}
+
+	const TCHAR* GenericPlatformMisc::getPathVarDelimiter()
+	{
+		return TEXT(";");
+	}
+
 	const TCHAR* GenericPlatformMisc::engineDir()
 	{
 		static wstring engineDirectory = L"";
@@ -43,6 +53,7 @@ namespace Air
 				engineDirectory = defaultEngineDir;
 
 			}
+		
 #else
 			engineDirectory = defaultEngineDir;
 #endif
@@ -66,11 +77,8 @@ namespace Air
 		static wstring path;
 		if (path.length() == 0)
 		{
-			path = PlatformProcess::baseDir();
-			if (boost::algorithm::ends_with(path, "/"))
-			{
-				path = path.substr(0, path.length() - 1);
-			}
+			path = Paths::engineDir();
+			
 		}
 		return path.c_str();
 	}

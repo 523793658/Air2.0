@@ -92,6 +92,11 @@ namespace Air
 		{
 			return ::_tcscmp(string1, string2);
 		}
+		static FORCEINLINE int32 stricmp(const WIDECHAR* string1, const WIDECHAR* string2)
+		{
+			return ::_tcsicmp(string1, string2);
+		}
+
 		static FORCEINLINE const WIDECHAR* strchr(const WIDECHAR* string, WIDECHAR c)
 		{
 			return _tcschr(string, c);
@@ -100,6 +105,11 @@ namespace Air
 		static FORCEINLINE int32 strcmp(const ANSICHAR* string1, const ANSICHAR* string2)
 		{
 			return ::strcmp(string1, string2);
+		}
+
+		static FORCEINLINE int32 stricmp(const ANSICHAR* string1, const ANSICHAR* string2)
+		{
+			return ::stricmp(string1, string2);
 		}
 
 		static FORCEINLINE WIDECHAR* strcpy(WIDECHAR* dest, SIZE_T destCount, const WIDECHAR* src)
@@ -145,6 +155,25 @@ namespace Air
 		static FORCEINLINE const ANSICHAR* strchr(const ANSICHAR* string, ANSICHAR c)
 		{
 			return ::strchr(string, c);
+		}
+
+		static FORCEINLINE WIDECHAR* strcat(WIDECHAR* dest, SIZE_T destCount, const WIDECHAR* src)
+		{
+#if USE_SECURE_CRT
+			_tcscat_s(dest, destCount, src);
+#else
+			return (WIDECHAR*)_tcscat(dest, src);
+#endif
+		}
+
+		static FORCEINLINE ANSICHAR* strcat(ANSICHAR* dest, SIZE_T destCount, const ANSICHAR* src)
+		{
+#if USE_SECURE_CRT
+			strcat_s(dest, destCount, src);
+			return dest;
+#else
+			return (ANSICHAR*)::strcat(dest, src);
+#endif
 		}
 	};
 }

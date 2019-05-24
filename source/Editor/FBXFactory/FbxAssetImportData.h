@@ -12,7 +12,7 @@ namespace Air
 
 		float mImportConstantScale;
 
-		bool bConvertScene;
+		bool bConvertScene{ true };
 
 		bool bForceFrontXAxis;
 

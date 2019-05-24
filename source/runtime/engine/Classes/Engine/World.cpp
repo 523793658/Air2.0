@@ -211,7 +211,6 @@ namespace Air
 			mComponentsThatNeedEndOfFrameUpdate_OnGameThread.reset();
 			mComponentsThatNeedEndOfFrameUpdate.reset();
 		};
-		if (localComponentsThatNeedEndFrameUpdate.size() > 0)
 		{
 			GTWork();
 			parallelFor(localComponentsThatNeedEndFrameUpdate.size(), paralleWork);

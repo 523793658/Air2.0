@@ -13,6 +13,10 @@
 #define WITH_EDITOR	0
 #endif
 
+#ifndef IS_PROGRAM
+#define IS_PROGRAM	0
+#endif
+
 #ifndef CHECK_PUREVIRTUALS
 #define CHECK_PUREVIRTUALS	0
 #endif

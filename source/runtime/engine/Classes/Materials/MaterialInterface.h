@@ -6,10 +6,53 @@
 #include "Classes/Engine/EngineType.h"
 #include "RHI.h"
 #include "RenderCommandFence.h"
+#include "PrimitiveViewRelevance.h"
 namespace Air
 {
 	class MaterialResource;
 	class MaterialCompiler;
+
+	struct ENGINE_API MaterialRelevance
+	{
+		uint16 mShadingModelMask;
+		uint32 bOpaque : 1;
+		uint32 bMasked : 1;
+		uint32 bDistortion;
+		uint32 bSeparateTranslucency : 1;
+		uint32 bMobileSeparateTranslucency : 1;
+		uint32 bNormalTranslucency : 1;
+		uint32 bDisableDepthTest : 1;
+		uint32 bOutputsVelocityInBasePass : 1;
+		uint32 bUsesGlobalDistanceField : 1;
+		uint32 bUsesWorldPositionOffset : 1;
+		uint32 bDecal : 1;
+		uint32 bTranslucentSurfaceLighting : 1;
+		uint32 bUsersSceneDpeth;
+
+		MaterialRelevance()
+		{
+			uint8* RESTRICT p = (uint8*)this;
+			for (uint32 i = 0; i < sizeof(*this); ++i)
+			{
+				*p++ = 0;
+			}
+		}
+
+		MaterialRelevance& operator |= (const MaterialRelevance& b)
+		{
+			const uint8 * RESTRICT s = (const uint8*)&b;
+			uint8* RESTRICT d = (uint8*)this;
+			for (uint32 i = 0; i < sizeof(*this); ++i)
+			{
+				*d = *d | *s;
+				++s; ++d;
+			}
+			return *this;
+		}
+
+		void setPrimitiveViewRelevance(PrimitiveViewRelevance& outViewRelevance) const;
+	};
+
 	class MaterialInterface : public Object
 	{
 		GENERATED_RCLASS_BODY(MaterialInterface, Object)
@@ -40,6 +83,8 @@ namespace Air
 		ENGINE_API virtual int32 compilePropertyEx(class MaterialCompiler* compiler, const Guid& attributeId);
 
 		ENGINE_API virtual bool isPropertyActive(EMaterialProperty inProperty) const;
+
+		ENGINE_API MaterialRelevance getRelevance(ERHIFeatureLevel::Type inFeatureLevel) const;
 
 		virtual class RMaterial* getMaterial() PURE_VIRTRUAL(MaterialInterface::getMaterial, return nullptr;);
 
@@ -75,6 +120,8 @@ namespace Air
 		ENGINE_API uint32 getFeatureLevelsToCompileForRendering() const;
 	private:
 		static void postLoadDefaultMaterials();
+
+		MaterialRelevance getRelevance_Internal(const RMaterial* material, ERHIFeatureLevel::Type inFeatureLevel) const;
 	private: 
 		uint32 mFeatureLevelsToForceCompile;
 
@@ -83,4 +130,6 @@ namespace Air
 	public:
 		RenderCommandFence mParentReference;
 	};
+
+	
 }

@@ -90,4 +90,56 @@ namespace Air
 		return INDEX_NONE;
 	}
 #endif
+
+	MaterialRelevance MaterialInterface::getRelevance(ERHIFeatureLevel::Type inFeatureLevel) const
+	{
+		const RMaterial* material = getMaterial();
+		return getRelevance_Internal(material, inFeatureLevel);
+	}
+
+	MaterialRelevance MaterialInterface::getRelevance_Internal(const RMaterial* material, ERHIFeatureLevel::Type inFeatureLevel) const
+	{
+		if (material)
+		{
+			const MaterialResource* materialResource = material->getMaterialResource(inFeatureLevel);
+			const bool bIsTranslucent = isTranslucentBlendMode((EBlendMode)getBlendMode());
+			EMaterialShadingModel shadingModel = getShadingModel();
+			EMaterialDomain domain = (EMaterialDomain)materialResource->getMaterialDomain();
+			bool bDecal = (domain == MD_DeferredDecal);
+
+			MaterialRelevance materialRelevance;
+			materialRelevance.mShadingModelMask = 1 << shadingModel;
+			if (bDecal)
+			{
+				materialRelevance.bDecal = bDecal;
+			}
+			else
+			{
+				materialRelevance.bOpaque = !bIsTranslucent;
+				materialRelevance.bMasked = isMasked();
+				//materialRelevance.bDistortion= materialResource->isdisto
+			}
+			return materialRelevance;
+		}
+		else
+		{
+			return MaterialRelevance();
+		}
+	}
+
+	void MaterialRelevance::setPrimitiveViewRelevance(PrimitiveViewRelevance& outViewRelevance) const
+	{
+		outViewRelevance.bOpaqueRelevance = bOpaque;
+		outViewRelevance.bMaskedRelevance = bMasked;
+		outViewRelevance.bDistortionRelevance = bDistortion;
+		outViewRelevance.bSeparateTranslucencyRelevance = bSeparateTranslucency;
+		outViewRelevance.bMobileSeparateTranslucencyRelevance = bMobileSeparateTranslucency;
+		outViewRelevance.bNormalTranslucencyRelevance = bNormalTranslucency;
+		outViewRelevance.mShadingModelMaskRelevance = mShadingModelMask;
+		outViewRelevance.bUsesGlobalDistanceField = bUsesGlobalDistanceField;
+		outViewRelevance.bUsesWorldPositionOffset = bUsesWorldPositionOffset;
+		outViewRelevance.bDecal = bDecal;
+		outViewRelevance.bTranslucentSurfaceLighting = bTranslucentSurfaceLighting;
+		outViewRelevance.bUsesSceneDepth = bUsersSceneDpeth;
+	}
 }

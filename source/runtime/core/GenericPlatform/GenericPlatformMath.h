@@ -2,6 +2,7 @@
 #include "CoreType.h"
 #include "HAL/PlatformCrt.h"
 #include "Math/MathUtility.h"
+#include <cmath>
 namespace Air
 {
 	struct GenericPlatformMath

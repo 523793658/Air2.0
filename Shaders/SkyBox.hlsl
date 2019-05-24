@@ -1,7 +1,7 @@
 #include "Common.hlsl"
 void MainVS(
 	in float4 inPosition : ATTRIBUTE0,
-	out noperspective float3 outWorldPosition : TEXCOOR0,
+	out noperspective float3 outWorldPosition : TEXCOORD0,
 	out float4 outPosition : SV_POSITION
 )
 {

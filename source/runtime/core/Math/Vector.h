@@ -252,7 +252,7 @@ namespace Air
 		static CORE_API const Vector3 Up;
 		static CORE_API const Vector3 Forward;
 		static CORE_API const Vector3 Right;
-
+		static CORE_API const Vector3 One;
 	};
 
 
@@ -489,11 +489,12 @@ namespace Air
 
 	typedef Vector3<float> float3;
 	typedef Vector3<int> int3;
-	typedef Vector3<float16> half2;
+	typedef Vector3<float16> half3;
 
 	typedef Vector2<float> float2;
 	typedef Vector2<uint32> uint2;
 	typedef Vector2<int32>	int2;
+	typedef Vector2<float16> half2;
 
 	template<typename T>
 	FORCEINLINE Vector3<T> operator*(float scale, const Vector3<T>& V)

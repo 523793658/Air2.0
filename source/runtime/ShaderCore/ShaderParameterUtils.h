@@ -68,7 +68,7 @@ namespace Air
 		const ParameterType& value,
 		uint32 elementIndex = 0)
 	{
-		static_assert(!std::_Is_pointer<ParameterType>::value, "Passing by value is not valid.");
+		static_assert(!std::is_pointer<ParameterType>::value, "Passing by value is not valid.");
 		const uint32 alignedTypeSize = align(sizeof(ParameterType), ShaderArrayElementAlignBytes);
 		const int32 numBytesToSet = Math::min<int32>(sizeof(ParameterType), parameter.getNumBytes() - elementIndex * alignedTypeSize);
 		BOOST_ASSERT(parameter.isInitialized());

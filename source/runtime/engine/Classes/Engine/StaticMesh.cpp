@@ -3,11 +3,28 @@
 #include "SimpleReflection.h"
 #include "Misc/App.h"
 #include "Classes/Engine/TextureStreamingTypes.h"
+#include "Interface/ITargetPlatform.h"
 namespace Air
 {
 #if WITH_EDITORONLY_DATA
 	const float RStaticMesh::mMinimumAutoLODPixelError = SMALL_NUMBER;
 #endif
+
+#if WITH_EDITOR
+	static StaticMeshRenderData& getPlatformStaticMeshRenderData(RStaticMesh* mesh, const ITargetPlatform* platform)
+	{
+		BOOST_ASSERT(mesh && mesh->mRenderData);
+		const StaticMeshLODSettings& platformLODSettings = platform->getStaticMeshLODSettings();
+		StaticMeshRenderData* platformRenderData = mesh->mRenderData.get();
+		if (platformRenderData == nullptr)
+		{
+			platformRenderData = new StaticMeshRenderData();
+			platformRenderData->cache(mesh, platformLODSettings);
+		}
+		return *platformRenderData;
+	}
+#endif
+
 
 	RStaticMesh::RStaticMesh(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
@@ -214,6 +231,15 @@ namespace Air
 
 	void RStaticMesh::postLoad()
 	{
+		ParentType::postLoad();
+
+#if WITH_EDITOR
+		cacheDerivedData();
+
+
+#endif
+
+
 		if (App::canEverRender() && !hasAnyFlags(RF_ClassDefaultObject))
 		{
 			initResource();
@@ -232,6 +258,30 @@ namespace Air
 	void RStaticMesh::updateUVChannelData(bool bRebuildAll)
 	{
 
+	}
+
+	void RStaticMesh::cacheDerivedData()
+	{
+		ITargetPlatformManagerModule& targetPlatformManager = getTargetPlatformManagerRef();
+		ITargetPlatform* runningPlatform = targetPlatformManager.getRunningTargetPlatform();
+
+		BOOST_ASSERT(runningPlatform);
+
+		const StaticMeshLODSettings& LODSettings = runningPlatform->getStaticMeshLODSettings();
+
+
+
+		mRenderData = makeUniquePtr<StaticMeshRenderData>();
+		mRenderData->cache(this, LODSettings);
+		const TArray<ITargetPlatform*>& targetPlatforms = targetPlatformManager.getActiveTargetPlatforms();
+		for (int32 platformIndex = 0; platformIndex < targetPlatforms.size(); platformIndex++)
+		{
+			ITargetPlatform* platform = targetPlatforms[platformIndex];
+			if (platform != runningPlatform)
+			{
+				getPlatformStaticMeshRenderData(this, platform);
+			}
+		}
 	}
 
 	DECLARE_SIMPLER_REFLECTION(RStaticMesh);

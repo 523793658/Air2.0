@@ -14,6 +14,8 @@ namespace Air
 		{
 			return true;
 		}
+
+		static const char* iniPlatformName();
 	};
 
 

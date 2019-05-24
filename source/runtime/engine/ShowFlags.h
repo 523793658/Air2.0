@@ -24,6 +24,12 @@ namespace Air
 #define BUILD_OPTIMIZED_SHOWFLAGS	0 
 #endif
 
+	enum EShowFlagInitMode
+	{
+		ESFIM_Game,
+		ESFIM_Editor,
+		ESFIM_All0
+	};
 
 
 	struct EngineShowFlags
@@ -36,6 +42,34 @@ namespace Air
 #endif
 
 #include "ShowFlagsValues.inl"
+
+		EngineShowFlags(EShowFlagInitMode initMode)
+		{
+			init(initMode);
+		}
+
+		EngineShowFlags()
+		{
+			init(ESFIM_Game);
+		}
+
+	private:
+		void init(EShowFlagInitMode initMode)
+		{
+			if (initMode == ESFIM_All0)
+			{
+				Memory::Memset(this, 0x00, sizeof(*this));
+				return;
+			}
+
+			Memory::Memset(this, 0xff, sizeof(*this));
+			setReflectionOverride(false);
+			setShaderComplexity(false);
+			setStationaryLightOverlap(false);
+			setWireframe(false);
+			setVisualizeLightCulling(false);
+			setPostProcessing(false);
+		}
 	};
 
 

@@ -6,8 +6,7 @@
 #include "HAL/Event.h"
 #include "Template/TypeCompatibleBytes.h"
 #include "Template/RefCounting.h"
-
-
+#include <functional>
 #include <utility>
 #include <mutex>
 

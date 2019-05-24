@@ -10,17 +10,7 @@ namespace Air
 
 	}
 
-	PrimitiveSceneProxy* StaticMeshComponent::createSceneProxy()
-	{
-		if (getStaticMesh() == nullptr || getStaticMesh()->mRenderData == nullptr || getStaticMesh()->mRenderData->mLODResources.size() == 0 || getStaticMesh()->mRenderData->mLODResources[0].mVertexBuffer.getNumVertices() == 0)
-		{
-			return nullptr;
-		}
-
-		PrimitiveSceneProxy* proxy = new StaticMeshSceneProxy(this, getStaticMesh()->bLODsShareStaticLighting);
-
-		return proxy;
-	}
+	
 
 	bool StaticMeshComponent::setStaticMesh(class RStaticMesh* newMesh)
 	{

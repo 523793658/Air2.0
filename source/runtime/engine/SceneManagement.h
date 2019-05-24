@@ -217,10 +217,18 @@ namespace Air
 
 	};
 
+	class LightMap;
+	class ShadowMap;
 
 	class LightCacheInterface
 	{
 	public:
+		LightCacheInterface(const LightMap* inLightMap, const ShadowMap* inShadowMap)
+			:mLightMap(inLightMap)
+			,mShadowMap(inShadowMap)
+		{
+		}
+
 		ConstantBufferRHIParamRef getPrecomputedLightingBuffer()const
 		{
 			return mPrecomputedLightingConstantBuffer;
@@ -228,7 +236,7 @@ namespace Air
 
 	private:
 		const LightMap* mLightMap;
-
+		const ShadowMap* mShadowMap;
 		ConstantBufferRHIRef mPrecomputedLightingConstantBuffer;
 
 	};
@@ -270,6 +278,11 @@ namespace Air
 	{
 	public:
 		virtual void drawMesh(const MeshBatch& mesh, float screenSize) = 0;
+	};
+
+	class LightInteraction
+	{
+
 	};
 
 	class MeshElementCollector

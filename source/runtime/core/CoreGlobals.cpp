@@ -31,6 +31,8 @@ namespace Air
 
 	wstring		GGameIni;
 
+	wstring		GEngineIni;
+
 	bool GIntraFrameDebuggingGameThread = false;
 
 	bool GIsGameThreadIdInitialized = false;

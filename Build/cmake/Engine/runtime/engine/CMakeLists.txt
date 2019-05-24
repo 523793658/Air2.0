@@ -77,6 +77,7 @@ SET(SOURCE_FILE
     ${engine_SOURCE_DIR}/StaticMeshRenderData.cpp
     ${engine_SOURCE_DIR}/StaticMeshResources.h
     ${engine_SOURCE_DIR}/StaticMeshResources.cpp
+    ${engine_SOURCE_DIR}/StaticMeshRender.cpp
     ${engine_SOURCE_DIR}/RawIndexBuffer.h
     ${engine_SOURCE_DIR}/RawIndexBuffer.cpp
     ${engine_SOURCE_DIR}/LocalVertexFactory.h

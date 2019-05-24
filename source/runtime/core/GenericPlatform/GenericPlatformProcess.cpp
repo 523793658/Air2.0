@@ -38,7 +38,7 @@ namespace Air
 
 	const wstring GenericPlatformProcess::getModulesDirectory()
 	{
-		return Paths::engineDir() + L"bin";
+		return Paths::engineDir() + TEXT("/bin");
 	}
 
 	const TCHAR* GenericPlatformProcess::getModulePrefix()

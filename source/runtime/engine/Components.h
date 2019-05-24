@@ -6,7 +6,7 @@ namespace Air
 {
 	enum { MAX_TEXCOORDS = 4, MAX_STATIC_TEXCOORDS = 8 };
 
-	struct StaticMeshBuildvertex
+	struct StaticMeshBuildVertex
 	{
 		float3 mPosition;
 		float3 TangentX;

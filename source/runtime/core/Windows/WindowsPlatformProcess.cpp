@@ -310,6 +310,7 @@ namespace Air
 			
 			tempResult = Paths::getPath(tempResult);
 			boost::algorithm::replace_all(tempResult, TEXT("\\"), TEXT("/"));
+			tempResult = tempResult.append(TEXT("/"));
 
 			tempResult.copy(result, tempResult.length());
 			result[tempResult.length()] = 0;

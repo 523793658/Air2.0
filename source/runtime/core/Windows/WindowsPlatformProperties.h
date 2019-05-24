@@ -21,5 +21,15 @@ namespace Air
 		{
 			return false;
 		}
+
+		static FORCEINLINE const TCHAR* platformName()
+		{
+			return TEXT("Windows");
+		}
+
+		static FORCEINLINE const char* iniPlatformName()
+		{
+			return "Windows";
+		}
 	};
 }

@@ -430,6 +430,16 @@ namespace Air
 		{
 			return !!MoveFileW(normalizeFilename(src).c_str(), normalizeFilename(dest).c_str());
 		}
+
+		virtual bool isReadOnly(const TCHAR* filename) override
+		{
+			uint32 result = GetFileAttributes(normalizeFilename(filename).c_str());
+			if (result != 0xFFFFFFFF)
+			{
+				return !!(result & FILE_ATTRIBUTE_READONLY);
+			}
+			return false;
+		}
 	};
 
 

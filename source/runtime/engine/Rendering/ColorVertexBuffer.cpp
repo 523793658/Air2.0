@@ -67,4 +67,69 @@ namespace Air
 		mVertexData = new ColorVertexData(bNeedsCPUAccess);
 		mStride = mVertexData->getStride();
 	}
+
+	void ColorVertexBuffer::init(const TArray<StaticMeshBuildVertex>& vertices)
+	{
+		const int32 inVertexCount = vertices.size();
+		bool bAllColorsAreOpaqueWhite = true;
+		bool bAllColorsAreEquals = true;
+
+		if (inVertexCount > 0)
+		{
+			const Color firstColor = vertices[0].mColor;
+			for (int32 curVertexIndex = 0; curVertexIndex < inVertexCount; ++curVertexIndex)
+			{
+				const Color curColor = vertices[curVertexIndex].mColor;
+				if (curColor.R != 255 || curColor.G != 255 || curColor.B != 255 || curColor.A != 255)
+				{
+					bAllColorsAreOpaqueWhite = false;
+				}
+
+				if (curColor.R != firstColor.R || curColor.G != firstColor.G || curColor.B != firstColor.B || curColor.A != firstColor.A)
+				{
+					bAllColorsAreEquals = false;
+				}
+
+				if (!bAllColorsAreEquals && !bAllColorsAreOpaqueWhite)
+				{
+					break;
+				}
+			}
+		}
+
+		if (bAllColorsAreOpaqueWhite)
+		{
+			cleanUp();
+			mStride = 0;
+			mNumVertex = 0;
+		}
+		else
+		{
+			mNumVertex = inVertexCount;
+			allocateData();
+
+			mVertexData->resizeBuffer(mNumVertex);
+			mData = mVertexData->getDataPointer();
+
+			for (int32 vertexIndex = 0; vertexIndex < vertices.size(); vertexIndex++)
+			{
+				const StaticMeshBuildVertex& sourceVertex = vertices[vertexIndex];
+				const uint32 destVertexIndex = vertexIndex;
+				vertexColor(destVertexIndex) = sourceVertex.mColor;
+			}
+		}
+	}
+
+	void ColorVertexBuffer::initRHI()
+	{
+		if (mVertexData != nullptr)
+		{
+			ResourceArrayInterface* resourceArray = mVertexData->getResourceArray();
+			if (resourceArray->getResourceDataSize())
+			{
+				RHIResourceCreateInfo info(resourceArray);
+				mVertexBufferRHI = RHICreateVertexBuffer(resourceArray->getResourceDataSize(), BUF_Static, info);
+			}
+		}
+	}
 }

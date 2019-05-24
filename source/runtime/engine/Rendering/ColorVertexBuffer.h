@@ -1,6 +1,7 @@
 #pragma once
 #include "EngineMininal.h"
 #include "RenderResource.h"
+#include "Components.h"
 namespace Air
 {
 	class ColorVertexBuffer : public VertexBuffer
@@ -15,12 +16,23 @@ namespace Air
 
 		void cleanUp();
 
+		ENGINE_API void init(const TArray<StaticMeshBuildVertex>& vertices);
+
 		void serialize(Archive& ar, bool bNeedsCPUAccess);
 
 		FORCEINLINE int32 getNumVertices() const
 		{
 			return mNumVertex;
 		}
+
+		FORCEINLINE Color& vertexColor(uint32 vertexIndex)
+		{
+			BOOST_ASSERT(vertexIndex < getNumVertices());
+			return *(Color*)(mData + vertexIndex * mStride);
+		}
+
+		virtual void initRHI() override;
+
 	private:
 		class ColorVertexData*	mVertexData{ nullptr };
 		uint8* mData{ nullptr };

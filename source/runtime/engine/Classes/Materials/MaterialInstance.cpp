@@ -519,6 +519,12 @@ namespace Air
 		
 	}
 
+	MaterialRenderProxy* MaterialInstance::getRenderProxy(bool selected, bool bHovered /* = false */) const
+	{
+		BOOST_ASSERT(!(selected || bHovered) || GIsEditor);
+		return mResources[selected ? 1 : (bHovered ? 2 : 0)];
+	}
+
 
 	DECLARE_SIMPLER_REFLECTION(MaterialInstance);
 }

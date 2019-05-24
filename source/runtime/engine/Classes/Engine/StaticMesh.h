@@ -112,6 +112,9 @@ namespace Air
 		virtual void initResource();
 
 		void updateUVChannelData(bool bRebuildAll);
+
+	private:
+		void cacheDerivedData();
 	public:
 
 		std::unique_ptr<class StaticMeshRenderData> mRenderData;
@@ -135,6 +138,8 @@ namespace Air
 		TArray<StaticMaterial> mStaticMaterials;
 
 		MeshSectionInfoMap mSectionInfoMap;
+
+		wstring mLODGroup;
 
 		bool bAllowCPUAccess;
 	};

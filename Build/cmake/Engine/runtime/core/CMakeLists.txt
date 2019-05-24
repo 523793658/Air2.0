@@ -108,6 +108,8 @@ SET(CORE_MISC_FILE
     ${CORE_SOURCE_DIR}/Misc/AssertionMacros.h 
     ${CORE_SOURCE_DIR}/Misc/ConfigCacheIni.h 
     ${CORE_SOURCE_DIR}/Misc/ConfigCacheIni.cpp 
+    ${CORE_SOURCE_DIR}/Misc/RemoteConfigIni.h 
+    ${CORE_SOURCE_DIR}/Misc/RemoteConfigIni.cpp 
     ${CORE_SOURCE_DIR}/Misc/Parse.h 
     ${CORE_SOURCE_DIR}/Misc/Parse.cpp 
     ${CORE_SOURCE_DIR}/Misc/Util.h 
@@ -138,7 +140,6 @@ SET(WINDOWS_FILE
     ${CORE_SOURCE_DIR}/Windows/WindowsPlatformMemory.cpp 
     ${CORE_SOURCE_DIR}/Windows/WindowsPlatformProperties.h 
     ${CORE_SOURCE_DIR}/Windows/WindowsPlatformProperties.cpp 
-    ${CORE_SOURCE_DIR}/Windows/GenericWindowsTargetPlatform.h 
     ${CORE_SOURCE_DIR}/Windows/AllowWindowsPlatformTypes.h 
     ${CORE_SOURCE_DIR}/Windows/WindowsPlatformAffinity.h 
     ${CORE_SOURCE_DIR}/Windows/WindowsPlatformAffinity.cpp 

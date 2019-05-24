@@ -1,4 +1,5 @@
 #include "CoreMinimal.h"
+#include "RHIResource.h"
 #include "Interface/ITargetPlatformManagerModule.h"
 #include "Interface/IShaderFormat.h"
 #include "Modules/ModuleManager.h"
@@ -6,8 +7,18 @@
 #include "Interface/ITargetPlatform.h"
 #include "Misc/ScopedSlowTask.h"
 #include "Interface/ITargetPlatformModule.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
+#include "boost/algorithm/string.hpp"
+
 namespace Air
 {
+#if !IS_MONOLITHIC && (PLATFORM_WINDOWS)
+#define AUTOSDK_ENABLED		0
+#else
+#define AUTOSDK_ENABLED		0
+#endif
+
 	class TargetPlatformManagerModule : public ITargetPlatformManagerModule
 	{
 	private:
@@ -100,12 +111,40 @@ namespace Air
 			return result;
 		}
 
+		bool isAutoSDKsEnabled()
+		{
+			static const wstring sdkRootEnvFar(TEXT("AIR_SDKS_ROOT"));
+			const int32 maxPathSize = 16384;
+			TCHAR sdkPath[maxPathSize] = { 0 };
+			PlatformMisc::getEnvironmentVariable(sdkRootEnvFar.c_str(), sdkPath, maxPathSize);
+
+			if (sdkPath[0] != 0)
+			{
+				return true;
+			}
+			return false;
+		}
+
+		bool setupEnvironmentFromAutoSDK(const wstring& autoSDKPath)
+		{
+			return true;
+		}
+
+		bool setupAndValidateAutoSDK(const wstring& autoSDKPath)
+		{
+#if AUTOSDK_ENABLED
+#else
+			return true;
+#endif
+		}
+
+
 		void discoverAvailablePlatforms()
 		{
 			mPlatforms.empty(mPlatforms.size());
 			TArray<wstring> modules;
 
-			wstring moduleWildCard = TEXT("TargetPlatform");
+			wstring moduleWildCard = TEXT("*TargetPlatform");
 
 #if WITH_EDITOR
 #if PLATFORM_WINDOWS
@@ -128,19 +167,63 @@ namespace Air
 					ITargetPlatform* platform = mod->getTargetPlatform();
 					if (platform != nullptr)
 					{
+					RETRY_SETUPANDVALIDATE:
+						if (setupAndValidateAutoSDK(platform->getPlatformInfo().mAutoSDKPath))
+						{
+							mPlatforms.add(platform);
+						}
+						else
+						{
+							//static bool bIsChildCooker
+						}
+					}
+					else
+					{
+
 					}
 				}
 			}
-
 		}
 
 		virtual const TArray<ITargetPlatform*>& getTargetPlatforms() override
 		{
 			if (mPlatforms.size() == 0 || bForceCacheUpdate)
 			{
-				//diso
+				discoverAvailablePlatforms();
 			}
 			return mPlatforms;
+		}
+
+		virtual const TArray<ITargetPlatform*>& getActiveTargetPlatforms() override
+		{
+			static bool bInitialized = false;
+			static TArray<ITargetPlatform*> results;
+			if (!bInitialized || bForceCacheUpdate)
+			{
+				bInitialized = true;
+				results.empty(results.size());
+				const TArray<ITargetPlatform*>& targetPlatforms = getTargetPlatforms();
+
+				for (int32 index = 0; index < targetPlatforms.size(); index++)
+				{
+					if (targetPlatforms[index]->isRunningPlatform())
+					{
+						results.add(targetPlatforms[index]);
+					}
+				}
+				if (!results.size())
+				{
+					AIR_LOG(LOGTargetPlatformManager, Display, TEXT("Not building assets for any platform."));
+				}
+				else
+				{
+					for (int32 index = 0; index < results.size(); index++)
+					{
+						AIR_LOG(LogTargetPlatformManager, Display, TEXT("Building Assets for %s"), results[index]->platformName().c_str());
+					}
+				}
+			}
+			return results;
 		}
 
 		TArray<ITargetPlatform*> mPlatforms;

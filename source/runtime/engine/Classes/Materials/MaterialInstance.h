@@ -95,6 +95,8 @@ namespace Air
 
 		ENGINE_API virtual bool isPropertyActive(EMaterialProperty inProperty) const override;
 
+		virtual ENGINE_API MaterialRenderProxy* getRenderProxy(bool selected, bool bHovered = false) const override;
+
 		void updatePermutationAllocations();
 
 		void cacheResourceShaderForRendering();

@@ -177,6 +177,8 @@ namespace AirFbx
 		mImportOptions = new FBXImporterOptions();
 
 		Memory::memzero(*mImportOptions);
+		mImportOptions->bConvertScene = true;
+		mImportOptions->bTransformVertexToAbsolute = true;
 	}
 
 
@@ -491,7 +493,7 @@ namespace AirFbx
 			vertexColorImportOption = EVertexColorImportOption::Replace;
 		}
 
-		if (inStaticMesh != nullptr && LODIndex > 0)
+		if (inStaticMesh != nullptr)
 		{
 			staticMesh = inStaticMesh;
 		}
@@ -1029,13 +1031,13 @@ namespace AirFbx
 
 						tempValue = layerElementBinormal->GetDirectArray().GetAt(binormalValueIndex);
 						tempValue = totalMatrixForNormal.MultT(tempValue);
-						float3 tangentY = -mDataConverter.convertDir(tempValue);
-						rawMesh.mWedgeTangentY[wedgeIndex] = tangentY.getSafeNormal();
+						float3 tangentZ = -mDataConverter.convertDir(tempValue);
+						rawMesh.mWedgeTangentZ[wedgeIndex] = tangentZ.getSafeNormal();
 					}
 					FbxVector4 tempValue = layerElementNormal->GetDirectArray().GetAt(normalValueIndex);
 					tempValue = totalMatrixForNormal.MultT(tempValue);
-					float3 tangentZ = mDataConverter.convertDir(tempValue);
-					rawMesh.mWedgeTangentZ[wedgeIndex] = tangentZ.getSafeNormal();
+					float3 tangentY = mDataConverter.convertDir(tempValue);
+					rawMesh.mWedgeTangentY[wedgeIndex] = tangentY.getSafeNormal();
 
 				}
 
@@ -1320,7 +1322,26 @@ namespace AirFbx
 		geometry.SetS(scaling);
 
 		FbxAMatrix& globalTransform = mScene->GetAnimationEvaluator()->GetNodeGlobalTransform(node);
-		FbxAMatrix totalMatrix = geometry;
+		if (!mImportOptions->bTransformVertexToAbsolute)
+		{
+			if (mImportOptions->bBakePivotInVertex)
+			{
+				FbxAMatrix pivotGeometry;
+				FbxVector4 rotationPivot = node->GetRotationPivot(FbxNode::eSourcePivot);
+				FbxVector4 fullPivot;
+				fullPivot[0] = -rotationPivot[0];
+				fullPivot[1] = -rotationPivot[1];
+				fullPivot[2] = -rotationPivot[2];
+				pivotGeometry.SetT(fullPivot);
+				geometry = geometry * pivotGeometry;
+			}
+			else
+			{
+				geometry.SetIdentity();
+			}
+		}
+
+		FbxAMatrix totalMatrix = mImportOptions->bTransformVertexToAbsolute ? globalTransform * geometry : geometry;
 		return totalMatrix;
 	}
 

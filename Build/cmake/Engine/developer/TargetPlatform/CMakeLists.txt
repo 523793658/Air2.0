@@ -11,6 +11,8 @@ SET(Interface_FILES
     ${AIR_DEVELOPER_SOURCE_DIR}/TargetPlatform/Interface/ITargetPlatformManagerModule.h
     ${AIR_DEVELOPER_SOURCE_DIR}/TargetPlatform/Interface/ITargetPlatformModule.h
     ${AIR_DEVELOPER_SOURCE_DIR}/TargetPlatform/Interface/IShaderFormatModule.h
+    ${AIR_DEVELOPER_SOURCE_DIR}/TargetPlatform/Interface/ITargetDevice.h
+    ${AIR_DEVELOPER_SOURCE_DIR}/TargetPlatform/Interface/TargetDeviceId.h
     )
 SOURCE_GROUP(Interface FILES ${Interface_FILES})
     
