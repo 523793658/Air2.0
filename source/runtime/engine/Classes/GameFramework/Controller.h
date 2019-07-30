@@ -33,7 +33,7 @@ namespace Air
 
 		virtual void getPlayerViewPoint(float3& outLocation, Rotator& outRotation) const;
 
-		FORCEINLINE APawn* getPawn() const { return mPawn; }
+		FORCEINLINE APawn* getPawn() const { return mPawn.get(); }
 
 		EStateName getStateName() const;
 
@@ -52,7 +52,7 @@ namespace Air
 
 		virtual void setControlRotation(const Rotator& newRotation);
 
-		virtual void removePawnTickDependency(APawn* inOldPawn);
+		virtual void removePawnTickDependency(std::shared_ptr<APawn> inOldPawn);
 
 		virtual void addPawnTickDependency(APawn* inPawn);
 
@@ -73,15 +73,15 @@ namespace Air
 
 		uint32 bAttachToPawn : 1;
 
-		APawn* mPawn;
+		std::shared_ptr<APawn> mPawn;
 
 		EStateName mStateName;
 
 
 		Rotator mControlRotation;
 		
-		class APlayerState* mPlayerState;
+		std::shared_ptr<class APlayerState> mPlayerState;
 	
-		class SceneComponent* mTransformComponent;
+		std::shared_ptr<class SceneComponent> mTransformComponent;
 	};
 }

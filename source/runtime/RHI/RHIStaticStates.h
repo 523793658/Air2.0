@@ -135,6 +135,9 @@ namespace Air
 		};
 	};
 
+
+
+
 	/**
 	* A static RHI sampler state resource.
 	* TStaticSamplerStateRHI<...>::GetStaticState() will return a FSamplerStateRHIRef to a sampler state with the desired settings.

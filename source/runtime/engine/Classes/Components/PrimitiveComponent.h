@@ -22,7 +22,7 @@ namespace Air
 
 		virtual Matrix getRenderMatrix()const;
 
-		virtual class MaterialInterface* getMaterial(int32 elementIndex) const;
+		virtual std::shared_ptr<class MaterialInterface> getMaterial(int32 elementIndex) const;
 
 		virtual void unWeldFromParent();
 

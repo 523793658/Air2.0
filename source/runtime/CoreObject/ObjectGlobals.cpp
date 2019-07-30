@@ -23,7 +23,6 @@ namespace Air
 		mObjectArchetype(inObjectArchetType)
 		, bCopyTransientsFromClassDefaults(bInCopyTransientsFromClassDefaults)
 		, bShouldInitializePropsFromArchetype(true)
-		, mLastConstructedObject(nullptr)
 		, bIsDeferredInitializer(false)
 	{
 		ObjectThreadContext& threadContext = ObjectThreadContext::get();
@@ -54,10 +53,10 @@ namespace Air
 		RClass* Class = mObj->getClass();
 		if (Class != Object::StaticClass())
 		{
-			if(!mObjectArchetype && Class->getClass())
+			/*if(!mObjectArchetype && Class->getClass())
 			{
 				mObjectArchetype = Class->getDefaultObject();
-			}
+			}*/
 		}
 		else if (bIsCDO)
 		{
@@ -85,10 +84,10 @@ namespace Air
 		mObj = nullptr;
 	}
 
-	Object* ObjectInitializer::createDefaultSubObject(Object* outer, wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient) const
+	std::shared_ptr<Object> ObjectInitializer::createDefaultSubObject(Object* outer, wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient) const
 	{
 		BOOST_ASSERT(ObjectThreadContext::get().mIsInConstructor);
-		Object* result = nullptr;
+		std::shared_ptr<Object> result;
 		RClass* overrideClass = mComponentOverrides.get(subObjectName, returnType, classToCreateByDefault, *this);
 		if (!overrideClass && bIsRequired)
 		{
@@ -102,7 +101,7 @@ namespace Air
 			result = staticConstructObject_Internal(overrideClass, outer, subObjectName, subObjectFlags);
 			if (outer->hasAnyFlags(RF_ClassDefaultObject) && outer->getClass()->getSupperClass())
 			{
-				outer->getClass()->addDefaultSubobject(result, returnType);
+				outer->getClass()->addDefaultSubobject(result.get(), returnType);
 			}
 			result->setFlags(RF_DefaultSubobject);
 		}
@@ -110,6 +109,8 @@ namespace Air
 		
 		return result;
 	}
+
+	
 
 	void Object::postInitProperties()
 	{
@@ -144,19 +145,19 @@ namespace Air
 			*bOutRecycledSubobject = bSubObject;
 		}
 		return obj;
-		return nullptr;
 	}
 
-	Object* staticConstructObject_Internal(RClass* inClass, Object* inOuter /* = nullptr */, wstring name /* = TEXT("") */, EObjectFlags setFlags /* = RF_NoFlags */, EInternalObjectFlags internalSetFlags /* = EInternalObjectFlags::None */, Object* inTemplate /* = nullptr */, bool bCopyTransientsFromClassDefaults /* = false */)
+	std::shared_ptr<Object> staticConstructObject_Internal(RClass* inClass, Object* inOuter /* = nullptr */, wstring name /* = TEXT("") */, EObjectFlags setFlags /* = RF_NoFlags */, EInternalObjectFlags internalSetFlags /* = EInternalObjectFlags::None */, Object* inTemplate /* = nullptr */, bool bCopyTransientsFromClassDefaults /* = false */)
 	{
-		Object* result = nullptr;
+		Object* result;
 		//BOOST_ASSERT(!inTemplate || inTemplate->is)
 		bool bRecycledSubobject = false;
 		result = staticAllocateObject(inClass, inOuter, name, setFlags, internalSetFlags, bCopyTransientsFromClassDefaults, &bRecycledSubobject);
-		(*inClass->classConstructor)(ObjectInitializer(result, inTemplate, bCopyTransientsFromClassDefaults, false));
-		return result;
-
-
+		ObjectInitializer initializer(result, inTemplate, bCopyTransientsFromClassDefaults, false);
+		(*inClass->classConstructor)(initializer);
+		auto ptr = initializer.getSharedPtr();
+		initializer.mObjectSharedPtr.reset();
+		return ptr;
 	}
 
 	ObjectInitializer& ObjectInitializer::get()
@@ -167,7 +168,7 @@ namespace Air
 
 
 
-	Object* staticLoadObjectInternal(RClass* objectClass, Object* inOuter, const TCHAR* inName, const TCHAR* filename, uint32 loadFlags)
+	std::shared_ptr<Object> staticLoadObjectInternal(RClass* objectClass, Object* inOuter, const TCHAR* inName, const TCHAR* filename, uint32 loadFlags)
 	{
 		BOOST_ASSERT(objectClass);
 		BOOST_ASSERT(inName);
@@ -186,10 +187,10 @@ namespace Air
 		return true;
 	}
 
-	Object* staticLoadObject(RClass* inClass, Object* inOuter, const TCHAR* name, const TCHAR* filename /* = nullptr */, uint32 loadFlags /* = LOAD_None */)
+	std::shared_ptr<Object> staticLoadObject(RClass* inClass, Object* inOuter, const TCHAR* name, const TCHAR* filename /* = nullptr */, uint32 loadFlags /* = LOAD_None */)
 	{
 		BOOST_ASSERT(ObjectThreadContext::get().isRoutingPostLoad && isInAsyncLoadingThread());
-		Object* result = staticLoadObjectInternal(inClass, inOuter, name, filename, loadFlags);
+		std::shared_ptr<Object> result = staticLoadObjectInternal(inClass, inOuter, name, filename, loadFlags);
 
 		if (!result)
 		{
@@ -218,6 +219,17 @@ namespace Air
 			return false;
 		}
 		return true;
+	}
+
+	void ObjectInitializer::initSharedPtr()
+	{
+		mObjectSharedPtr = std::shared_ptr<Object>(mObj, freeObject);
+	}
+
+	COREOBJECT_API void freeObject(Object* obj)
+	{
+		obj->~Object();
+		GObjectAllocator.freeObject(obj);
 	}
 }
  

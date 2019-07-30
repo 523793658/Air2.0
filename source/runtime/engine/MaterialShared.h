@@ -252,7 +252,7 @@ namespace Air
 
 		const MaterialShaderMapId& getShaderMapId() const { return mShaderMapId; }
 
-		void compile(FMaterial* material, const MaterialShaderMapId& shaderMapId, TRefCountPtr<ShaderCompilerEnvironment> materialEnvironment, const MaterialCompilationOutput& inMateiralCompilationOutput, EShaderPlatform platform, bool bSynchronousCompile, bool bApplyCompletedShaderMapForRendering);
+		void compile(FMaterial* material, const MaterialShaderMapId& shaderMapId, TRefCountPtr<ShaderCompilerEnvironment> materialEnvironment, const MaterialCompilationOutput& inMaterialCompilationOutput, EShaderPlatform platform, bool bSynchronousCompile, bool bApplyCompletedShaderMapForRendering);
 
 		virtual void finishCleanup()
 		{
@@ -277,7 +277,7 @@ namespace Air
 
 		uint32 getCompilingId()const { return mCompilingId; }
 
-		bool isMateiralShaderComplete(const FMaterial* mateiral, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, bool bSilent);
+		bool isMaterialShaderComplete(const FMaterial* material, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, bool bSilent);
 
 		const wstring& getFriendlyName() const { return mFriendlyName; }
 	private:
@@ -351,8 +351,6 @@ namespace Air
 		virtual bool isSpecialEngineMaterial() const = 0;
 
 		virtual bool requiresSynchronousCompilation()const { return false; }
-
-		virtual const TArray<RTexture*>& getReferencedTextures() const = 0;
 
 		virtual float getOpacityMaskClipValue() const = 0;
 
@@ -448,6 +446,8 @@ namespace Air
 
 		virtual int32 compilePropertyAndSetMaterialProperty(EMaterialProperty prop, class MaterialCompiler* compiler, EShaderFrequency overrideShaderFrequency = SF_NumFrequencies, bool bUsePreviousFrameTime = false) const = 0;
 
+		virtual const TArray<std::shared_ptr<RTexture>>& getReferencedTextures() const = 0;
+
 	private:
 		MaterialShaderMap* mRenderingThreadShaderMap;
 
@@ -504,20 +504,13 @@ namespace Air
 
 		ENGINE_API virtual bool isLightFunction() const override;
 
-		virtual const TArray<RTexture*>& getReferencedTextures() const override;
-
 		wstring getFriendlyName() const override;
 
 		virtual float getOpacityMaskClipValue() const override;
 
 		virtual Guid getMaterialId() const;
 
-		void setMaterial(RMaterial* inMaterial, EMaterialQualityLevel::Type inQualityLevel, bool bInQualityLevelHasDifferentNodes, ERHIFeatureLevel::Type inFeatureLevel, MaterialInstance* instance = nullptr)
-		{
-			mMaterial = inMaterial;
-			mMaterialInstance = instance;
-			setQualityLevelProperties(inQualityLevel, bInQualityLevelHasDifferentNodes, inFeatureLevel);
-		}
+		void setMaterial(class RMaterial* inMaterial, EMaterialQualityLevel::Type inQualityLevel, bool bInQualityLevelHasDifferentNodes, ERHIFeatureLevel::Type inFeatureLevel, std::shared_ptr<MaterialInstance> instance = std::shared_ptr<MaterialInstance>());
 
 		ENGINE_API virtual bool isSpecialEngineMaterial() const override;
 
@@ -526,10 +519,10 @@ namespace Air
 
 		virtual int32 compilePropertyAndSetMaterialProperty(EMaterialProperty prop, class MaterialCompiler* compiler, EShaderFrequency overrideShaderFrequency = SF_NumFrequencies, bool bUsePreviousFrameTime = false) const override;
 
-
+		ENGINE_API virtual const TArray<std::shared_ptr<RTexture>>& getReferencedTextures() const override;
 	protected:
-		RMaterial* mMaterial;
-		MaterialInstance* mMaterialInstance;
+		std::shared_ptr<RMaterial> mMaterial;
+		std::shared_ptr<MaterialInstance> mMaterialInstance;
 	};
 
 	struct ENGINE_API MaterialRenderContext
@@ -546,18 +539,20 @@ namespace Air
 
 	class MaterialConstantExpressionTexture : public MaterialConstantExpression
 	{
+		DECLARE_MATERIALCONSTANTEXPRESSION_TYPE(MaterialConstantExpressionTexture);
 	public:
 
 		MaterialConstantExpressionTexture();
 		MaterialConstantExpressionTexture(int32 inTextureIndex, ESamplerSourceMode inSamplerSource);
 		virtual void serialize(Archive& ar);
-		virtual void getTextureValue(const MaterialRenderContext& context, const FMaterial& material, const RTexture* & outValue, ESamplerSourceMode& outSamplerSource) const;
+		virtual void getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<const RTexture>& outValue, ESamplerSourceMode& outSamplerSource) const;
 
+		virtual MaterialConstantExpressionTexture* getTextureConstantExpression() { return this; }
 	protected:
 		int32 mTextureIndex;
 		ESamplerSourceMode mSamplerSource;
-		RTexture* mTransientOverrideValue_GameThread;
-		RTexture* mTransientOverrideValue_RenderThread;
+		std::shared_ptr<RTexture> mTransientOverrideValue_GameThread;
+		std::shared_ptr<RTexture> mTransientOverrideValue_RenderThread;
 
 	};
 
@@ -628,7 +623,7 @@ namespace Air
 
 		virtual bool getScalarValue(const wstring parameterName, float* outValue, const MaterialRenderContext& context) const = 0;
 
-		virtual bool getTextureValue(const wstring parameterName, const RTexture** outValue, const MaterialRenderContext& context) const = 0;
+		virtual bool getTextureValue(const wstring parameterName, std::shared_ptr<const RTexture>& outValue, const MaterialRenderContext& context) const = 0;
 
 		void ENGINE_API invalidateConstantExpressionCache();
 
@@ -683,7 +678,7 @@ namespace Air
 	private:
 		VertexFactoryType* mVertexFactoryType;
 
-		static bool isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* mateiral, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, bool bSilent);
+		static bool isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* material, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, bool bSilent);
 
 	};
 

@@ -50,9 +50,9 @@ namespace Air
 	public:
 		float3 mVelocity;
 
-		SceneComponent* mUpdatedComponent;
+		std::shared_ptr<SceneComponent> mUpdatedComponent;
 
-		class PrimitiveComponent* mUpdatedPrimitive;
+		std::shared_ptr<class PrimitiveComponent> mUpdatedPrimitive;
 	};
 
 	inline void MovementComponent::stopMovementImmediately()

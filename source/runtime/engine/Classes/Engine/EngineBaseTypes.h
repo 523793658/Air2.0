@@ -98,7 +98,7 @@ namespace Air
 
 	struct TickPrerequisite
 	{
-		class Object* mPrerequisiteObject;
+		std::shared_ptr<class Object> mPrerequisiteObject;
 		struct TickFunction*		mPrerequisiteTickFunction;
 
 		TickPrerequisite()

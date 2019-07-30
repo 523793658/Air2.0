@@ -18,7 +18,7 @@ namespace Air
 		bCachedMaterialParameterIndicesAreDirty = true;
 	}
 
-	MaterialInterface* MeshComponent::getMaterial(int32 elementIndex) const
+	std::shared_ptr<MaterialInterface> MeshComponent::getMaterial(int32 elementIndex) const
 	{
 		if (mOverrideMaterials.isValidIndex(elementIndex))
 		{
@@ -30,11 +30,12 @@ namespace Air
 		}
 	}
 
+
 	void MeshComponent::setMaterial(int32 elementIndex, class MaterialInterface* material)
 	{
 		if (elementIndex >= 0)
 		{
-			if (mOverrideMaterials.isValidIndex(elementIndex) && (mOverrideMaterials[elementIndex] == material))
+			if (mOverrideMaterials.isValidIndex(elementIndex) && (mOverrideMaterials[elementIndex].get() == material))
 			{
 
 			}
@@ -47,12 +48,12 @@ namespace Air
 				if (material != nullptr && mOverrideMaterials[elementIndex] != nullptr)
 				{
 					RMaterialInstanceDynamic* dynamicMaterial = dynamic_cast<RMaterialInstanceDynamic*>(material);
-					if (dynamicMaterial != nullptr && dynamicMaterial->mParent != mOverrideMaterials[elementIndex])
+					if (dynamicMaterial && dynamicMaterial->mParent != mOverrideMaterials[elementIndex])
 					{
 						markCachedMaterialParameterNameIndicesDirty();
 					}
 				}
-				mOverrideMaterials[elementIndex] = material;
+				mOverrideMaterials[elementIndex] = std::dynamic_pointer_cast<MaterialInterface>(material->shared_from_this());
 				markRenderStateDirty();
 			}
 		}

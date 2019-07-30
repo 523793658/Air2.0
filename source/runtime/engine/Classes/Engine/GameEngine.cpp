@@ -36,10 +36,10 @@ namespace Air
 			mGameInstance->initializeStandalone();
 		}
 
-		GameViewportClient* viewportClient = nullptr;
+		std::shared_ptr<GameViewportClient> viewportClient;
 		if (GIsClient)
 		{
-			viewportClient = new GameViewportClient();
+			viewportClient = MakeSharedPtr<GameViewportClient>();
 			viewportClient->init(*mGameInstance->getWorldContext(), mGameInstance);
 			mGameViewport = viewportClient;
 			mGameInstance->getWorldContext()->mGameViewport = viewportClient;
@@ -52,7 +52,7 @@ namespace Air
 			{
 				mGameViewportWindow = createGameWindow();
 			}
-			createGameViewport(viewportClient);
+			createGameViewport(viewportClient.get());
 			if (!bWindowAlreadyExits)
 			{
 				switchGameWindowToUseGameViewport();
@@ -182,7 +182,7 @@ namespace Air
 
 	void GameEngine::redrawViewports(bool bShouldPresent /* = true */)
 	{
-		if (mGameViewport != nullptr)
+		if (mGameViewport)
 		{
 			mGameViewport->layoutPlayers();
 			if (mGameViewport->mViewport != nullptr)

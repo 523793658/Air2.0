@@ -20,9 +20,9 @@ namespace Air
 
 		struct WorldContext* getWorldContext() const { return mWorldContext; }
 
-		const TArray<LocalPlayer*>& getLocalPlayers() const;
+		const TArray<std::shared_ptr<LocalPlayer>>& getLocalPlayers() const;
 
-		TArray<class LocalPlayer*>::TConstIterator getLocalPlayerIterator() const
+		TArray<std::shared_ptr<class LocalPlayer>>::TConstIterator getLocalPlayerIterator() const
 		{
 			return mLocalPlayers.createConstIterator();
 		}
@@ -33,17 +33,17 @@ namespace Air
 
 		virtual void init();
 
-		int32 addLocalPlayer(LocalPlayer* newLocalPlayer, int32 ControllerId);
+		int32 addLocalPlayer(std::shared_ptr<LocalPlayer> newLocalPlayer, int32 ControllerId);
 		
 		ViewportClient* getGameViewportClient() const;
 
-		LocalPlayer* createInitialPlayer(wstring &outError);
+		std::shared_ptr<LocalPlayer> createInitialPlayer(wstring &outError);
 
-		LocalPlayer* createLocalPlayer(int32 ControllerId, wstring& outError, bool bSpawnActor);
+		std::shared_ptr<LocalPlayer> createLocalPlayer(int32 ControllerId, wstring& outError, bool bSpawnActor);
 
-		LocalPlayer* findLocalPlayerFromControllerId(const int32 controllerID) const;
+		std::shared_ptr<LocalPlayer> findLocalPlayerFromControllerId(const int32 controllerID) const;
 
-		virtual class GameModeBase* createGameModeForURL(URL inURL);
+		virtual std::shared_ptr<class GameModeBase> createGameModeForURL(URL inURL);
 
 		virtual void startGameInstance();
 
@@ -55,7 +55,7 @@ namespace Air
 	private:
 		struct WorldContext*	mWorldContext;
 
-		TArray<LocalPlayer*>	mLocalPlayers;
+		TArray<std::shared_ptr<LocalPlayer>>	mLocalPlayers;
 
 		Engine* mEngine;
 	};

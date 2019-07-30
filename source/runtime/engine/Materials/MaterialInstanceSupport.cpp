@@ -43,16 +43,16 @@ namespace Air
 		return nullptr;
 	}
 
-	void MaterialInstanceResource::GameThread_setParent(MaterialInterface* parentMaterialInterface)
+	void MaterialInstanceResource::GameThread_setParent(std::shared_ptr<MaterialInterface>& parentMaterialInterface)
 	{
 		BOOST_ASSERT(isInGameThread() || isAsyncLoading());
 		if (mGameThreadParent != parentMaterialInterface)
 		{
-			MaterialInterface* oldParent = mGameThreadParent;
+			std::shared_ptr<MaterialInterface>& oldParent = mGameThreadParent;
 			mGameThreadParent = parentMaterialInterface;
 			BOOST_ASSERT(parentMaterialInterface != nullptr);
 			ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-				InitMaterialInstanceResource, MaterialInstanceResource*, resource, this, MaterialInterface*, parent, parentMaterialInterface,
+				InitMaterialInstanceResource, MaterialInstanceResource*, resource, this, std::shared_ptr<MaterialInterface>&, parent, parentMaterialInterface,
 				{
 					resource->mParent = parent;
 					resource->invalidateConstantExpressionCache();
@@ -109,13 +109,13 @@ namespace Air
 		}
 	}
 
-	bool MaterialInstanceResource::getTextureValue(const wstring parameterName, const RTexture** outValue, const MaterialRenderContext& context) const
+	bool MaterialInstanceResource::getTextureValue(const wstring parameterName, std::shared_ptr<const RTexture>& outValue, const MaterialRenderContext& context) const
 	{
 		BOOST_ASSERT(isInParallelRenderingThread());
 		const RTexture* const * value = RenderThread_findParameterByName<const RTexture*>(parameterName);
 		if (value && *value)
 		{
-			*outValue = *value;
+			outValue.reset(*value);
 			return true;
 		}
 		else if (mParent)
@@ -146,7 +146,7 @@ namespace Air
 				else
 				{
 					EMaterialDomain domain = (EMaterialDomain)staticPermutationResource->getMaterialDomain();
-					RMaterial* fallbackMaterial = RMaterial::getDefaultMaterial(domain);
+					std::shared_ptr<RMaterial>& fallbackMaterial = RMaterial::getDefaultMaterial(domain);
 					return fallbackMaterial->getRenderProxy(isSelected(), isHovered())->getMaterial(inFeatureLevel);
 				}
 
@@ -158,7 +158,7 @@ namespace Air
 		}
 		else
 		{
-			RMaterial* fallbackMaterial = RMaterial::getDefaultMaterial(MD_Surface);
+			std::shared_ptr<RMaterial>& fallbackMaterial = RMaterial::getDefaultMaterial(MD_Surface);
 			return fallbackMaterial->getRenderProxy(isSelected(), isHovered())->getMaterial(inFeatureLevel);
 		}
 	}

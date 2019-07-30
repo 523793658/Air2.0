@@ -166,7 +166,7 @@ namespace Air
 		params.mParent = inParentMesh;
 
 		uint32 tangentXOffset = 0;
-		uint32 tangentZOffset = 0;
+		uint32 tangentYOffset = 0;
 		uint32 uvBaseOffset = 0;
 		SELECT_STATIC_MESH_VERTEX_TYPE(
 			params.mLODResource->mVertexBuffer.getUseHighPrecisionTangentBasis(),
@@ -174,7 +174,7 @@ namespace Air
 			params.mLODResource->mVertexBuffer.getNumTexCoords(),
 			{
 				tangentXOffset = STRUCT_OFFSET(VertexType, mTangentX);
-				tangentZOffset = STRUCT_OFFSET(VertexType, mTangentZ);
+				tangentYOffset = STRUCT_OFFSET(VertexType, mTangentY);
 				uvBaseOffset = STRUCT_OFFSET(VertexType, mUVs);
 			});
 
@@ -182,7 +182,7 @@ namespace Air
 			InitStaticMeshVertexFactory,
 			InitStaticMeshVertexFactoryParams, params, params,
 			uint32, tangentXOffset, tangentXOffset,
-			uint32, tangentZOffset, tangentZOffset,
+			uint32, tangentYOffset, tangentYOffset,
 			uint32, uvBaseOffset, uvBaseOffset,
 			{
 				LocalVertexFactory::DataType data;
@@ -199,7 +199,7 @@ namespace Air
 				);
 				data.mTangentBasisComponents[1] = VertexStreamComponent(
 					&params.mLODResource->mVertexBuffer,
-					tangentZOffset,
+					tangentYOffset,
 					params.mLODResource->mVertexBuffer.getStride(),
 					params.mLODResource->mVertexBuffer.getUseHighPrecisionTangentBasis() ? TStaticMeshVertexTangentTypeSelector<EStaticMeshVertexTangentBasisType::HighPrecision>::VertexElementType : TStaticMeshVertexTangentTypeSelector<EStaticMeshVertexTangentBasisType::Default>::VertexElementType);
 

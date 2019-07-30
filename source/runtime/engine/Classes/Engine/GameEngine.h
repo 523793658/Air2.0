@@ -37,7 +37,7 @@ namespace Air
 		MovieSceneCaptureHandle mStartupMovieCaptureHandle;
 
 	public:
-		class GameViewportClient* mGameViewport;
+		std::shared_ptr<class GameViewportClient> mGameViewport;
 
 
 		std::weak_ptr<class SWindow> mGameViewportWindow;

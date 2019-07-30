@@ -10,9 +10,9 @@ namespace Air
 	struct TextureInfo
 	{
 		RTexture::TextureType mType;
-		uint32 mWidth;
-		uint32 mHeight;
-		uint32 mDepth;
+		int32 mWidth;
+		int32 mHeight;
+		int32 mDepth;
 		uint32 mArraySize;
 		uint32 mNumMipmaps;
 		EPixelFormat mFormat;

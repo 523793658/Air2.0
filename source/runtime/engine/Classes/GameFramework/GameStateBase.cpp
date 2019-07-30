@@ -14,7 +14,7 @@ namespace Air
 	{
 		for (ConstPlayerControllerIterator iterator = getWorld()->getPlayerControllerIterator(); iterator; ++iterator)
 		{
-			APlayerController* const playerController = *iterator;
+			APlayerController* const playerController = (*iterator).get();
 			if (playerController)
 			{
 				playerController->receivedGameModeClass(mGameModeClass);
@@ -26,7 +26,7 @@ namespace Air
 	{
 		for (ConstPlayerControllerIterator iterator = getWorld()->getPlayerControllerIterator(); iterator; ++iterator)
 		{
-			APlayerController* const playerController = *iterator;
+			APlayerController* const playerController = (*iterator).get();
 			if (playerController && playerController->isLocalController())
 			{
 				playerController->receivedSpectatorClass(mSpectatorClass);

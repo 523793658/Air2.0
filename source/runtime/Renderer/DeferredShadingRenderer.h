@@ -36,6 +36,10 @@ namespace Air
 
 		void renderLights(RHICommandListImmediate& RHICmdList);
 
+		void renderDynamicSkyLighting(RHICommandListImmediate& RHICmdList, const TRefCountPtr<IPooledRenderTarget>& velocityTexture, TRefCountPtr<IPooledRenderTarget>& dynamicBentNormalAO);
+
+		bool shouldRenderDistanceFieldAO() const;
+
 		void asyncSortBasePassStaticData(const float3 InViewPosition, GraphEventArray &outSortEvents);
 
 		void sortBasePassStaticData(float3 viewPosition);

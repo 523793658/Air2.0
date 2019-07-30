@@ -74,6 +74,15 @@ namespace Air
 		const EMaterialDomain domain = (const EMaterialDomain)mMaterial->getMaterialDomain();
 
 		const uint32 saveNumUserTexCoords = mNumUserTexCoords;
+
+		for (uint32 customUVIndex = MP_CustomizedUVs0; customUVIndex <= MP_CustomizedUVs7; customUVIndex++)
+		{
+			if (customUVIndex - MP_CustomizedUVs0 < saveNumUserTexCoords)
+			{
+				chunk[customUVIndex] = mMaterial->compilePropertyAndSetMaterialProperty((EMaterialProperty)customUVIndex, this);
+			}
+		}
+
 		if (mMaterial->getBlendMode() == BLEND_Modulate && materialShadingModel != MSM_Unlit)
 		{
 			errorf(TEXT("Dynamically lit translucency is not supported for blend_modulate materials"));
@@ -241,6 +250,30 @@ namespace Air
 		lazyPrintf.pushParam(pixelMembersDeclaration.c_str());
 		lazyPrintf.pushParam(mResourcesString.c_str());
 		lazyPrintf.pushParam(printf(TEXT("return %.5f"), mMaterial->getOpacityMaskClipValue()).c_str());
+		wstring customUVAssignments;
+
+		int32 lastProperty = -1;
+		for (uint32 customUVIndex = 0; customUVIndex < mNumUserTexCoords; customUVIndex++)
+		{
+			if (customUVIndex == 0)
+			{
+				customUVAssignments += mTranslatedCodeChunkDefinitions[MP_CustomizedUVs0 + customUVIndex];
+			}
+			if (mTranslatedCodeChunkDefinitions[MP_CustomizedUVs0 + customUVIndex].length() > 0)
+			{
+				if (lastProperty >= 0)
+				{
+					BOOST_ASSERT(mTranslatedCodeChunkDefinitions[lastProperty].length() == mTranslatedCodeChunkDefinitions[MP_CustomizedUVs0 + customUVIndex].length());
+				}
+				lastProperty = MP_CustomizedUVs0 + customUVIndex;
+			}
+			customUVAssignments += printf(TEXT("\toutTexCoords[%u] = %s;") LINE_TERMINATOR, customUVIndex, mTranslatedCodeChunks[MP_CustomizedUVs0 + customUVIndex].c_str());
+
+		}
+
+		lazyPrintf.pushParam(customUVAssignments.c_str());
+
+
 
 		lazyPrintf.pushParam(mTranslatedCodeChunkDefinitions[MP_Normal].c_str());
 		lazyPrintf.pushParam(normalAssignment.c_str());

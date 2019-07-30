@@ -12,7 +12,8 @@
 #include "DebugViewModeHelpers.h"
 #include "Materials/MeshMaterialShader.h"
 #include "VertexFactory.h"
-
+#include "ShaderParameterUtils.h"
+#include "RenderResource.h"
 namespace Air
 {
 	class BasePassOpaqueDrawingPolicyFactory
@@ -113,16 +114,75 @@ namespace Air
 	private:
 	};
 
+	class SkyLightReflectionParameters
+	{
+	public:
+		void bind(const ShaderParameterMap& parameterMap)
+		{
+			mSkyLightCubemap.bind(parameterMap, TEXT("SkyLightCubemap"));
+			mSkyLightCubemapSampler.bind(parameterMap, TEXT("SkyLightCubemapSampler"));
+			mSkyLightBlendDestinationCubemap.bind(parameterMap, TEXT("SkyLightBlendDestinationCubemap"));
+			mSkyLightBlendDestinationCubemapSampler.bind(parameterMap, TEXT("SkyLightBlendDestinationCubemapSampler"));
+			mSkyLightParameters.bind(parameterMap, TEXT("SkyLightParameters"));
+			mSkyLightCubemapBrightness.bind(parameterMap, TEXT("SkyLightCubemapBrightness"));
+		}
+
+		template<typename TParamRef, typename TRHICmdList>
+		void setParameters(TRHICmdList& RHICmdList, const TParamRef& shaderRHI, const Scene* scene, bool bApplySkyLight)
+		{
+			if (mSkyLightCubemap.isBound() || mSkyLightBlendDestinationCubemap.isBound() || mSkyLightParameters.isBound())
+			{
+				Texture* skyLightTextureResource = GBlackTextureCube;
+				Texture* skyLightBlendDistinationTextureResource = GBlackTextureCube;
+				float applySkyLightMask = 0;
+				float skyMipCount = 0;
+				float blendFraction = 0;
+				bool bSkyLightIsDynamic = false;
+				float skyAverageBrightness = 1.0f;
+				getSkyParametersFromScene(scene, bApplySkyLight, skyLightTextureResource, skyLightBlendDistinationTextureResource, applySkyLightMask, skyMipCount, bSkyLightIsDynamic, blendFraction, skyAverageBrightness);
+				setTextureParameter(RHICmdList, shaderRHI, mSkyLightCubemap, mSkyLightCubemapSampler, skyLightTextureResource);
+				setTextureParameter(RHICmdList, shaderRHI, mSkyLightBlendDestinationCubemap, mSkyLightBlendDestinationCubemapSampler, skyLightBlendDistinationTextureResource);
+				const float4 skyParametersValue(skyMipCount - 1.0f, applySkyLightMask, bSkyLightIsDynamic ? 1.0f : 0.0f, blendFraction);
+				setShaderValue(RHICmdList, shaderRHI, mSkyLightParameters, skyParametersValue);
+				setShaderValue(RHICmdList, shaderRHI, mSkyLightCubemapBrightness, skyAverageBrightness);
+			}
+		}
+
+	private:
+		ShaderResourceParameter mSkyLightCubemap;
+		ShaderResourceParameter mSkyLightCubemapSampler;
+		ShaderResourceParameter mSkyLightBlendDestinationCubemap;
+		ShaderResourceParameter mSkyLightBlendDestinationCubemapSampler;
+
+		ShaderParameter mSkyLightParameters;
+		ShaderParameter mSkyLightCubemapBrightness;
+
+
+		void getSkyParametersFromScene(
+			const Scene* scene,
+			bool bApplySkyLight,
+			Texture*& outSkyLightTextureResource,
+			Texture*& outSkyLightBlendDestinationTextureResource,
+			float& outApplySkyLightMask,
+			float& outSkyMipCount,
+			bool& bSkyLightIsDynamic,
+			float& outBlendFraction,
+			float& outSkyAverageBrightness
+		);
+	};
+
 	class BasePassReflectionParameters
 	{
 	public:
 		void bind(const ShaderParameterMap& parameterMap)
 		{
-			
+			mSkyLightReflectionParameters.bind(parameterMap);
 		}
 
+		void set(RHICommandList& RHICmdList, PixelShaderRHIParamRef pixelShaderRHI, const ViewInfo* view);
+
 	private:
-		
+		SkyLightReflectionParameters mSkyLightReflectionParameters;
 	};
 
 
@@ -134,6 +194,7 @@ namespace Air
 			:MeshMaterialShader(initializer)
 		{
 			PixelParametersType::bind(initializer.mParameterMap);
+			mReflectionParameters.bind(initializer.mParameterMap);
 		}
 
 		TBasePassPixelShaderPolicyParamType() {}
@@ -157,6 +218,7 @@ namespace Air
 			const TConstantBufferRef<ViewConstantShaderParameters>& viewConstantBuffer = bUseDownsampledTranslucencyViewConstantBuffer ? view->mDownsampledTranslucencyViewConstantBuffer : view->mViewConstantBuffer;
 			MeshMaterialShader::setParameters(RHICmdList, shaderRHI, materialRenderProxy, materialResource, *view, viewConstantBuffer, textureMode);
 			
+			mReflectionParameters.set(RHICmdList, shaderRHI, view);
 			//reflection parameter
 			//transparent parameters
 			//forwardlighting parameter
@@ -164,6 +226,7 @@ namespace Air
 
 		}
 	private:
+		BasePassReflectionParameters mReflectionParameters;
 	};
 
 	template<typename LightMapPolicyType>

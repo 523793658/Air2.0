@@ -12,14 +12,13 @@
 namespace Air
 {
 
-	static void sortActorsHierarchy(TArray<AActor*>& actors, Object* level)
+	static void sortActorsHierarchy(TArray<std::shared_ptr<AActor>>& actors, Object* level)
 	{
 
 	}
 
 	Level::Level(const ObjectInitializer& objectInitializer /* = ObjectInitializer::get() */)
 		:Object(objectInitializer),
-		mOwningWorld(nullptr),
 		mTickTaskLevel(TickTaskManagerInterface::get().allocateTickTaskLevel())
 	{
 
@@ -55,7 +54,7 @@ namespace Air
 
 		while (mCurrentActorIndexForUpdateComponents < mActors.size())
 		{
-			AActor* actor = mActors[mCurrentActorIndexForUpdateComponents];
+			std::shared_ptr<AActor>& actor = mActors[mCurrentActorIndexForUpdateComponents];
 			bool bAllComponentsRegistered = true;
 			if (actor && !actor->isPendingKill())
 			{
@@ -88,24 +87,24 @@ namespace Air
 
 	World* Level::getWorld() const
 	{
-		return mOwningWorld;
+		return mOwningWorld.get();
 	}
 
-	void Level::setWorldSettings(WorldSettings* worldSetting)
+	void Level::setWorldSettings(std::shared_ptr<WorldSettings> worldSetting)
 	{
 		if (mWorldSettings != worldSetting)
 		{
 			const int32 newWorldSettingsIndex = mActors.findLast(worldSetting);
 			if (newWorldSettingsIndex != 0)
 			{
-				if (mActors[0] == nullptr || dynamic_cast<WorldSettings*>(mActors[0]) != nullptr)
+				if (!mActors[0] || std::dynamic_pointer_cast<WorldSettings>(mActors[0]))
 				{
 					exchange(mActors[0], mActors[newWorldSettingsIndex]);
 				}
 				else
 				{
 					mActors[newWorldSettingsIndex] = nullptr;
-					mActors.insert((AActor*)worldSetting, 0);
+					mActors.insert(std::static_pointer_cast<AActor>(worldSetting), 0);
 
 				}
 			}
@@ -124,8 +123,8 @@ namespace Air
 		int32 index = 0;
 		for (ConstPlayerControllerIterator iterator = pc->getWorld()->getPlayerControllerIterator(); iterator; ++iterator)
 		{
-			APlayerController* playerController = *iterator;
-			if (pc == playerController)
+			std::shared_ptr<APlayerController> playerController = *iterator;
+			if (pc == playerController.get())
 			{
 				playerIndex = index;
 				break;
@@ -168,7 +167,7 @@ namespace Air
 	{
 		for (int32 index = 0; index < mActors.size(); ++index)
 		{
-			AActor* const actor = mActors[index];
+			std::shared_ptr<AActor> const actor = mActors[index];
 			if (actor && !actor->isActorInitialized())
 			{
 				actor->preInitializeComponents();
@@ -176,10 +175,10 @@ namespace Air
 		}
 
 		const bool bCallBeginPlay = mOwningWorld->hasBegunPlay();
-		TArray<AActor*> actorsToBeginPlay;
+		TArray<std::shared_ptr<AActor>> actorsToBeginPlay;
 		for (int32 index = 0; index < mActors.size(); ++index)
 		{
-			AActor* const actor = mActors[index];
+			std::shared_ptr<AActor> const actor = mActors[index];
 			if (actor)
 			{
 				if (!actor->isActorInitialized())
@@ -200,18 +199,27 @@ namespace Air
 
 		for (int32 actorIndex = 0; actorIndex < actorsToBeginPlay.size(); actorIndex++)
 		{
-			AActor* actor = actorsToBeginPlay[actorIndex];
+			std::shared_ptr<AActor> actor = actorsToBeginPlay[actorIndex];
 			actor->dispatchBeginPlay();
 		}
 	}
 
-	WorldSettings* Level::getWorldSettings(bool bChecked) const
+	const WorldSettings* Level::getWorldSettings(bool bChecked) const
 	{
 		if (bChecked)
 		{
-			BOOST_ASSERT(mWorldSettings != nullptr);
+			BOOST_ASSERT(mWorldSettings);
 		}
-		return mWorldSettings;
+		return mWorldSettings.get();
+	}
+
+	WorldSettings* Level::getWorldSettings(bool bChecked)
+	{
+		if (bChecked)
+		{
+			BOOST_ASSERT(mWorldSettings);
+		}
+		return mWorldSettings.get();
 	}
 
 	DECLARE_SIMPLER_REFLECTION(Level)

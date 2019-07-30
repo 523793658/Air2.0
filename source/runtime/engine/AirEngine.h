@@ -9,7 +9,7 @@ namespace Air
 	class LocalPlayerIterator
 	{
 	protected:
-		TArray<class LocalPlayer*>::TConstIterator iter;
+		TArray<std::shared_ptr<class LocalPlayer>>::TConstIterator iter;
 		void getCurrent()
 		{
 			while (iter && *iter == nullptr)
@@ -30,12 +30,12 @@ namespace Air
 			getCurrent();
 		}
 
-		LocalPlayer* operator*()
+		std::shared_ptr<LocalPlayer> operator*()
 		{
 			return *iter;
 		}
 
-		LocalPlayer* operator->()
+		std::shared_ptr<LocalPlayer> operator->()
 		{
 			return *iter;
 		}

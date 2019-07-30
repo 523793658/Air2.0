@@ -10,6 +10,7 @@
 #include "EngineDefines.h"
 #include "Classes/Components/PrimitiveComponent.h"
 #include "Misc/Guid.h"
+#include "Math/SHMath.h"
 namespace Air
 {
 	class LightComponent;
@@ -71,7 +72,7 @@ namespace Air
 
 		inline bool hasStaticShadowing() const { return bStaticShadowing; }
 
-		inline const LightComponent* getLightComponent() const { return mLightComponent; }
+		inline const LightComponent* getLightComponent() const { return mLightComponent.get(); }
 
 		virtual bool isInverseSquared() const 
 		{
@@ -114,7 +115,7 @@ namespace Air
 		float4 mPosition;
 		Matrix mWorldToLight;
 		Matrix mLightToWorld;
-		const LightComponent* mLightComponent{ nullptr };
+		std::shared_ptr<const LightComponent> mLightComponent;
 		const uint8 mLightType;
 
 		const uint32 bStaticLighting : 1;
@@ -287,6 +288,94 @@ namespace Air
 
 	class MeshElementCollector
 	{
+
+	};
+
+	namespace EReflectionCaptureShape
+	{
+		enum Type
+		{
+			Sphere,
+			Box,
+			Plane,
+			Num
+		};
+	}
+
+	class ENGINE_API ReflectionCaptureProxy
+	{
+	public:
+		const class ReflectionCaptureComponent* mComponent;
+		int32 mPackedIndex;
+		Texture* mSM4FullHDRCubemap;
+
+		float mAverageBrightness;
+
+		Texture* mEncodedHDRCubemap;
+
+		EReflectionCaptureShape::Type mShape;
+
+		float3 mPosition;
+
+		float mInfluenceRadius;
+
+		float mBrightness;
+
+		uint32 mGuid;
+
+		float3 mCaptureOffset;
+
+		Matrix mBoxTransform;
+
+		float3 mBoxScale;
+
+		float mBoxTransitionDistance;
+
+		Plane mReflectionPlane;
+		float4 mReflectionXAxisAndYScale;
+
+		ReflectionCaptureProxy(const class ReflectionCaptureComponent* inComponent);
+
+		void initializeAverageBrightness(const float& averageBrightness);
+
+		void setTransform(const Matrix& inTransform);
+
+	};
+
+	class ENGINE_API SkyLightSceneProxy
+	{
+	public:
+		SkyLightSceneProxy(const class SkyLightComponent* inLightComponent);
+
+		void initialize(
+			float inBlendFraction,
+			const SHVectorRGB3* inIrradianceEnvironmentMap,
+			const SHVectorRGB3* blenddestinationIrradianceEnvironmentMap,
+			const float* inAverageBrightness,
+			const float* blendDestinationAverageBrightness);
+
+		std::shared_ptr<const SkyLightComponent> mLightComponent;
+
+		Texture* mProcessedTexture;
+
+		float mBlendFraction;
+
+		Texture* mBlendDestinationProcessedTexture;
+
+		float mSkyDistanceThreshold;
+		bool bCastShadows;
+		bool bWantsStaticShadowing;
+		bool bHasStaticLighting;
+		LinearColor mLightColor;
+		SHVectorRGB3 mIrradianceEnvironmentMap;
+
+		float mAverageBrightness;
+		float mIndirectLightingIntensity;
+		float mOcclusionMaxDistance;
+		float mContrast;
+		float mMinOcclusion;
+		LinearColor mOcclusionTint;
+
 
 	};
 }

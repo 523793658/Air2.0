@@ -11,6 +11,7 @@
 #include "PostProcess/PostProcessing.h"
 #include "ScenePrivate.h"
 #include "Misc/App.h"
+#include "CompositionLighting/CompositionLighting.h"
 namespace Air
 {
 
@@ -149,12 +150,38 @@ namespace Air
 			serviceLocalQueue();
 
 		}
+
+		const bool bUseVelocityGBuffer = false;
+
+		TRefCountPtr<IPooledRenderTarget> velocityRT;
+		if (bUseVelocityGBuffer)
+		{
+
+		}
+
+		if (mFeatureLevel >= ERHIFeatureLevel::SM4)
+		{
+			GRenderTargetPool.addPhaseEvent(TEXT("AfterBasePass"));
+
+			for (int32 viewIndex = 0; viewIndex < mViews.size(); viewIndex++)
+			{
+				GCompositionLighting.processAfterBasePass(RHICmdList, mViews[viewIndex]);
+			}
+			serviceLocalQueue();
+		}
+
 		{
 			renderSky(RHICmdList);
 		}
 		{
+			TRefCountPtr<IPooledRenderTarget> dynamicBentNormalAO;
+
 			renderLights(RHICmdList);
 			serviceLocalQueue();
+
+			GRenderTargetPool.addPhaseEvent(TEXT("AfterRenderLights"));
+
+			renderDynamicSkyLighting(RHICmdList, velocityRT, dynamicBentNormalAO);
 		}
 		
 

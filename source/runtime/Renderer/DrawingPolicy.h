@@ -10,6 +10,8 @@
 namespace Air
 {
 	class RHICommandList;
+	class SceneView;
+	class ViewInfo;
 
 #define COMPAREDRAWINGPOLICYMEMBERS(MemberName) \
 	if(A.MemberName < B.MemberName){return -1;}	\
@@ -91,19 +93,7 @@ namespace Air
 	struct DrawingPolicyRenderState
 	{
 		DrawingPolicyRenderState() = delete;
-		DrawingPolicyRenderState(RHICommandList* inDebugResetRHICmdList, const SceneView& sceneView)
-			:mBlendState(nullptr)
-			, mDepthStencilState(nullptr)
-			, mViewConstantBuffer(sceneView.mViewConstantBuffer)
-			, mStencilRef(0)
-			, mViewOverrideFlags(EDrawingPolicyOverrideFlags::None)
-			, mDitheredLODTransitionAlpha(0.0f)
-		{
-			mViewOverrideFlags |= sceneView.bReverseCulling ? EDrawingPolicyOverrideFlags::ReverseCullMode : EDrawingPolicyOverrideFlags::None;
-			mViewOverrideFlags |= sceneView.bRenderSceneTwoSided ?
-				EDrawingPolicyOverrideFlags::TwoSided :
-				EDrawingPolicyOverrideFlags::None;
-		}
+		DrawingPolicyRenderState(RHICommandList* inDebugResetRHICmdList, const SceneView& sceneView);
 		DrawingPolicyRenderState(const DrawingPolicyRenderState& drawRenderState) = delete;
 
 		FORCEINLINE_DEBUGGABLE DrawingPolicyRenderState(RHICommandList* inDebugResetRHICmdList, const DrawingPolicyRenderState& drawRenderState)

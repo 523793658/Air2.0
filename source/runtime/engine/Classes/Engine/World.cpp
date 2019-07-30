@@ -55,7 +55,7 @@ namespace Air
 		mAllWorlds.remove(this);
 	}
 
-	AActor* World::spawnActor(RClass* inClass, float3 const * location, Rotator const* rotation, const ActorSpawnParameters& spawnParameters)
+	std::shared_ptr<AActor> World::spawnActor(RClass* inClass, float3 const * location, Rotator const* rotation, const ActorSpawnParameters& spawnParameters)
 	{
 		Transform transform;
 		if (location)
@@ -71,15 +71,15 @@ namespace Air
 		return spawnActor(inClass, &transform, spawnParameters);
 	}
 
-	AActor* World::spawnActor(RClass* inClass, Transform const* userTransformPtr, const ActorSpawnParameters& spawnParameters)
+	std::shared_ptr<AActor> World::spawnActor(RClass* inClass, Transform const* userTransformPtr, const ActorSpawnParameters& spawnParameters)
 	{
-		Level* levelToSpawnIn = spawnParameters.mOverrideLevel;
+		Level* levelToSpawnIn = spawnParameters.mOverrideLevel.get();
 		if (levelToSpawnIn == nullptr)
 		{
-			levelToSpawnIn = (spawnParameters.mOwner != nullptr) ? dynamic_cast<Level*>(spawnParameters.mOwner->getOuter()) : mCurrentLevel;
+			levelToSpawnIn = (spawnParameters.mOwner) ? dynamic_cast<Level*>(spawnParameters.mOwner->getOuter()) : mCurrentLevel.get();
 		}
 		wstring newActorName = spawnParameters.Name;
-		AActor* Template = spawnParameters.mTemplate;
+		AActor* Template = spawnParameters.mTemplate.get();
 		if (!Template)
 		{
 			Template = inClass->getDefaultObject<AActor>();
@@ -87,7 +87,7 @@ namespace Air
 
 		Transform const userTransform = userTransformPtr ? *userTransformPtr : Transform::identity;
 
-		AActor* const actor = newObject<AActor>(levelToSpawnIn, inClass, newActorName, spawnParameters.objectFlags, Template);
+		std::shared_ptr<AActor> actor = newObject<AActor>(levelToSpawnIn, inClass, newActorName, spawnParameters.objectFlags, Template);
 		levelToSpawnIn->mActors.add(actor);
 		actor->postSpawnInitialize(userTransform,   spawnParameters.mOwner);
 		mActors.add(actor);
@@ -109,7 +109,7 @@ namespace Air
 
 		for (int32 levelIndex = 0; levelIndex < mLevels.size(); levelIndex++)
 		{
-			Level* level = mLevels[levelIndex];
+			std::shared_ptr<Level> level = mLevels[levelIndex];
 		}
 
 		if (!areActorsInitialized())
@@ -118,7 +118,7 @@ namespace Air
 
 			for (int32 levelIndex = 0; levelIndex < mLevels.size(); levelIndex++)
 			{
-				Level* const level = mLevels[levelIndex];
+				std::shared_ptr<Level> const level = mLevels[levelIndex];
 				level->routeActorInitialize();
 			}
 		}
@@ -129,7 +129,7 @@ namespace Air
 		BOOST_ASSERT(mLevels[0] == mPersistentLevel);
 		for (int32 levelIndex = 0; levelIndex < mLevels.size(); levelIndex++)
 		{
-			Level* level = mLevels[levelIndex];
+			std::shared_ptr<Level> level = mLevels[levelIndex];
 			level->sortActorList();
 		}
 
@@ -137,9 +137,14 @@ namespace Air
 
 	}
 
+	bool World::containsActor(AActor* actor)
+	{
+		return (actor && actor->getWorld() == this);
+	}
+
 	void World::beginPlay()
 	{
-		GameModeBase* const gameMode = getAuthGameMode();
+		std::shared_ptr<GameModeBase> const gameMode = getAuthGameMode();
 		if (gameMode)
 		{
 			gameMode->startPlay();
@@ -230,9 +235,9 @@ namespace Air
 		}
 		mPersistentLevel = newObject<Level>(this, TEXT("PersistentLevel"));
 		mPersistentLevel->initialize(URL(nullptr));
-		mPersistentLevel->mModel = newObject<Model>(mPersistentLevel);
+		mPersistentLevel->mModel = newObject<Model>(mPersistentLevel.get());
 		mPersistentLevel->mModel->initialize(nullptr);
-		mPersistentLevel->mOwningWorld = this;
+		mPersistentLevel->mOwningWorld = std::dynamic_pointer_cast<World>(this->shared_from_this());
 
 		if (ivs.bTransactional)
 		{
@@ -241,7 +246,7 @@ namespace Air
 
 		ActorSpawnParameters spawnInfo;
 		mCurrentLevel = mPersistentLevel;
-		WorldSettings* worldSettings = spawnActor<WorldSettings>(spawnInfo);
+		std::shared_ptr<WorldSettings> worldSettings = spawnActor<WorldSettings>(spawnInfo);
 		mPersistentLevel->setWorldSettings(worldSettings);
 		initWorld(ivs);
 		updateWorldComponents(true, false);
@@ -266,7 +271,7 @@ namespace Air
 		}
 		mLevels.empty(1);
 		mLevels.add(mPersistentLevel);
-		mPersistentLevel->mOwningWorld = this;
+		mPersistentLevel->mOwningWorld = std::dynamic_pointer_cast<World>(this->shared_from_this());
 		mPersistentLevel->bIsVisible = true;
 
 		mCurrentLevel = mPersistentLevel;
@@ -279,7 +284,7 @@ namespace Air
 
 	World* World::getWorld() const
 	{
-		return const_cast<World*>(this);
+		return const_cast<World*>( this);
 	}
 
 
@@ -317,13 +322,13 @@ namespace Air
 			}*/
 		}
 	}
-	World* World::createWorld(const EWorldType::Type inWorldType, bool bInformEngineOfWorld, wstring worldName /* = TEXT("") */, ERHIFeatureLevel::Type inFeatureLevel /* = ERHIFeatureLevel::Num */)
+	std::shared_ptr<World> World::createWorld(const EWorldType::Type inWorldType, bool bInformEngineOfWorld, wstring worldName /* = TEXT("") */, ERHIFeatureLevel::Type inFeatureLevel /* = ERHIFeatureLevel::Num */)
 	{
 		if (inFeatureLevel >= ERHIFeatureLevel::Num)
 		{
 			inFeatureLevel = GMaxRHIFeatureLevel;
 		}
-		World* newWorld = newObject<World>();
+		std::shared_ptr<World> newWorld = newObject<World>();
 		newWorld->mWorldType = inWorldType;
 		newWorld->mFeatureLevel = inFeatureLevel;
 		newWorld->initializeNewWorld();
@@ -338,7 +343,7 @@ namespace Air
 	WorldSettings* World::getWorldSettings(bool bCheckStreamingPesistent /* = false */, bool bChecked /* = true */) const
 	{
 		BOOST_ASSERT(!isInActualRenderinThread());
-		WorldSettings* worldSettings = nullptr;
+		WorldSettings* worldSettings;
 		if (mPersistentLevel)
 		{
 			worldSettings = mPersistentLevel->getWorldSettings(bChecked);
@@ -351,11 +356,11 @@ namespace Air
 		return true;
 	}
 
-	APlayerController* World::spawnPlayActor(class Player* player, ENetRole remoteRole)
+	std::shared_ptr<APlayerController> World::spawnPlayActor(class Player* player, ENetRole remoteRole)
 	{
-		GameModeBase* gameMode = getAuthGameMode();
+		const std::shared_ptr<GameModeBase>& gameMode = getAuthGameMode();
 
-		APlayerController* const newPlayerController = gameMode->login(player, remoteRole, TEXT(""), TEXT(""));
+		std::shared_ptr<APlayerController> newPlayerController = gameMode->login(player, remoteRole, TEXT(""), TEXT(""));
 
 		newPlayerController->mRole = ROLE_Authority;
 		newPlayerController->setPlayer(player);
@@ -459,7 +464,7 @@ namespace Air
 	{
 		bool bSuccessfulRemoval = false;
 		Level* checkLevel = actor->getLevel();
-		int32 actorListIndex = checkLevel->mActors.find(actor);
+		int32 actorListIndex = checkLevel->mActors.find(std::dynamic_pointer_cast<AActor>(actor->shared_from_this()));
 		if (actorListIndex != INDEX_NONE)
 		{
 			if (bShouldModifyLevel && false)
@@ -537,12 +542,12 @@ namespace Air
 
 	void World::setGameState(AGameStateBase* newGameState)
 	{
-		if (newGameState == mGameState)
+		if (newGameState == mGameState.get())
 		{
 			return;
 		}
 
-		mGameState = newGameState;
+		mGameState = std::dynamic_pointer_cast<AGameStateBase>(newGameState->shared_from_this());
 
 		const Level* const cachedLevel = newGameState->getLevel();
 		LevelCollection* const foundCollection = newGameState ? cachedLevel->getCachedLevelCollection() : nullptr;
@@ -552,7 +557,7 @@ namespace Air
 		}
 	}
 
-	const TArray<class Level*>& World::getLevels() const
+	const TArray<std::shared_ptr<class Level>>& World::getLevels() const
 	{
 		return mLevels;
 	}
@@ -560,9 +565,9 @@ namespace Air
 	bool World::setCurrentLevel(class Level* inLevel)
 	{
 		bool bChanged = false;
-		if (mCurrentLevel != inLevel)
+		if (mCurrentLevel.get() != inLevel)
 		{
-			mCurrentLevel = inLevel;
+			mCurrentLevel = std::dynamic_pointer_cast<Level>(inLevel->shared_from_this());
 			bChanged = true;
 		}
 		return bChanged;
@@ -571,10 +576,10 @@ namespace Air
 	void World::setActiveLevelCollection(const LevelCollection* inCollection)
 	{
 		mActiveLevelCollection = inCollection;
-		mPersistentLevel = inCollection->getPersistentLevel();
+		mPersistentLevel = std::dynamic_pointer_cast<Level>(const_cast<LevelCollection*>(inCollection)->getPersistentLevel()->shared_from_this());
 		if (isGameWorld())
 		{
-			setCurrentLevel(inCollection->getPersistentLevel());
+			setCurrentLevel(const_cast<Level*>(inCollection->getPersistentLevel()));
 		}
 		mGameState = inCollection->getGameState();
 	}
@@ -632,7 +637,7 @@ namespace Air
 
 			if (mPersistentLevel->getCachedLevelCollection() == nullptr)
 			{
-				dynamicCollection.addLevel(mPersistentLevel);
+				dynamicCollection.addLevel(mPersistentLevel.get());
 			}
 			mActiveLevelCollection = &dynamicCollection;
 		}
@@ -648,7 +653,7 @@ namespace Air
 		if (level)
 		{
 			BOOST_ASSERT(level->getCachedLevelCollection() == nullptr);
-			mLevels.add(level);
+			mLevels.add(std::dynamic_pointer_cast<Level>(level->shared_from_this()));
 			level->setCachedLevelToCollection(this);
 		}
 	}
@@ -662,7 +667,7 @@ namespace Air
 
 	LevelCollection::~LevelCollection()
 	{
-		for (Level* level : mLevels)
+		for (std::shared_ptr<Level>& level : mLevels)
 		{
 			if (level)
 			{
@@ -679,7 +684,7 @@ namespace Air
 		,mLevels(std::move(other.mLevels))
 		,bIsVisible(other.bIsVisible)
 	{
-		for (Level* level : mLevels)
+		for (std::shared_ptr<Level>& level : mLevels)
 		{
 			if (level)
 			{
@@ -698,7 +703,7 @@ namespace Air
 			mPersistentLevel = other.mPersistentLevel;
 			mLevels = std::move(other.mLevels);
 			bIsVisible = other.bIsVisible;
-			for (Level* level : mLevels)
+			for (std::shared_ptr<Level>& level : mLevels)
 			{
 				if (level)
 				{
@@ -716,7 +721,7 @@ namespace Air
 		mControllerList.addUnique(controller);
 		if (dynamic_cast<APlayerController*>(controller))
 		{
-			mPlayerControllerList.addUnique(dynamic_cast<APlayerController*>(controller));
+			mPlayerControllerList.addUnique(std::dynamic_pointer_cast<APlayerController>(controller->shared_from_this()));
 		}
 	}
 
@@ -736,7 +741,7 @@ namespace Air
 				break;
 			}
 		}
-		RMaterialParameterCollectionInstance* newInstance = newObject<RMaterialParameterCollectionInstance>();
+		std::shared_ptr<RMaterialParameterCollectionInstance> newInstance = newObject<RMaterialParameterCollectionInstance>();
 		newInstance->setCollection(collection, this);
 		if (existingIndex != INDEX_NONE)
 		{
@@ -759,7 +764,7 @@ namespace Air
 			TArray<MaterialParameterCollectionInstanceResource*> instanceResources;
 			for (int32 instanceIndex = 0; instanceIndex < mParameterCollectionInstances.size(); instanceIndex++)
 			{
-				RMaterialParameterCollectionInstance* instance = mParameterCollectionInstances[instanceIndex];
+				RMaterialParameterCollectionInstance* instance = mParameterCollectionInstances[instanceIndex].get();
 				if (bUpdateInstanceConstantBuffers)
 				{
 					instance->updateRenderState();
@@ -768,6 +773,11 @@ namespace Air
 			}
 			mScene->updateParameterCollections(instanceResources);
 		}
+	}
+
+	void LevelCollection::setGameState(class AGameStateBase* inGameState)
+	{
+		mGameState = std::dynamic_pointer_cast<class AGameStateBase>(inGameState->shared_from_this());
 	}
 
 	DECLARE_SIMPLER_REFLECTION(World);

@@ -103,14 +103,14 @@ namespace Air
 	void AController::setPawn(APawn* inPawn)
 	{
 		removePawnTickDependency(mPawn);
-		mPawn = inPawn;
+		mPawn = std::dynamic_pointer_cast<APawn>(inPawn->shared_from_this());
 		
-		attachToPawn(mPawn);
+		attachToPawn(inPawn);
 
-		addPawnTickDependency(mPawn);
+		addPawnTickDependency(mPawn.get());
 	}
 
-	void AController::removePawnTickDependency(APawn* inOldPawn)
+	void AController::removePawnTickDependency(std::shared_ptr<APawn> inOldPawn)
 	{
 		if (inOldPawn != nullptr)
 		{
@@ -126,7 +126,7 @@ namespace Air
 
 	void AController::addPawnTickDependency(APawn* inPawn)
 	{
-		if (inPawn != nullptr)
+		if (inPawn)
 		{
 			bool bNeedsPawnPrereq = true;
 			PawnMovementComponent* pawnMovement = inPawn->getMovementComponent();

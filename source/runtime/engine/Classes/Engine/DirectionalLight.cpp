@@ -21,7 +21,7 @@ namespace Air
 
 		static ConstructorStatics constructorStatics;
 
-		DirectionalLightComponent* directinalLightComponent = check_cast<DirectionalLightComponent*>(getLightComponent());
+		std::shared_ptr<DirectionalLightComponent>& directinalLightComponent = std::dynamic_pointer_cast<DirectionalLightComponent>(getLightComponent());
 		directinalLightComponent->mMobility = EComponentMobility::Stationary;
 		directinalLightComponent->mRelativeRotation = Rotator(46.0f, 0.0f, 0.0f);
 		directinalLightComponent->setRelativeScale3D(float3(2.5f));

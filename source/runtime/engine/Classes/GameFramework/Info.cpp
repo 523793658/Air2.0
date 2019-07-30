@@ -2,7 +2,7 @@
 #include "SimpleReflection.h"
 namespace Air
 {
-	Info::Info(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
+	AInfo::AInfo(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
 	{
 		mPrimaryActorTick.bCanEverTick = false;
@@ -11,5 +11,5 @@ namespace Air
 		
 	}
 
-	DECLARE_SIMPLER_REFLECTION(Info);
+	DECLARE_SIMPLER_REFLECTION(AInfo);
 }

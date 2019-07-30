@@ -113,6 +113,8 @@ namespace Air
 
 		static FORCEINLINE int32 rand() { return ::rand(); }
 
+		static FORCEINLINE float exp(float value) { return expf(value); }
+
 	};
 
 	template<> 

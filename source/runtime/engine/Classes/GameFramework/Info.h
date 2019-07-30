@@ -2,9 +2,9 @@
 #include "Classes/GameFramework/Actor.h"
 namespace Air
 {
-	class Info : public AActor
+	class AInfo : public AActor
 	{
-		GENERATED_RCLASS_BODY(Info, AActor)
+		GENERATED_RCLASS_BODY(AInfo, AActor)
 	public:
 
 	};

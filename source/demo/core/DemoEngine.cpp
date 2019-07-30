@@ -16,6 +16,7 @@
 #include "Classes/Engine/GameInstance.h"
 #include "ApplicationManager.h"
 #include "SimpleReflection.h"
+#include "Classes/Components/SkyLightComponent.h"
 namespace Air
 {
 	DemoEngine::DemoEngine(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
@@ -56,7 +57,7 @@ namespace Air
 		if (GIsClient)
 		{
 			mViewportClient = newObject<DemoViewportClient>(this);
-			mViewportClient->init(*mGameInstance->getWorldContext(), mGameInstance);
+			mViewportClient->init(*mGameInstance->getWorldContext(), mGameInstance.get());
 			mGameInstance->getWorldContext()->mGameViewport = mViewportClient;
 		}
 		if (mViewportClient)
@@ -77,7 +78,7 @@ namespace Air
 
 
 		wstring error;
-		LocalPlayer* localPlayer = mViewportClient->setupInitialLocalPlayer(error);
+		std::shared_ptr<LocalPlayer>& localPlayer = mViewportClient->setupInitialLocalPlayer(error);
 
 
 		WorldContext* worldContext = mGameInstance->getWorldContext();
@@ -96,7 +97,7 @@ namespace Air
 			for (auto it = worldContext->mOwningGameInstance->getLocalPlayerIterator(); it; it++)
 			{
 				wstring error2;
-				LocalPlayer* lp = *it;
+				const std::shared_ptr<LocalPlayer>& lp = *it;
 				wstring url = TEXT("");
 				bool b = lp->spawnPlayActor(url, error2, worldContext->getWorld());
 				if (!b)
@@ -170,6 +171,12 @@ namespace Air
 			}
 
 			GWorld = context.getWorld();
+
+			if (!isRunningDedicatedServer())
+			{
+				SkyLightComponent::updateSkyCaptureContents(context.getWorld());
+			}
+
 			if (!bIdleMode)
 			{
 				context.getWorld()->tick(LEVELTICK_ALL, deltaSeconds);
@@ -264,7 +271,7 @@ namespace Air
 		std::shared_ptr<SViewport> gameViewportWidgetRef = mViewportWidget;
 		auto window = mViewportWindow.lock();
 
-		mSceneViewport = MakeSharedPtr<SceneViewport>(mViewportClient, gameViewportWidgetRef);
+		mSceneViewport = MakeSharedPtr<SceneViewport>(mViewportClient.get(), gameViewportWidgetRef);
 
 		mViewportClient->mViewport = mSceneViewport.get();
 

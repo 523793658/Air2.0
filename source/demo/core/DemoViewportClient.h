@@ -82,7 +82,7 @@ namespace Air
 			return bIgnoreInput;
 		}
 
-		LocalPlayer* setupInitialLocalPlayer(wstring& outError);
+		std::shared_ptr<LocalPlayer> setupInitialLocalPlayer(wstring& outError);
 
 		virtual void finalizeViews(class SceneViewFamily* viewFamily, const TMap<LocalPlayer*, SceneView*>& playerViewMap) {}
 

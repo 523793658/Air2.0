@@ -34,21 +34,21 @@ namespace Air
 
 		ENGINE_API virtual const MaterialResource* getMaterialResource(ERHIFeatureLevel::Type inFeatureLvel, EMaterialQualityLevel::Type qualityLevel = EMaterialQualityLevel::Num) const override;
 
-		ENGINE_API virtual RMaterial* getMaterial() override;
+		ENGINE_API virtual std::shared_ptr<RMaterial> getMaterial() override;
 
-		ENGINE_API virtual const RMaterial* getMaterial() const override;
+		ENGINE_API virtual std::shared_ptr<const RMaterial> getMaterial() const override;
 
 		ENGINE_API void postLoad() override;
 
 		ENGINE_API bool isDefaultMaterial() const;
 
-		ENGINE_API static RMaterial* getDefaultMaterial(EMaterialDomain domain);
+		ENGINE_API static std::shared_ptr<RMaterial>& getDefaultMaterial(EMaterialDomain domain);
 
 		ENGINE_API static ResLoadingDescPtr createLoadingDesc(wstring const & path);
 
 		ENGINE_API virtual MaterialResource* allocateResource();
 
-		ENGINE_API void appendReferencedTextures(TArray<RTexture*>& inOutTextures) const;
+		ENGINE_API void appendReferencedTextures(TArray<std::shared_ptr<RTexture>>& inOutTextures) const;
 
 		ENGINE_API virtual EMaterialShadingModel getShadingModel() const override;
 
@@ -94,6 +94,10 @@ namespace Air
 
 		class RMaterialExpression* findExpression(uint32 id);
 
+		void rebuildMaterialFunctionInfo();
+
+		void rebuildMaterialParameterCollectionInfo();
+
 	private:
 		TEnumAsByte<enum EBlendMode>	mBlendMode{ BLEND_Opaque };
 		TEnumAsByte<enum EMaterialShadingModel> mShadingMode{ MSM_DefaultLit };
@@ -102,7 +106,7 @@ namespace Air
 
 		TArray<MaterialResource> mLoadedMaterialResources;
 
-		TArray<RTexture*> mExpressionTextureReferences;
+		TArray <std::shared_ptr<RTexture>> mExpressionTextureReferences;
 
 		uint32 bUseMaterialAttributes : 1;
 
@@ -116,6 +120,8 @@ namespace Air
 
 		Guid mStateId;
 
+		int32 mNumCustomizedUVs{ 1 };
+
 		uint32 bWireFrame : 1;
 
 		uint32 mTwoSided : 1;
@@ -128,7 +134,7 @@ namespace Air
 
 		float mOpacityMaskClipValue{ 0 };
 
-		TArray<class RMaterialExpression*> mExpressions;
+		TArray<std::shared_ptr<class RMaterialExpression>> mExpressions;
 		ScalarMaterialInput mMetallic;
 		
 		ScalarMaterialInput mSpecular;
@@ -138,6 +144,8 @@ namespace Air
 		ColorMaterialInput mBaseColor;
 
 		VectorMaterialInput mNormal;
+
+		Vector2MaterialInput mCustomizedUVs[8];
 
 		ExpressionInput* mMaterialPropertyTable[MP_Max];
 	private:

@@ -3,6 +3,7 @@
 #include "HAL/FileManager.h"
 #include "Texture2D.h"
 #include "TextureCube.h"
+#include "RenderUtils.h"
 namespace Air
 {
 	TextureImporter::TextureImporter(TCHAR* extension)
@@ -149,6 +150,15 @@ namespace Air
 			}
 			std::shared_ptr<RTexture> ptr = std::dynamic_pointer_cast<RTexture>(ResLoadingDesc::createResource());
 			ptr->mTextureData = std::dynamic_pointer_cast<TextureData>(mTexDesc.mTexData);
+			if (texData->mInfo.mFormat == PF_A8)
+			{
+				ptr->mCompressionSettings = TC_Alpha;
+			}
+			else
+			{
+				ptr->mCompressionSettings = TC_Default;
+			}
+			ptr->bSRGB = isSRGB(texData->mInfo.mFormat);
 			return ptr;
 		}
 

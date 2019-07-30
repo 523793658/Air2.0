@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "ShaderCore.h"
+#include "Misc/App.h"
 namespace Air
 {
 	enum EShaderParameterFlags

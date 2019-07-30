@@ -20,7 +20,7 @@ namespace AirFbx
 		int32 faceNum;
 		int32 vertexNum;
 		bool bTriangulated;
-		int32 mateiralNum;
+		int32 materialNum;
 		bool bIsSkelMesh;
 		wstring skeletonRoot;
 		int32 skeletonElemeNum;
@@ -117,7 +117,7 @@ namespace AirFbx
 
 		Fbx_API bool importFromFile(const wstring& filename, const wstring& type, bool bPreventMaterialClash = false);
 
-		Fbx_API RStaticMesh* importStaticMeshAsSingle(TArray<FbxNode*>& meshNodeArray, const wstring inName, EObjectFlags flags, FbxStaticMeshImportData* templateImportData, RStaticMesh* inStaticMesh, int LODIndex = 0, void * existMeshDataPtr = nullptr);
+		Fbx_API std::shared_ptr<RStaticMesh> importStaticMeshAsSingle(TArray<FbxNode*>& meshNodeArray, const wstring inName, EObjectFlags flags, FbxStaticMeshImportData* templateImportData, RStaticMesh* inStaticMesh, int LODIndex = 0, void * existMeshDataPtr = nullptr);
 
 		bool openFile(wstring filename, bool bParseStatistics, bool bForSceneInfo = false);
 
@@ -143,7 +143,7 @@ namespace AirFbx
 		struct FbxMaterial
 		{
 			FbxSurfaceMaterial* mFBXMaterial;
-			MaterialInterface* mMaterial;
+			std::shared_ptr<MaterialInterface> mMaterial;
 
 			wstring getName() const { return mFBXMaterial ? ANSI_TO_TCHAR(mFBXMaterial->GetName()) : TEXT("None"); }
 		};

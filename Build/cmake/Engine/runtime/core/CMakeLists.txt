@@ -325,7 +325,9 @@ SET(Math_File
     ${CORE_SOURCE_DIR}/Math/Sphere.h 
     ${CORE_SOURCE_DIR}/Math/Sphere.cpp 
     ${CORE_SOURCE_DIR}/Math/Float16.h 
-    ${CORE_SOURCE_DIR}/Math/Float32.h)
+    ${CORE_SOURCE_DIR}/Math/Float32.h
+    ${CORE_SOURCE_DIR}/Math/SHMath.h
+	)
 SOURCE_GROUP("Math" FILES ${Math_File})
     
 SET(FeaTures_File 

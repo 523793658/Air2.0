@@ -10,8 +10,17 @@
 #include "MaterialCompiler.h"
 #include "Classes/Materials/XMLMaterialTranslator.h"
 #include "MaterialExpressionScalarParameter.h"
+#include "MaterialExpressionVectorParameter.h"
+#include "MaterialExpressionTextureSampleParameter.h"
+#include "MaterialExpressionTextureSampleParameter2D.h"
+#include "MaterialExpressionTextureObject.h"
+#include "MaterialExpressionTextureObjectParameter.h"
+#include "Texture.h"
+#include "Texture2D.h"
+#include "Misc/SecureHash.h"
 namespace Air
 {
+
 	static bool readExpressionInputXML(ExpressionInput& input, XMLNode* node)
 	{
 		input.mOutputIndex = boost::lexical_cast<uint32>(node->first_node(TEXT("OutputIndex"))->value());
@@ -35,7 +44,7 @@ namespace Air
 		:ParentType(objectInitializer)
 	{
 		RMaterial* material = getTypedOuter<RMaterial>();
-		material->mExpressions.add(this);
+		material->mExpressions.add(std::dynamic_pointer_cast<RMaterialExpression>(this->shared_from_this()));
 		mOutputs.add(ExpressionOutput(TEXT("")));
 	}
 
@@ -137,15 +146,29 @@ namespace Air
 
 	void RMaterialExpression::serialize(XMLNode* node)
 	{
-		bIsParameterExpression = boost::lexical_cast<bool>(node->first_attribute(TEXT("isParameterExpression"))->value());
-		mID = boost::lexical_cast<uint32>(node->first_attribute(TEXT("id"))->value());
-		XMLNode* outputRoot = node->first_node(TEXT("ExpressionOutputs"));
-		XMLNode* outputNode = outputRoot->first_node(TEXT("ExpressionOutput"));
-		while (outputNode)
+		XMLNode* ThisNode = node->first_node(TEXT("RMaterialExpression"));
+		auto* idNode = node->first_attribute(TEXT("id"));
+		BOOST_ASSERT(idNode);
+		mID = boost::lexical_cast<uint32>(idNode->value());
+		
+		if (ThisNode)
 		{
-			mOutputs.addDefaulted();
-			readExpressionOutputXML(mOutputs.top(), outputNode);
-			outputNode = outputNode->next_sibling(TEXT("ExpressionOutput"));
+			auto* isParameterExpressionNode = node->first_attribute(TEXT("isParameterExpression"));
+			if (isParameterExpressionNode)
+			{
+				bIsParameterExpression = boost::lexical_cast<bool>(isParameterExpressionNode->value());
+				XMLNode* outputRoot = node->first_node(TEXT("ExpressionOutputs"));
+				if (outputRoot)
+				{
+					XMLNode* outputNode = outputRoot->first_node(TEXT("ExpressionOutput"));
+					while (outputNode)
+					{
+						mOutputs.addDefaulted();
+						readExpressionOutputXML(mOutputs.top(), outputNode);
+						outputNode = outputNode->next_sibling(TEXT("ExpressionOutput"));
+					}
+				}
+			}
 		}
 	}
 
@@ -241,23 +264,7 @@ namespace Air
 	void RMaterialExpressionCustom::serialize(XMLNode* node)
 	{
 		ParentType::serialize(node);
-		const wstring preFixUp = mCode;
-		bool bDidUpdate = false;
-		XMLNode* parentNode = node->first_node(TEXT("Parent"));
-		RMaterialExpression::serialize(node);
-
-		mInputs.clear();
-		XMLNode* inputsNode = node->first_node(TEXT("Inputs"));
-		if (inputsNode)
-		{
-			XMLNode* customInputNode = inputsNode->first_node(TEXT("CustomInput"));
-			while (customInputNode)
-			{
-				int index = mInputs.addDefaulted(1);
-				customInputNode = customInputNode->next_sibling(TEXT("CustomInput"));
-
-			}
-		}
+		
 	}
 
 	const void RMaterialExpressionCustom::innerGetInputs(TArray<ExpressionInput *>& result)
@@ -434,11 +441,11 @@ namespace Air
 		}
 		EMaterialProperty prop = MaterialAttributeDefinationMap::getProperty(attributeID);
 		setConnectedProperty(prop, ret != INDEX_NONE);
-		if (ret == INDEX_NONE)
-		{
-			ret = MaterialAttributeDefinationMap::compileDefaultExpression(compiler, attributeID);
-		}
-		return ret;
+if (ret == INDEX_NONE)
+{
+	ret = MaterialAttributeDefinationMap::compileDefaultExpression(compiler, attributeID);
+}
+return ret;
 	}
 #endif
 
@@ -453,9 +460,12 @@ namespace Air
 
 	void RMaterialExpressionParameter::serialize(XMLNode* node)
 	{
-		XMLNode* parentNode = node->first_node(TEXT("RMaterialExpression"));
-		ParentType::serialize(parentNode);
-		mParameterName = node->first_node(TEXT("ParameterName"))->value();
+		ParentType::serialize(node);
+		auto* ThisNode = node->first_node(TEXT("RMaterialExpressionParameter"));
+		if (ThisNode)
+		{
+			mParameterName = ThisNode->first_node(TEXT("ParameterName"))->value();
+		}
 	}
 	RMaterialExpressionScalarParameter::RMaterialExpressionScalarParameter(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
@@ -463,11 +473,29 @@ namespace Air
 
 	void RMaterialExpressionScalarParameter::serialize(XMLNode* node)
 	{
-		XMLNode* parentNode = node->first_node(TEXT("RMaterialExpressionParameter"));
-		ParentType::serialize(parentNode);
-		mDefaultValue = boost::lexical_cast<float>(node->first_node(TEXT("DefaultValue"))->value());
-		mSliderMin = boost::lexical_cast<float>(node->first_node(TEXT("SliderMin"))->value());
-		mSliderMax = boost::lexical_cast<float>(node->first_node(TEXT("SliderMax"))->value());
+		ParentType::serialize(node);
+		auto* thisNode = node->first_node(TEXT("RMaterialExpressionScalarParameter"));
+		if (thisNode)
+		{
+			auto* valueNode = thisNode->first_node(TEXT("DefaultValue"));
+			if (valueNode)
+			{
+				mDefaultValue = boost::lexical_cast<float>(valueNode->value());
+			}
+			auto* sliderMinNode = thisNode->first_node(TEXT("SliderMin"));
+			if (sliderMinNode)
+			{
+				mSliderMin = boost::lexical_cast<float>(sliderMinNode->value());
+			}
+
+			auto* sliderMaxNode = thisNode->first_node(TEXT("SliderMax"));
+			if (sliderMaxNode)
+			{
+				mSliderMax = boost::lexical_cast<float>(sliderMaxNode->value());
+			}
+		
+		}
+		
 
 	}
 
@@ -476,11 +504,521 @@ namespace Air
 		return compiler->scalarParameter(mParameterName, mDefaultValue);
 	}
 
+	RMaterialExpressionVectorParameter::RMaterialExpressionVectorParameter(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
+		:ParentType(objectInitializer)
+	{}
+
+#if WITH_EDITOR
+	int32 RMaterialExpressionVectorParameter::compile(class MaterialCompiler* compiler, int32 outputIndex)
+	{
+		return compiler->vectorParameter(mParameterName, mDefaultValue);
+	}
+
+	void RMaterialExpressionVectorParameter::getCaption(TArray<wstring>& outCaptions) const
+	{
+		outCaptions.add(printf(TEXT("Param (%.3g,%.3g,%.3g,%.3g)"), mDefaultValue.R, mDefaultValue.G, mDefaultValue.B, mDefaultValue.A));
+		outCaptions.add(printf(TEXT("'%s'"), mParameterName.c_str()));
+	}
+
+	void RMaterialExpressionVectorParameter::serialize(XMLNode* node)
+	{
+		ParentType::serialize(node);
+		auto* thisNode = node->first_node(TEXT("RMaterialExpressionVectorParameter"));
+		if (thisNode)
+		{
+			auto* n = thisNode->first_node(TEXT("DefaultValue"));
+			if (n)
+			{
+				mDefaultValue = LinearColor::fromString(n->value());
+			}
+		}
+
+
+	}
+
+	int32 RMaterialExpression::compilerError(class MaterialCompiler* compiler, const TCHAR* pcMessage)
+	{
+		TArray<wstring> captions;
+		getCaption(captions);
+		return compiler->errorf(TEXT("%s> %s"), mDesc.length() > 0 ? mDesc.c_str() : captions[0].c_str(), pcMessage);
+	}
+
+	const TCHAR* RMaterialExpressionTextureSampleParameter::getRequirements()
+	{
+		return TEXT("Invalid texture type");
+	}
+
+	bool RMaterialExpressionTextureSampleParameter::textureIsValid(std::shared_ptr<RTexture> inTexture)
+	{
+		return false;
+	}
+
+	static bool verifySamplerType(
+		MaterialCompiler* compiler,
+		const TCHAR* expressionDesc,
+		const std::shared_ptr<RTexture> texture,
+		EMaterialSamplerType samplerType)
+	{
+		BOOST_ASSERT(compiler);
+		BOOST_ASSERT(expressionDesc);
+		if (texture)
+		{
+			EMaterialSamplerType correctSamplerType = RMaterialExpressionTextureBase::getSamplerTypeForTexture(texture);
+			if (samplerType != correctSamplerType)
+			{
+				return false;
+			}
+
+			if ((samplerType == SamplerType_Normal || samplerType == SamplerType_Masks) && texture->bSRGB)
+			{
+				compiler->errorf(TEXT("%s> To use as sampler type, SRGB must be disabled for %s"), expressionDesc, texture->getPathName());
+				return false;
+			}
+		}
+		return true;
+	}
+
+	int32 RMaterialExpressionTextureSampleParameter::compile(class MaterialCompiler* compiler, int32 outputIndex)
+	{
+		if (!mTexture)
+		{
+			return compilerError(compiler, getRequirements());
+		}
+		if (mTexture)
+		{
+			if (!textureIsValid(mTexture))
+			{
+				return compilerError(compiler, getRequirements());
+			}
+
+			if (!verifySamplerType(compiler, (mDesc.length() > 0 ? mDesc.c_str() : TEXT("TextureSamplerParameter")), mTexture, mSamplerType))
+			{
+				return INDEX_NONE;
+			}
+		}
+
+		if (mParameterName.empty())
+		{
+			return RMaterialExpressionTextureSample::compile(compiler, outputIndex);
+		}
+
+		int32 mipValue0Index = compileMipValue0(compiler);
+		int32 mipValue1Index = compileMipValue1(compiler);
+		int32 textureReferenceIndex = INDEX_NONE;
+		return compiler->textureSample(compiler->textureParameter(mParameterName, mTexture, textureReferenceIndex, mSamplerSource), mCoordinates.getTracedInput().mExpression ? mCoordinates.compile(compiler) : compiler->textureCoordinate(mConstCoordinate, false, false), (EMaterialSamplerType)mSamplerType, mipValue0Index, mipValue1Index, mMipValueMode, mSamplerSource, textureReferenceIndex);
+	}
+
+
+	void RMaterialExpressionTextureSampleParameter::serialize(XMLNode* node)
+	{
+		ParentType::serialize(node);
+		auto* thisNode = node->first_node(TEXT("RMaterialExpressionTextureSampleParameter"));
+		if (thisNode)
+		{
+			XMLNode* parameterNameNode = thisNode->first_node(TEXT("ParameterName"));
+			if (parameterNameNode)
+			{
+				mParameterName = parameterNameNode->value();
+			}
+		}
+		
+	}
+
+#endif
+
+	RMaterialExpressionTextureBase::RMaterialExpressionTextureBase(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
+		:ParentType(objectInitializer)
+		, isDefaultMeshpaintTexture(false)
+	{
+
+	}
+
+	void RMaterialExpressionTextureBase::autoSetSamplerType()
+	{
+		if (mTexture)
+		{
+			mSamplerType = getSamplerTypeForTexture(mTexture);
+		}
+	}
+
+	wstring RMaterialExpressionTextureBase::getDescription() const
+	{
+		wstring result = ParentType::getDescription();
+		result += TEXT(" (");
+		result += mTexture ? mTexture->getName() : TEXT("None");
+		result += TEXT(")");
+		return result;
+	}
+
+	EMaterialSamplerType RMaterialExpressionTextureBase::getSamplerTypeForTexture(std::shared_ptr<const RTexture> texture)
+	{
+		if (texture)
+		{
+			switch (texture->mCompressionSettings)
+			{
+			case TC_NormalMap:
+				return SamplerType_Normal;
+			case TC_Grayscale:
+				return texture->bSRGB ? SamplerType_Grayscale : SamplerType_LinearGrayscale;
+			case TC_Alpha:
+				return SamplerType_Alpha;
+			case TC_Masks:
+				return SamplerType_Masks;
+			case TC_DistanceFieldFont:
+				return SamplerType_DistanceFieldFont;
+			default:
+				return texture->bSRGB ? SamplerType_Color : SamplerType_LinearColor;
+			}
+		}
+		return SamplerType_Color;
+	}
+
+	RMaterialExpressionTextureSample::RMaterialExpressionTextureSample(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
+		:ParentType(objectInitializer)
+		,bShowTextureInputPin(true)
+	{}
+
+	const TArray<ExpressionInput*> RMaterialExpressionTextureSample::getInputs()
+	{
+		TArray<ExpressionInput*> outputs;
+		uint32 inputIndex = 0;
+		while (ExpressionInput* ptr = getInput(inputIndex++))
+		{
+			outputs.add(ptr);
+		}
+		return outputs;
+	}
+
+#define IF_INPUT_RETURN(item) if(!inputIndex) return &item; -- inputIndex
+
+	ExpressionInput* RMaterialExpressionTextureSample::getInput(int32 inputIndex)
+	{
+		IF_INPUT_RETURN(mCoordinates);
+
+		if (bShowTextureInputPin)
+		{
+			IF_INPUT_RETURN(mTextureObject);
+		}
+
+		if (mMipValueMode == TMVM_Derivative)
+		{
+			IF_INPUT_RETURN(mCoordinatesDX);
+			IF_INPUT_RETURN(mCoordinatesDY);
+		}
+		else if (mMipValueMode != TMVM_None)
+		{
+			IF_INPUT_RETURN(mMipValue);
+		}
+		return nullptr;
+	}
+#undef IF_INPUT_RETURN
+
+#define IF_INPUT_RETURN(item, name) if(!inputIndex) return name; --inputIndex
+	wstring RMaterialExpressionTextureSample::getInputName(uint32 inputIndex) const
+	{
+		IF_INPUT_RETURN(mCoordinates, TEXT("Coordinates"));
+
+		if (bShowTextureInputPin)
+		{
+			IF_INPUT_RETURN(mTextureObject, TEXT("TextureObject"));
+		}
+
+		if (mMipValueMode == TMVM_MipLevel)
+		{
+			IF_INPUT_RETURN(mMipValue, TEXT("MipLevel"));
+		}
+		else if (mMipValueMode == TMVM_MipBias)
+		{
+			IF_INPUT_RETURN(mMipValue, TEXT("MipBias"));
+		}
+		else if (mMipValueMode == TMVM_Derivative)
+		{
+			IF_INPUT_RETURN(mCoordinatesDX, TEXT("DDX(UVs)"));
+			IF_INPUT_RETURN(mCoordinatesDY, TEXT("DDY(UVs)"));
+
+		}
+		return TEXT("");
+	}
+
+#undef IF_INPUT_RETURN
+#if WITH_EDITOR
+	int32 RMaterialExpressionTextureSample::compile(class MaterialCompiler* compiler, int32 outputIndex)
+	{
+		if (mTexture || mTextureObject.mExpression)
+		{
+			int32 textureReferenceIndex = INDEX_NONE;
+			int32 textureCodeIndex = mTextureObject.mExpression ? mTextureObject.compile(compiler) : compiler->texture(mTexture, textureReferenceIndex, mSamplerSource, mMipValueMode);
+
+			std::shared_ptr<RTexture> effectiveTexture = mTexture;
+			EMaterialSamplerType effectiveSamplerType = (EMaterialSamplerType)mSamplerType;
+			if (mTextureObject.mExpression)
+			{
+				RMaterialExpression* inputExpression = mTextureObject.mExpression;
+				RMaterialExpressionFunctionInput* functionInput = check_cast<RMaterialExpressionFunctionInput*>(inputExpression);
+				if (functionInput)
+				{
+					RMaterialExpressionFunctionInput* nestedFunctionInput = functionInput;
+					while (true)
+					{
+						RMaterialExpression* previewExpression = nestedFunctionInput->getEffectivePreviewExpression();
+						if (previewExpression && previewExpression->isA(RMaterialExpressionFunctionInput::StaticClass()))
+						{
+							nestedFunctionInput = check_cast<RMaterialExpressionFunctionInput*>(previewExpression);
+						}
+						else
+						{
+							break;
+						}
+					}
+					inputExpression = nestedFunctionInput->getEffectivePreviewExpression();
+				}
+
+				RMaterialExpressionTextureObject* textureObjectExpression = check_cast<RMaterialExpressionTextureObject*>(inputExpression);
+				RMaterialExpressionTextureObjectParameter* textureObjectParameter = check_cast<RMaterialExpressionTextureObjectParameter*>(inputExpression);
+				if (textureObjectExpression)
+				{
+					effectiveTexture = textureObjectExpression->mTexture;
+					effectiveSamplerType = textureObjectExpression->mSamplerType;
+				}
+				else if (textureObjectParameter)
+				{
+					effectiveTexture = textureObjectParameter->mTexture;
+					effectiveSamplerType = textureObjectParameter->mSamplerType;
+				}
+				textureReferenceIndex = compiler->getTextureReferenceIndex(effectiveTexture);
+			}
+			if (effectiveTexture && verifySamplerType(compiler, (mDesc.length() > 0 ? mDesc.c_str() : TEXT("TextureSample")), effectiveTexture, effectiveSamplerType))
+			{
+				return compiler->textureSample(
+					textureCodeIndex,
+					mCoordinates.getTracedInput().mExpression ? mCoordinates.compile(compiler) : compiler->textureCoordinate(mConstCoordinate, false, false),
+					(EMaterialSamplerType)effectiveSamplerType,
+					compileMipValue0(compiler),
+					compileMipValue1(compiler),
+					mMipValueMode,
+					mSamplerSource,
+					textureReferenceIndex);
+			}
+			else
+			{
+				return INDEX_NONE;
+			}
+		}
+		else
+		{
+			if (mDesc.length() > 0)
+			{
+				return compiler->errorf(TEXT("%s> Missing input texture"), mDesc.c_str());
+			}
+			else
+			{
+				return compiler->errorf(TEXT("TextureSample> Missing input texture"));
+			}
+		}
+	}
+#endif
+
+
+	RMaterialExpressionTextureSampleParameter::RMaterialExpressionTextureSampleParameter(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
+		: ParentType(objectInitializer)
+	{
+		struct ConstructStatics
+		{
+			wstring NAME_Obsolete;
+			ConstructStatics()
+				:NAME_Obsolete(TEXT("Obsolete"))
+			{}
+		};
+
+		static ConstructStatics constructorStatics;
+		bIsParameterExpression = true;
+		bShowTextureInputPin = false;
+
+#if WITH_EDITOR
+		
+#endif
+		
+	}
+
+	void RMaterialExpressionTextureSample::getCaption(TArray<wstring>& outCaptions) const
+	{
+		outCaptions.add(TEXT("Texture Sample"));
+	}
+
+#if WITH_EDITOR
+
+#define IF_INPUT_RETURN(item, type) if(!inputIndex) return type; -- inputIndex
+
+	uint32 RMaterialExpressionTextureSample::getInputType(int32 inputIndex)
+	{
+		IF_INPUT_RETURN(mCoordinates, MCT_Float);
+
+		if (bShowTextureInputPin)
+		{
+			IF_INPUT_RETURN(mTextureObject, MCT_Texture);
+		}
+		if (mMipValueMode == TMVM_MipLevel || mMipValueMode == TMVM_MipBias)
+		{
+			IF_INPUT_RETURN(mMipValue, MCT_Float);
+		}
+		else if (mMipValueMode == TMVM_Derivative)
+		{
+			IF_INPUT_RETURN(mCoordinatesDX, MCT_Float);
+			IF_INPUT_RETURN(mCoordinatesDY, MCT_Float);
+		}
+		return MCT_Unknown;
+	}
+#undef IF_INPUT_RETURN
+
+	void RMaterialExpressionTextureSample::serialize(XMLNode* node)
+	{
+		ParentType::serialize(node);
+
+		auto* thisNode = node->first_node(TEXT("RMaterialExpressionTextureSample"));
+		if (thisNode)
+		{
+			XMLNode* mipValueModeNode = thisNode->first_node(TEXT("MipValueMode"));
+			if (mipValueModeNode)
+			{
+				wstring s = mipValueModeNode->value();
+				size_t h = RT_HASH(TCHAR_TO_ANSI(s.c_str()));
+				switch (h)
+				{
+				case CT_HASH("TMVM_None"):
+					mMipValueMode = TMVM_None;
+					break;
+				case CT_HASH("TMVM_MipLevel"):
+					mMipValueMode = TMVM_MipLevel;
+					break;
+				case CT_HASH("TMVM_MipBias"):
+					mMipValueMode = TMVM_MipBias;
+					break;
+				case CT_HASH("TMVM_Derivative"):
+					mMipValueMode = TMVM_Derivative;
+					break;
+				}
+			}
+
+			XMLNode* sampleSourceNode = thisNode->first_node(TEXT("SampleSource"));
+			if (sampleSourceNode)
+			{
+				wstring s = sampleSourceNode->value();
+				size_t h = RT_HASH(TCHAR_TO_ANSI(s.c_str()));
+				if (h == CT_HASH("SSM_FromTextureAsset"))
+				{
+					mSamplerSource = SSM_FromTextureAsset;
+				}
+				else if (h == CT_HASH("SSM_Wrap_WorldGroupSettings"))
+				{
+					mSamplerSource = SSM_Wrap_WorldGroupSettings;
+				}
+				else if (h == CT_HASH("SSM_Clamp_WorldGroupSettings"))
+				{
+					mSamplerSource = SSM_Clamp_WorldGroupSettings;
+				}
+			}
+		}
+	}
+
+	int32 RMaterialExpressionTextureSample::compileMipValue0(class MaterialCompiler* compiler)
+	{
+		if (mMipValueMode == TMVM_Derivative)
+		{
+			if (mCoordinatesDX.getTracedInput().isConnected())
+			{
+				return mCoordinatesDX.compile(compiler);
+			}
+		}
+		else if (mMipValue.getTracedInput().isConnected())
+		{
+			return mMipValue.compile(compiler);
+		}
+		else
+		{
+			return compiler->constant(mConstCoordinate);
+		}
+		return INDEX_NONE;
+	}
+	int32 RMaterialExpressionTextureSample::compileMipValue1(class MaterialCompiler* compiler)
+	{
+		if (mMipValueMode == TMVM_Derivative && mCoordinatesDY.getTracedInput().isConnected())
+		{
+			return mCoordinatesDY.compile(compiler);
+		}
+		return INDEX_NONE;
+	}
+
+	void RMaterialExpressionTextureSampleParameter::getCaption(TArray<wstring>& outCaptions) const
+	{
+		outCaptions.add(TEXT("Texture Param"));
+		outCaptions.add(printf(TEXT("'%s'"), mParameterName.c_str()));
+	}
+
+	void RMaterialExpressionTextureSampleParameter::setDefaultTexture()
+	{
+
+	}
+
+#endif
+
+
 	bool ExpressionInput::serialize(XMLNode* node)
 	{
 		return readExpressionInputXML(*this, node);
 	}
 
+
+	RMaterialExpressionTextureSampleParameter2D::RMaterialExpressionTextureSampleParameter2D(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
+		:ParentType(objectInitializer)
+	{
+		struct ConstructorStatics
+		{
+			
+		};
+
+		mTexture = loadObjectSync<RTexture>(TEXT("assets/EngineResources/DefaultTexture.dds"));
+		autoSetSamplerType();
+	}
+
+#if WITH_EDITOR
+	void RMaterialExpressionTextureSampleParameter2D::getCaption(TArray<wstring>& outCaptions) const
+	{
+		outCaptions.add(TEXT("Param2D"));
+		outCaptions.add(printf(TEXT("'%s'"), mParameterName.c_str()));
+	}
+#endif
+
+	bool RMaterialExpressionTextureSampleParameter2D::textureIsValid(std::shared_ptr<RTexture> inTexture)
+	{
+		bool result = false;
+		if (inTexture)
+		{
+			if (inTexture->getClass() == RTexture2D::StaticClass())
+			{
+				result = true;
+			}
+		}
+		return result;
+	}
+
+	void RMaterialExpressionTextureSampleParameter2D::setDefaultTexture()
+	{
+		mTexture = loadObjectAsync<RTexture2D>(TEXT("assets/EngineResources/DefaultTexture.dds"));
+		autoSetSamplerType();
+	}
+
+	const TCHAR* RMaterialExpressionTextureSampleParameter2D::getRequirements()
+	{
+		return TEXT("Requires Texture2D");
+	}
+
+
 	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionParameter);
 	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionScalarParameter);
+	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionVectorParameter);
+
+	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionTextureBase);
+	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionTextureSample);
+	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionTextureSampleParameter);
+	DECLARE_SIMPLER_REFLECTION(RMaterialExpressionTextureSampleParameter2D);
 }

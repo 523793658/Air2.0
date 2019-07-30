@@ -88,7 +88,7 @@ namespace Air
 
 	}
 
-	void AActor::addOwnedComponent(ActorComponent* component)
+	void AActor::addOwnedComponent(std::shared_ptr<ActorComponent> component)
 	{
 		BOOST_ASSERT(component->getOwner() == this);
 		bool bAlreadyInSet = false;
@@ -97,17 +97,18 @@ namespace Air
 
 	}
 
-	void AActor::postSpawnInitialize(Transform const& userSpawnTransform, AActor* inOwner)
+	void AActor::postSpawnInitialize(Transform const& userSpawnTransform, std::shared_ptr<AActor> inOwner)
 	{
-		World* const world = getWorld();
+		const World* world = getWorld();
 		bool const bActorsInitialized = world && world->areActorsInitialized();
 		mCreationTime = (world ? world->getTimeSecondes() : 0.f);
 
-		SceneComponent* const sceneRootComponent = fixupNativeActorCompoment(this);
+		SceneComponent* sceneRootComponent = fixupNativeActorCompoment(this);
 		if (sceneRootComponent != nullptr)
 		{
 			const Transform rootTransform(sceneRootComponent->mRelativeRotation, sceneRootComponent->mRelativeLocation, sceneRootComponent->mRelativeScale3D);
-			const Transform finalRootComponentTransform = rootTransform * userSpawnTransform;
+			Transform finalRootComponentTransform = rootTransform * userSpawnTransform;
+
 			sceneRootComponent->setWorldTransform(finalRootComponentTransform);
 		}
 
@@ -125,14 +126,14 @@ namespace Air
 	WorldSettings* AActor::getWorldSettings() const
 	{
 		World* world = getWorld();
-		return (world ? world->getWorldSettings() : nullptr);
+		return world ? world->getWorldSettings() : nullptr;
 	}
 
 	World* AActor::getWorld() const
 	{
 		if (Level* level = getLevel())
 		{
-			return level->mOwningWorld;
+			return level->mOwningWorld.get();
 		}
 		return nullptr;
 	}
@@ -239,7 +240,7 @@ namespace Air
 
 	void AActor::postActorConstruction()
 	{
-		World* const world = getWorld();
+		World* world = getWorld();
 		bool const bActorsInitialized = world && world->areActorsInitialized();
 		if (bActorsInitialized)
 		{
@@ -410,11 +411,11 @@ namespace Air
 	void AActor::updateAllReplicatedComponents()
 	{
 		mReplicatedComponents.reset();
-		for (ActorComponent* component : mOwnedComponents)
+		for (std::shared_ptr<ActorComponent>& component : mOwnedComponents)
 		{
 			if (component != nullptr)
 			{
-				updateReplicatedComponent(component);
+				updateReplicatedComponent(component.get());
 			}
 		}
 	}
@@ -444,7 +445,7 @@ namespace Air
 			}
 			if (bDoComponents)
 			{
-				for (ActorComponent* component : getComponents())
+				for (const std::shared_ptr<ActorComponent>& component : getComponents())
 				{
 					if (component)
 					{
@@ -489,7 +490,7 @@ namespace Air
 
 		for (int32 i = 0; i < theActor->mChildren.size(); i++)
 		{
-			AActor* child = theActor->mChildren[i];
+			AActor* child = theActor->mChildren[i].get();
 			if (child != nullptr && !child->isPendingKill())
 			{
 				markOwnerRelevantComponentsDirty(child);
@@ -499,25 +500,25 @@ namespace Air
 
 	
 
-	void AActor::setOwner(AActor* newOwner)
+	void AActor::setOwner(std::shared_ptr<AActor> newOwner)
 	{
 		if (mOwner != newOwner && !isPendingKill())
 		{
-			if (newOwner != nullptr && newOwner->isOwnedBy(this))
+			if (newOwner && newOwner->isOwnedBy(std::dynamic_pointer_cast<AActor>(this->shared_from_this())))
 			{
 				return;
 			}
 
-			AActor* oldOwner = mOwner;
-			if (mOwner != nullptr)
+			std::shared_ptr<AActor>& oldOwner = mOwner;
+			if (mOwner)
 			{
-				BOOST_ASSERT(mOwner->mChildren.remove(this) == 1);
+				BOOST_ASSERT(mOwner->mChildren.remove(std::dynamic_pointer_cast<AActor>(this->shared_from_this())) == 1);
 			}
 			mOwner = newOwner;
-			if (mOwner != nullptr)
+			if (mOwner)
 			{
-				BOOST_ASSERT(!mOwner->mChildren.contains(this));
-				mOwner->mChildren.add(this);
+				BOOST_ASSERT(!mOwner->mChildren.contains(std::dynamic_pointer_cast<AActor>(this->shared_from_this())));
+				mOwner->mChildren.add(std::dynamic_pointer_cast<AActor>(this->shared_from_this()));
 			}
 			markOwnerRelevantComponentsDirty(this);
 		}
@@ -528,7 +529,7 @@ namespace Air
 	{
 		if (newRootComponent == nullptr || newRootComponent->getOwner() == this)
 		{
-			mRootComponent = newRootComponent;
+			mRootComponent = std::dynamic_pointer_cast<SceneComponent>(newRootComponent->shared_from_this());
 			return true;
 		}
 		return false;
@@ -558,7 +559,7 @@ namespace Air
 
 	bool AActor::ownsComponent(ActorComponent* component) const
 	{
-		return mOwnedComponents.contains(component);
+		return mOwnedComponents.contains(std::dynamic_pointer_cast<ActorComponent>( component->shared_from_this()));
 	}
 
 	void AActor::tickActor(float deltaTime, enum ELevelTick tickType, ActorTickFunction& thisTickFunction)
@@ -605,12 +606,12 @@ namespace Air
 		}
 	}
 
-	void AActor::becomeViewTarget(class APlayerController* pc)
+	void AActor::becomeViewTarget(std::shared_ptr<class APlayerController> pc)
 	{
 
 	}
 
-	void AActor::endViewTarget(class APlayerController* pc)
+	void AActor::endViewTarget(std::shared_ptr<class APlayerController> pc)
 	{
 
 	}
@@ -689,7 +690,7 @@ namespace Air
 			TInlineComponentArray<SceneComponent*> compsToCheck;
 			TInlineComponentArray<SceneComponent*> checkedComps;
 
-			compsToCheck.push(mRootComponent);
+			compsToCheck.push(mRootComponent.get());
 			while (compsToCheck.size() > 0)
 			{
 				const bool bAllowShrinking = false;
@@ -723,7 +724,7 @@ namespace Air
 
 	void AActor::detachAllSceneComponents(class SceneComponent* inParentComponent, const DetachmentTransformRules& detachmentRules)
 	{
-		if (inParentComponent != nullptr)
+		if (inParentComponent)
 		{
 			TInlineComponentArray<SceneComponent*> components;
 			getComponents(components);
@@ -751,11 +752,11 @@ namespace Air
 	ActorComponent* AActor::findComponentByClass(const TSubclassOf<ActorComponent> componentClass) const
 	{
 		ActorComponent* foundComponent = nullptr;
-		for (ActorComponent* component : mOwnedComponents)
+		for (const std::shared_ptr<ActorComponent>& component : mOwnedComponents)
 		{
 			if (component && component->isA(componentClass))
 			{
-				foundComponent = component;
+				foundComponent = component.get();
 				break;
 			}
 		}

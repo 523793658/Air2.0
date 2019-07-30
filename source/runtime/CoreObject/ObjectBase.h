@@ -5,11 +5,10 @@ namespace Air
 {
 	class RClass;
 	class Object;
-	class COREOBJECT_API ObjectBase
+	class COREOBJECT_API ObjectBase : public std::enable_shared_from_this<ObjectBase>
 	{
 	protected:
-		ObjectBase()
-		{}
+		ObjectBase(const class ObjectInitializer& objectInitializer);
 
 
 	public:
@@ -61,7 +60,7 @@ namespace Air
 		template<typename T>
 		T* getTypedOuter() const
 		{
-			return (T*)getTypedOuter(T::StaticClass());
+			return dynamic_cast<T*>(getTypedOuter(T::StaticClass()));
 		}
 
 		FORCEINLINE bool isPendingKill() const
@@ -102,6 +101,6 @@ namespace Air
 
 		wstring mNamePrivate;
 
-		Object*	mOuterPrivate;
+		Object* mOuterPrivate;
 	};
 }

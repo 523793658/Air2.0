@@ -16,7 +16,7 @@ namespace Air
 			uint32 index = 0; 
 			for (ConstPlayerControllerIterator iterator = world->getPlayerControllerIterator(); iterator; ++iterator)
 			{
-				APlayerController* playerController = *iterator;
+				APlayerController* playerController = (*iterator).get();
 				if (index == playerIndex)
 				{
 					return playerController;

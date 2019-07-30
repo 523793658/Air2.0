@@ -67,7 +67,7 @@ namespace Air
 		virtual void serialize(XMLNode* node);
 		virtual void postLoad() override;
 
-		const TArray<ExpressionInput*> getInputs();
+		virtual const TArray<ExpressionInput*> getInputs();
 
 		virtual const void innerGetInputs(TArray<ExpressionInput*>& result);
 
@@ -91,6 +91,15 @@ namespace Air
 
 		bool containsInputLoop(const bool bStopOnFunctionCall = true);
 
+		virtual std::shared_ptr<RTexture> getReferencedTexture()
+		{
+			return std::shared_ptr<RTexture>();
+		}
+
+#if WITH_EDITOR
+		virtual int32 compilerError(class MaterialCompiler* compiler, const TCHAR* pcMessage);
+#endif
+
 		bool containsInputLoopInternal(TArray < MaterialExpressionKey > &expressionStack, TSet<MaterialExpressionKey>& visitedExpressions, const bool bStopOnFunctionCall);
 
 		virtual bool isResultMaterialAttributes(int32 outputIndex) { return false; }
@@ -110,5 +119,7 @@ namespace Air
 		uint32 bIsParameterExpression : 1;
 		uint32 mID;
 		Guid mMaterialExpressionGuid;
+
+		wstring mDesc;
 	};
 }

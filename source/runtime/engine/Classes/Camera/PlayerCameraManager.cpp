@@ -11,7 +11,7 @@ namespace Air
 		return (mTarget == otherTarget.mTarget) && (mPlayerState == otherTarget.mPlayerState) && mPOV.equals(otherTarget.mPOV);
 	}
 
-	void TViewTarget::setNewTarget(AActor* newTarget)
+	void TViewTarget::setNewTarget(std::shared_ptr<AActor> newTarget)
 	{
 		mTarget = newTarget;
 	}
@@ -40,33 +40,33 @@ namespace Air
 	AActor* PlayerCameraManager::getViewTarget() const
 	{
 		PlayerCameraManager* const nonConstThis = const_cast<PlayerCameraManager*>(this);
-		return mViewTarget.mTarget;
+		return mViewTarget.mTarget.get();
 	}
 
 	void PlayerCameraManager::setViewTarget(class AActor* newTarget)
 	{
 		if (newTarget == nullptr)
 		{
-			newTarget = mPCOwner;
+			newTarget = mPCOwner.get();
 		}
-		mViewTarget.checkViewTarget(mPCOwner);
+		mViewTarget.checkViewTarget(mPCOwner.get());
 
-		if (newTarget != mViewTarget.mTarget)
+		if (newTarget != mViewTarget.mTarget.get())
 		{
 			assignViewTarget(newTarget, mViewTarget);
-			mViewTarget.checkViewTarget(mPCOwner);
+			mViewTarget.checkViewTarget(mPCOwner.get());
 		}
 	}
 
-	void PlayerCameraManager::assignViewTarget(AActor* newTarget, TViewTarget& vt)
+	void PlayerCameraManager::assignViewTarget(AActor* newTarget, TViewTarget vt)
 	{
-		if (!newTarget || (newTarget == vt.mTarget))
+		if (!newTarget || (newTarget == vt.mTarget.get()))
 		{
 			return;
 		}
 
-		AActor* oldViewTarget = vt.mTarget;
-		vt.mTarget = newTarget;
+		std::shared_ptr<AActor> oldViewTarget = vt.mTarget;
+		vt.mTarget = std::dynamic_pointer_cast<AActor>(newTarget->shared_from_this());
 		vt.mPOV.mAspectRatio = mDefaultAspectRatio;
 		vt.mPOV.mFOV = mDefaultFOV;
 
@@ -81,7 +81,7 @@ namespace Air
 	void PlayerCameraManager::initializeFor(class APlayerController* pc)
 	{
 		mCameraCache.mPOV.mFOV = mDefaultFOV;
-		mPCOwner = pc;
+		mPCOwner = std::dynamic_pointer_cast<APlayerController>(pc->shared_from_this());
 		setViewTarget(pc);
 		updateCamera(0.f);
 	}
@@ -95,7 +95,7 @@ namespace Air
 		outVT.mPOV.bUseFieldOfViewForLOD = true;
 		outVT.mPOV.mProjectonMode = bIsOrthographic ? ECameraProjectionMode::Orthographic : ECameraProjectionMode::Perspective;
 		bool bDoNotApplyModifiers = false;
-		if (ACameraActor* camActor = dynamic_cast<ACameraActor*>(outVT.mTarget))
+		if (std::shared_ptr<ACameraActor> camActor = std::dynamic_pointer_cast<ACameraActor>(outVT.mTarget))
 		{
 
 		}
@@ -129,7 +129,7 @@ namespace Air
 	void PlayerCameraManager::doUpdateCamera(float deltaTime)
 	{
 		MinimalViewInfo newPOV = mViewTarget.mPOV;
-		mViewTarget.checkViewTarget(mPCOwner);
+		mViewTarget.checkViewTarget(mPCOwner.get());
 		udpateViewTarget(mViewTarget, deltaTime);
 		
 		newPOV = mViewTarget.mPOV;
@@ -171,16 +171,16 @@ namespace Air
 
 	class APawn* PlayerCameraManager::getViewTargetPawn() const
 	{
-		PlayerCameraManager* const nonConstThis = const_cast<PlayerCameraManager*>(this);
+		PlayerCameraManager* nonConstThis = const_cast<PlayerCameraManager*>(this);
 		if (mPendingViewTarget.mTarget)
 		{
-			nonConstThis->mPendingViewTarget.checkViewTarget(nonConstThis->mPCOwner);
+			nonConstThis->mPendingViewTarget.checkViewTarget(nonConstThis->mPCOwner.get());
 			if (mPendingViewTarget.mTarget)
 			{
 				return mPendingViewTarget.getTargetPawn();
 			}
 		}
-		nonConstThis->mViewTarget.checkViewTarget(nonConstThis->mPCOwner);
+		nonConstThis->mViewTarget.checkViewTarget(nonConstThis->mPCOwner.get());
 		return mViewTarget.getTargetPawn();
 	}
 
@@ -190,10 +190,10 @@ namespace Air
 		BOOST_ASSERT(owningController);
 		if (mTarget == nullptr)
 		{
-			mTarget = owningController;
+			mTarget = std::dynamic_pointer_cast<APlayerController>(owningController->shared_from_this());
 		}
 
-		if (mTarget == owningController)
+		if (mTarget.get() == owningController)
 		{
 			mPlayerState = nullptr;
 		}
@@ -212,11 +212,11 @@ namespace Air
 
 	APawn* TViewTarget::getTargetPawn() const
 	{
-		if (APawn* pawn = dynamic_cast<APawn*>(mTarget))
+		if (APawn* pawn = dynamic_cast<APawn*>( mTarget.get()))
 		{
 			return pawn;
 		}
-		else if (AController* controller = dynamic_cast<AController*>(mTarget))
+		else if (std::shared_ptr<AController> controller = std::dynamic_pointer_cast<AController>(mTarget))
 		{
 			return controller->getPawn();
 		}

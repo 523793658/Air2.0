@@ -13,6 +13,6 @@ namespace Air
 
 	public:
 
-		class StaticMeshComponent* mStaticMeshComponennt;
+		std::shared_ptr<class StaticMeshComponent> mStaticMeshComponennt;
 	};
 }

@@ -69,7 +69,7 @@ namespace Air
 
 	void DefaultGameMoviePlayer::passLoadingScreenWindowBackToGame() const
 	{
-		GameEngine* gameEngine = dynamic_cast<GameEngine*>(GEngine);
+		GameEngine* gameEngine = dynamic_cast<GameEngine*>(GEngine.get());
 		if (mLoadingScreenWindowPtr.lock())
 		{
 			gameEngine->mGameViewportWindow = mLoadingScreenWindowPtr;
@@ -82,7 +82,7 @@ namespace Air
 
 	void DefaultGameMoviePlayer::waitForMovieToFinish()
 	{
-		GameEngine* gameEngine = dynamic_cast<GameEngine*>(GEngine);
+		GameEngine* gameEngine = dynamic_cast<GameEngine*>(GEngine.get());
 		if (gameEngine)
 		{
 			gameEngine->switchGameWindowToUseGameViewport();

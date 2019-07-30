@@ -292,6 +292,7 @@ namespace Air
 
 		virtual void RHIUnlockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, bool bLockWithinMiptail) = 0;
 
+		virtual TextureReferenceRHIRef RHICreateTextureReference(LastRenderTimeContainer* lastRenderTime) = 0;
 
 		virtual void* lockTexture2D_RenderThread(class RHICommandListImmediate& rhiCmdList, Texture2DRHIParamRef texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail, bool bNeedsDefaultRHIFlush);
 		

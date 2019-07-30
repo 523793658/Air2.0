@@ -32,7 +32,7 @@ namespace Air
 
 		RClass* mSuperClass{ nullptr };
 
-		Object* mClassDefaultObject{ nullptr };
+		std::shared_ptr<Object> mClassDefaultObject;
 
 		int32 mPropertiesSize;
 	public:
@@ -70,27 +70,27 @@ namespace Air
 		//virtual Object* createInstance() = 0;
 
 		template<typename T>
-		T* getTypeOuter() const
+		std::shared_ptr<T> getTypeOuter() const
 		{
-			return (T*)getTypeOuter(T::StaticClass());
+			return std::static_pointer_cast<T>(getTypeOuter(T::StaticClass()));
 		}
 
 		Object* createDefaultObject();
 
 		Object* getDefaultObject(bool bCreateIfNeed = true)
 		{
-			if (mClassDefaultObject == nullptr && bCreateIfNeed)
+			if (!mClassDefaultObject && bCreateIfNeed)
 			{
 				createDefaultObject();
 			}
-			return mClassDefaultObject;
+			return mClassDefaultObject.get();
 		}
 
 		template<class T>
 		T* getDefaultObject()
 		{
 			Object* ret = getDefaultObject();
-			return (T*)ret;
+			return dynamic_cast<T*>(ret);
 		}
 
 

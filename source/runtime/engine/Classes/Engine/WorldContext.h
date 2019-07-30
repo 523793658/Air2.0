@@ -7,7 +7,7 @@ namespace Air
 	class World;
 	struct WorldContext 
 	{
-		ViewportClient* mGameViewport;
+		std::shared_ptr<ViewportClient> mGameViewport;
 
 		void addRef(World*& worldPtr)
 		{
@@ -20,7 +20,7 @@ namespace Air
 			return mThisCurrentWorld;
 		}
 
-		void setCurrentWorld(World* inWorld);
+		void setCurrentWorld(std::shared_ptr<World>& inWorld);
 
 		TArray<World**> mExternalReferences;
 	public:
@@ -30,6 +30,6 @@ namespace Air
 
 		wstring mContextHandle;
 
-		class GameInstance* mOwningGameInstance{ nullptr };
+		std::shared_ptr<class GameInstance> mOwningGameInstance;
 	};
 }

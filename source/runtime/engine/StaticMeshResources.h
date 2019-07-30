@@ -414,7 +414,7 @@ namespace Air
 		public:
 			struct SectionInfo
 			{
-				MaterialInterface* mMaterial;
+				std::shared_ptr<class MaterialInterface> mMaterial;
 				bool bSelected;
 #if WITH_EDITORONLY_DATA
 				int32 mMaterialIndex;
@@ -458,29 +458,31 @@ namespace Air
 	struct TStaticMeshVertexTangentDatum
 	{
 		TangentTypeT mTangentX;
-		TangentTypeT mTangentZ;
+		TangentTypeT mTangentY;
 
 		FORCEINLINE float3 getTangentX() const
 		{
 			return mTangentX;
 		}
 
-		FORCEINLINE float3 getTangentZ() const
+		
+
+		FORCEINLINE float4 getTangentY() const
 		{
-			return mTangentX;
+			return mTangentY;
 		}
 
-		FORCEINLINE float3 getTangentY() const
+		FORCEINLINE float3 getTangentZ() const
 		{
 			float3 tanX = getTangentX();
-			float3 tanZ = getTangentZ();
-			return (float3(tanZ) ^ tanX) * tanZ.w;
+			float4 tanY = getTangentY();
+			return (tanX ^ float3(tanY)) * tanY.w;
 		}
 
 		FORCEINLINE void setTangents(float3 x, float3 y, float3 z)
 		{
 			mTangentX = x;
-			mTangentZ = float4(z, getBasisDeterminantSign(x, y, z));
+			mTangentY = float4(y, getBasisDeterminantSign(x, y, z));
 		}
 	};
 

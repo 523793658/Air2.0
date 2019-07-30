@@ -805,4 +805,66 @@ namespace Air
 		LinearColor mValue;
 		uint32 mValueType;
 	};
+
+	static std::shared_ptr<RTexture> getIndexedTexture(const FMaterial& material, int32 textureIndex)
+	{
+		const TArray<std::shared_ptr<RTexture>>& referencedTexture = material.getReferencedTextures();
+		std::shared_ptr<RTexture> indexedTexture;
+		if (referencedTexture.isValidIndex(textureIndex))
+		{
+			indexedTexture = referencedTexture[textureIndex];
+		}
+		else
+		{
+			static bool bwarnedOnce = false;
+			if (!bwarnedOnce)
+			{
+				AIR_LOG(logMaterial, Warning, TEXT("MaterialConstantExpressionTexture had invalid textureIndex!"));
+				bwarnedOnce = true;
+			}
+		}
+		return indexedTexture;
+	}
+
+
+	class MaterialConstantExpressionTextureParameter : public MaterialConstantExpressionTexture
+	{
+		typedef MaterialConstantExpressionTexture ParentType;
+		DECLARE_MATERIALCONSTANTEXPRESSION_TYPE(MaterialConstantExpressionTextureParameter);
+	public:
+		MaterialConstantExpressionTextureParameter() {}
+		MaterialConstantExpressionTextureParameter(wstring inParameterName, int32 inTextureIndex, ESamplerSourceMode inSourceMode)
+			:ParentType(inTextureIndex, inSourceMode)
+			,mParameterName(inParameterName)
+		{}
+
+		virtual void serialize(Archive& ar)
+		{
+			ar << mParameterName;
+			ParentType::serialize(ar);
+		}
+
+		virtual void getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<const RTexture>& outValue, ESamplerSourceMode& outSamplerSource) const
+		{
+			BOOST_ASSERT(isInParallelRenderingThread());
+			outSamplerSource = mSamplerSource;
+			if (mTransientOverrideValue_RenderThread != nullptr)
+			{
+				outValue = mTransientOverrideValue_RenderThread;
+			}
+			else
+			{
+				outValue = nullptr;
+				if (!context.mMaterialRenderProxy->getTextureValue(mParameterName, outValue, context))
+				{
+					outValue = getIndexedTexture(material, mTextureIndex);
+				}
+			}
+		}
+
+
+
+	private:
+		wstring mParameterName;
+	};
 }

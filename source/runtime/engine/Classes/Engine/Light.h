@@ -9,11 +9,11 @@ namespace Air
 		GENERATED_RCLASS_BODY(ALight, AActor)
 
 	public:
-		LightComponent * getLightComponent() const;
+		const std::shared_ptr<LightComponent>& getLightComponent() const;
 
 		void setLightColor(LinearColor newLightColor);
 	public:
-		class LightComponent* mLightComponent;
+		std::shared_ptr<class LightComponent> mLightComponent;
 		uint32 bEnabled : 1;
 	};
 }

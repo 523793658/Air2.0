@@ -349,4 +349,64 @@ namespace Air
 
 #define ENQUEUE_UNIQUE_RENDER_COMMAND_FIVEPARAMETER_CREATE_TEMPLATE(TypeName, TemplateParameterName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4, ParamType5, ParamValue5) \
 	ENQUEUE_UNIQUE_RENDER_COMMAND_FIVEPARAMETER_CREATE(TypeName<TemplateParameterName>, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4, ParamType5, ParamValue5)
+
+
+
+
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_DECLARE_OPTTYPENAME(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, OptTypename, code)	  \
+	class EURCMacro_##TypeName : public RenderCommand	\
+	{	\
+	public:	\
+		EURCMacro_##TypeName(OptTypename boost::call_traits<ParamType1>::value_type in##ParamName1, OptTypename boost::call_traits<ParamType2>::value_type in##ParamName2, OptTypename boost::call_traits<ParamType3>::value_type in##ParamName3, OptTypename boost::call_traits<ParamType4>::value_type in##ParamName4, OptTypename boost::call_traits<ParamType5>::value_type in##ParamName5, OptTypename boost::call_traits<ParamType6>::value_type in##ParamName6) :	 \
+			ParamName1(in##ParamName1),\
+			ParamName2(in##ParamName2),	\
+			ParamName3(in##ParamName3),	\
+			ParamName4(in##ParamName4),	\
+			ParamName5(in##ParamName5),	\
+			ParamName6(in##ParamName6)	\
+		{}\
+		TASK_FUNCTION(code)\
+		TASKNAME_FUNCTION(TypeName)	\
+	private:	\
+		ParamType1	ParamName1;	\
+		ParamType2	ParamName2;	\
+		ParamType3	ParamName3;	\
+		ParamType4	ParamName4;	\
+		ParamType5	ParamName5;	\
+		ParamType6	ParamName6;	\
+	};
+
+
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_DECLARE(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, code)\
+	ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_DECLARE_OPTTYPENAME(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, ,code)
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_CREATE(TypeName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4, ParamType5, ParamValue5, ParamType6, ParamValue6)	\
+	{\
+		if(shouldExecuteOnRenderThread())	\
+		{	\
+			checkNotBlockedOnRenderThread();	\
+			GraphTask<EURCMacro_##TypeName>::createTask().constructAndDispatchWhenReady(ParamValue1, ParamValue2, ParamValue3, ParamValue4, ParamValue5, ParamValue6);\
+		}\
+		else \
+		{	\
+			EURCMacro_##TypeName TempCommand(ParamValue1, ParamValue2, ParamValue3, ParamValue4, ParamValue5, ParamValue6);	\
+			TempCommand.doTask(ENamedThreads::GameThread, GraphEventRef());  \
+		}	\
+	}
+
+
+
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, code)	\
+	ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_DECLARE(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, code)	  \
+	ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_CREATE(TypeName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4, ParamType5, ParamValue5, ParamType6, ParamValue6)
+
+#define  ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_DECLARE_TEMPLATE(TypeName, TemplateParamName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, Code) \
+	template <typename TemplateParamName> \
+	ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_DECLARE_OPTTYPENAME(TypeName, ParamType1, ParamName1, ParamValue1, ParamType2, ParamName2, ParamValue2, ParamType3, ParamName3, ParamValue3, ParamType4, ParamName4, ParamValue4, ParamType5, ParamName5, ParamValue5, ParamType6, ParamName6, ParamValue6, typename, Code)
+
+#define ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_CREATE_TEMPLATE(TypeName, TemplateParameterName, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4, ParamType5, ParamValue5, ParamType6, ParamValue6) \
+	ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER_CREATE(TypeName<TemplateParameterName>, ParamType1, ParamValue1, ParamType2, ParamValue2, ParamType3, ParamValue3, ParamType4, ParamValue4, ParamType5, ParamValue5, ParamType6, ParamValue6)
 }

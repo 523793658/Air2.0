@@ -14,11 +14,11 @@ namespace Air
 
 		RStaticMesh* getStaticMesh()const
 		{
-			return mStaticMesh;
+			return mStaticMesh.get();
 		}
 
 		virtual bool setStaticMesh(class RStaticMesh* newMesh);
 
-		class RStaticMesh* mStaticMesh;
+		std::shared_ptr<class RStaticMesh> mStaticMesh;
 	};
 }

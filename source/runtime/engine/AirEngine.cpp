@@ -8,28 +8,28 @@
 
 namespace Air
 {
-	ENGINE_API Engine* GEngine = nullptr;
+	ENGINE_API std::shared_ptr<Engine> GEngine;
 
 	SystemResolution GSystemResolution;
 
 	static bool GHDROutputEnabled = false;
 
-	static TArray<LocalPlayer*> FakeEmptyLocalPlayers;
+	static TArray<std::shared_ptr<LocalPlayer>> FakeEmptyLocalPlayers;
 
-	const TArray<class LocalPlayer*>& handleFakeLocalPlayerList()
+	const TArray<std::shared_ptr<class LocalPlayer>>& handleFakeLocalPlayerList()
 	{
 		return FakeEmptyLocalPlayers;
 	}
 
 	static CachedSystemScalabilityCVars GCachedScalabilityCVars;
 
-	LocalPlayer* getLocalPlayerFromControllerId_Local(const TArray<class LocalPlayer*>& gamePlayers, const int32 controllerId)
+	LocalPlayer* getLocalPlayerFromControllerId_Local(const TArray<std::shared_ptr<class LocalPlayer>>& gamePlayers, const int32 controllerId)
 	{
-		for (LocalPlayer* const player : gamePlayers)
+		for (const std::shared_ptr<LocalPlayer>& player : gamePlayers)
 		{
 			if (player && player->getControllerId() == controllerId)
 			{
-				return player;
+				return player.get();
 			}
 		}
 		return nullptr;
@@ -115,13 +115,13 @@ namespace Air
 	{
 		if (getWorldContextFromViewport(inViewport) != nullptr)
 		{
-			const TArray<class LocalPlayer*>& gamePlayers = getGamePlayers(inViewport);
+			const TArray<std::shared_ptr<class LocalPlayer>>& gamePlayers = getGamePlayers(inViewport);
 			return getLocalPlayerFromControllerId_Local(gamePlayers, controllerId);
 		}
 		return nullptr;
 	}
 
-	const TArray<class LocalPlayer*>& Engine::getGamePlayers(const ViewportClient* viewport) const
+	const TArray<std::shared_ptr<class LocalPlayer>>& Engine::getGamePlayers(const ViewportClient* viewport) const
 	{
 		const WorldContext& context = getWorldContextFromViewportChecked(viewport);
 		if (context.mOwningGameInstance == nullptr)
@@ -141,7 +141,7 @@ namespace Air
 
 	}
 
-	const TArray<class LocalPlayer*>& Engine::getGamePlayers(World* inWorld) const
+	const TArray<std::shared_ptr<class LocalPlayer>>& Engine::getGamePlayers(World* inWorld) const
 	{
 		const WorldContext& context = getWorldContextFromWorldChecked(inWorld);
 		if (context.mOwningGameInstance == nullptr)
@@ -155,7 +155,7 @@ namespace Air
 	{
 		for (const WorldContext& worldContext : mWorldList)
 		{
-			if (worldContext.mGameViewport == inViewport)
+			if (worldContext.mGameViewport.get() == inViewport)
 			{
 				return &worldContext;
 			}
@@ -167,7 +167,7 @@ namespace Air
 	{
 		for (WorldContext& worldContext : mWorldList)
 		{
-			if (worldContext.mGameViewport == inViewport)
+			if (worldContext.mGameViewport.get() == inViewport)
 			{
 				return &worldContext;
 			}
@@ -215,7 +215,7 @@ namespace Air
 		return nullptr;
 	}
 
-	TArray<class LocalPlayer*>::TConstIterator Engine::getLocalPlayerIterator(World* world)
+	TArray<std::shared_ptr<class LocalPlayer>>::TConstIterator Engine::getLocalPlayerIterator(World* world)
 	{
 		return getGamePlayers(world).createConstIterator();
 	}

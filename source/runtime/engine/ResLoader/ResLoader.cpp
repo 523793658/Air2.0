@@ -332,10 +332,9 @@ namespace Air
 
 	std::shared_ptr<Object> ResLoadingDesc::createResource()
 	{
-		Object* obj = newObject<Object>(nullptr, mResourceClass, name(), RF_NeedPostLoad);
-		auto ptr = std::shared_ptr<Object>(obj);
-		setResource(ptr);
-		return ptr;
+		std::shared_ptr<Object> obj = newObject<Object>(nullptr, mResourceClass, name(), RF_NeedPostLoad);
+		setResource(obj);
+		return obj;
 	}
 
 	void processAsyncLoading(bool bUseTimeLimit, bool bUseFullTimeLimit, float timeLimit)

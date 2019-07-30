@@ -107,10 +107,10 @@ namespace Air
 	{
 		ActorSpawnParameters(){}
 		wstring Name{ TEXT("") };
-		AActor* mTemplate{ nullptr };
-		AActor* mOwner{ nullptr };
+		std::shared_ptr<AActor> mTemplate;
+		std::shared_ptr<AActor> mOwner;
 		EObjectFlags objectFlags{ RF_NoFlags };
-		class Level* mOverrideLevel{ nullptr };
+		std::shared_ptr<class Level> mOverrideLevel;
 	};
 
 	struct ENGINE_API LevelCollection
@@ -128,20 +128,19 @@ namespace Air
 
 		ELevelCollectionType getType() const { return mCollectionType; }
 
-		void setGameState(AGameStateBase* const inGameState)
-		{
-			mGameState = inGameState;
-		}
+		void setGameState(class AGameStateBase* inGameState);
 
-		const TSet<Level*>& getLevels() const { return mLevels; }
+		const TSet<std::shared_ptr<Level>>& getLevels() const { return mLevels; }
 
-		Level* getPersistentLevel() const { return mPersistentLevel; }
+		const Level* getPersistentLevel() const { return mPersistentLevel.get(); }
 
-		AGameStateBase* getGameState() const { return mGameState; }
+		std::shared_ptr<Level>& getPersistentLevel() { return mPersistentLevel; }
+
+		const std::shared_ptr<AGameStateBase> getGameState() const { return mGameState; }
 
 		void setType(const ELevelCollectionType inType) { mCollectionType = inType; }
 
-		void setPersistentLevel(Level* const level)
+		void setPersistentLevel(std::shared_ptr<Level> const level)
 		{
 			mPersistentLevel = level;
 		}
@@ -151,18 +150,18 @@ namespace Air
 	public:
 
 
-		AGameStateBase* mGameState{ nullptr };
+		std::shared_ptr<AGameStateBase> mGameState;
 
-		TSet<Level*> mLevels;
+		TSet<std::shared_ptr<Level>> mLevels;
 
 		ELevelCollectionType mCollectionType;
 
-		class Level* mPersistentLevel;
+		std::shared_ptr<class Level> mPersistentLevel;
 
 		bool bIsVisible;
 	};
 
-	typedef TArray<APlayerController*>::TConstIterator ConstPlayerControllerIterator;
+	typedef TArray<std::shared_ptr<APlayerController>>::TConstIterator ConstPlayerControllerIterator;
 
 	struct StartPhysicsTickFunction : public TickFunction
 	{
@@ -204,35 +203,37 @@ namespace Air
 
 		void initializeNewWorld(const InitializationValues = InitializationValues());
 
-		static World* createWorld(const EWorldType::Type inWorldType, bool bInformEngineOfWorld, wstring worldName = TEXT(""), ERHIFeatureLevel::Type inFeatureLevel = ERHIFeatureLevel::Num);
+		static std::shared_ptr<World> createWorld(const EWorldType::Type inWorldType, bool bInformEngineOfWorld, wstring worldName = TEXT(""), ERHIFeatureLevel::Type inFeatureLevel = ERHIFeatureLevel::Num);
 
 		WorldSettings* getWorldSettings(bool bCheckStreamingPesistent = false, bool bChecked = true) const;
 
-		inline void setGameInstance(GameInstance* newGI)
+		inline void setGameInstance(std::shared_ptr<GameInstance>& newGI)
 		{
 			mOwningGameIntance = newGI;
 		}
 
+		bool containsActor(AActor* actor);
+
 		bool isServer() const;
 
-		GameModeBase* getAuthGameMode() const { return mAuthorityGameMode; }
+		const std::shared_ptr<GameModeBase>& getAuthGameMode() const { return mAuthorityGameMode; }
 
-		AActor* spawnActor(RClass* inClass, float3 const * location, Rotator const* rotation, const ActorSpawnParameters& spawnParameters);
+		std::shared_ptr<AActor> spawnActor(RClass* inClass, float3 const * location, Rotator const* rotation, const ActorSpawnParameters& spawnParameters);
 
-		AActor* spawnActor(RClass* inClass, Transform const* userTransformPtr, const ActorSpawnParameters& spawnParameters);
+		std::shared_ptr<AActor> spawnActor(RClass* inClass, Transform const* userTransformPtr, const ActorSpawnParameters& spawnParameters);
 
 
 
 		
 
 		template<class T>
-		T* spawnActor(RClass* inClass, float3 const& location, Rotator const & rotation, const ActorSpawnParameters& spawnParamters = ActorSpawnParameters())
+		std::shared_ptr<T> spawnActor(RClass* inClass, float3 const& location, Rotator const & rotation, const ActorSpawnParameters& spawnParamters = ActorSpawnParameters())
 		{
-			return dynamic_cast<T*>(spawnActor(inClass, &location, &rotation, spawnParamters));
+			return std::dynamic_pointer_cast<T>(spawnActor(inClass, &location, &rotation, spawnParamters));
 		}
 
 		template<class T>
-		AActor* spawnActor(float3 const * location, Rotator const * rotation, const ActorSpawnParameters& spawnParameters)
+		std::shared_ptr<AActor> spawnActor(float3 const * location, Rotator const * rotation, const ActorSpawnParameters& spawnParameters)
 		{
 			Transform transform;
 			if (location)
@@ -243,22 +244,22 @@ namespace Air
 			{
 				transform.setRotation(Quaternion(*rotation));
 			}
-			return dynamic_cast<T*>(spawnActor(T::StaticClass(), &transform, spawnParameters));
+			return std::dynamic_pointer_cast<T>(spawnActor(T::StaticClass(), &transform, spawnParameters));
 		}
 
 		template<class T>
-		T* spawnActor(RClass* inClass, const ActorSpawnParameters& spawnParameters = ActorSpawnParameters())
+		std::shared_ptr<T> spawnActor(RClass* inClass, const ActorSpawnParameters& spawnParameters = ActorSpawnParameters())
 		{
-			return dynamic_cast<T*>(spawnActor(inClass, nullptr, nullptr, spawnParameters));
+			return std::dynamic_pointer_cast<T>(spawnActor(inClass, nullptr, nullptr, spawnParameters));
 		}
 
 		template<class T>
-		T* spawnActor(const ActorSpawnParameters& spawnParameters = ActorSpawnParameters())
+		std::shared_ptr<T> spawnActor(const ActorSpawnParameters& spawnParameters = ActorSpawnParameters())
 		{
-			return dynamic_cast<T*>(spawnActor<T>(nullptr, nullptr, spawnParameters));
+			return std::dynamic_pointer_cast<T>(spawnActor<T>(nullptr, nullptr, spawnParameters));
 		}
 
-		APlayerController* spawnPlayActor(class Player* player, ENetRole remoteRole);
+		std::shared_ptr<APlayerController> spawnPlayActor(class Player* player, ENetRole remoteRole);
 
 		void initWorld(const InitializationValues ivs = InitializationValues());
 
@@ -268,7 +269,7 @@ namespace Air
 
 		bool setGameMode(const URL& inURL);
 
-		inline GameInstance* getGameInstance() const
+		inline std::shared_ptr<GameInstance> getGameInstance() const
 		{
 			return mOwningGameIntance;
 		}
@@ -284,7 +285,7 @@ namespace Air
 			return mTimeSeconds;
 		}
 
-		AGameStateBase* getGameState() const { return mGameState; }
+		AGameStateBase* getGameState() const { return mGameState.get(); }
 		const LevelCollection* getActiveLevelCollection() const { return mActiveLevelCollection; }
 
 		bool areActorsInitialized() const;
@@ -316,7 +317,7 @@ namespace Air
 			return mDeltaTimeSeconds;
 		}
 
-		const TArray<class Level*> & getLevels() const;
+		const TArray<std::shared_ptr<class Level>>& getLevels() const;
 
 		bool setCurrentLevel(class Level* inLevel);
 
@@ -336,7 +337,7 @@ namespace Air
 
 		LevelCollection& findOrAddCollectionByType(const ELevelCollectionType inType);
 
-		const TArray<AActor*> & getActors() const { return mActors; }
+		const TArray<std::shared_ptr<AActor>> & getActors() const { return mActors; }
 
 
 		void addController(AController* controller);
@@ -361,7 +362,7 @@ namespace Air
 
 		EWorldType::Type			mWorldType;
 
-		GameInstance*				mOwningGameIntance{ nullptr };
+		std::shared_ptr<GameInstance>				mOwningGameIntance;
 
 		std::shared_ptr<class RTexture> mSkyTexture;
 
@@ -375,9 +376,9 @@ namespace Air
 
 		uint32 bMatchStarted : 1;
 
-		Level* mCurrentLevel{ nullptr };
+		std::shared_ptr<Level> mCurrentLevel;
 
-		Level* mPersistentLevel{ nullptr };
+		std::shared_ptr<Level> mPersistentLevel;
 
 		const LevelCollection*		mActiveLevelCollection{ nullptr };
 
@@ -393,11 +394,11 @@ namespace Air
 
 		class TickTaskLevel*			mTickTaskLevel{ nullptr };
 
-		TArray<APlayerController*> mPlayerControllerList;
+		TArray<std::shared_ptr<APlayerController>> mPlayerControllerList;
 
 		TArray<AController*> mControllerList;
 
-		class AGameStateBase*			mGameState;
+		std::shared_ptr<class AGameStateBase>			mGameState;
 
 		ETickingGroup					mTickGroup;
 
@@ -406,14 +407,14 @@ namespace Air
 		TSet<ActorComponent*> mComponentsThatNeedEndOfFrameUpdate;
 		TSet<ActorComponent*> mComponentsThatNeedEndOfFrameUpdate_OnGameThread;
 
-		TArray<class RMaterialParameterCollectionInstance*> mParameterCollectionInstances;
+		TArray<std::shared_ptr<class RMaterialParameterCollectionInstance>> mParameterCollectionInstances;
 
 		bool bShouldTick{ true };
 
-		TArray<AActor*> mActors;
+		TArray<std::shared_ptr<AActor>> mActors;
 	public:
-		GameModeBase*			mAuthorityGameMode{ nullptr };
-		TArray<Level*>			mLevels;
+		std::shared_ptr<GameModeBase>			mAuthorityGameMode;
+		TArray<std::shared_ptr<Level>>			mLevels;
 		bool bIsWorldInitialized{ false };
 		bool bShouldSimulatePhysics{ false };
 		bool bRequiresHitProxies{ false };
@@ -433,18 +434,18 @@ namespace Air
 
 		inline WorldProxy& operator =(World* inWorld)
 		{
-			mWorld = inWorld;
+			mWorld = std::dynamic_pointer_cast<World>(inWorld->shared_from_this());
 			return *this;
 		}
 
 		inline operator World* () const
 		{
 			BOOST_ASSERT(isInGameThread());
-			return mWorld;
+			return mWorld.get();
 		}
 
 	private:
-		World* mWorld{ nullptr };
+		std::shared_ptr<World> mWorld;
 	};
 
 	class ENGINE_API ScopedLevelCollectionContextSwitch

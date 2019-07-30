@@ -36,8 +36,8 @@ namespace Air
 		LocalPlayer* getLocalPlayerFromControllerId(const ViewportClient* inViewport, const int32 controllerId) const;
 
 
-		const TArray<class LocalPlayer*>& getGamePlayers(World* inWorld) const;
-		const TArray<class LocalPlayer*>& getGamePlayers(const ViewportClient* viewport) const;
+		const TArray<std::shared_ptr<class LocalPlayer>>& getGamePlayers(World* inWorld) const;
+		const TArray<std::shared_ptr<class LocalPlayer>>& getGamePlayers(const ViewportClient* viewport) const;
 
 		const WorldContext& getWorldContextFromWorldChecked(const World* inWorld) const;
 
@@ -54,9 +54,9 @@ namespace Air
 
 		WorldContext& createNewWorldContext(EWorldType::Type worldType);
 
-		TArray<class LocalPlayer*>::TConstIterator getLocalPlayerIterator(World* world);
+		TArray<std::shared_ptr<class LocalPlayer>>::TConstIterator getLocalPlayerIterator(World* world);
 
-		void worldAdded(World* inWorld)
+		void worldAdded(std::shared_ptr<World>& inWorld)
 		{
 
 		}
@@ -100,7 +100,7 @@ namespace Air
 		TArray<std::shared_ptr<class ISceneViewExtension>> mViewExtensions;
 	};
 
-	extern ENGINE_API class Engine*				GEngine;
+	extern ENGINE_API std::shared_ptr<class Engine>				GEngine;
 
 	ENGINE_API void staticTick(float deltaTime, bool bUseFullTimeLimit = true, float asyncLoadingTime = 0.005f);
 }

@@ -1,5 +1,4 @@
 #pragma once
-#include "DeferredShadingRenderer.h"
 #include "ShaderParameterUtils.h"
 #include "ShaderParameters.h"
 #include "Containers/DynamicRHIResourceArray.h"

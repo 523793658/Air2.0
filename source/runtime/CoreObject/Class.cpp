@@ -3,18 +3,26 @@ namespace Air
 {
 	Object* RClass::createDefaultObject()
 	{
-		if (mClassDefaultObject == nullptr)
+		if (!mClassDefaultObject)
 		{
-			//if (this == Object::StaticClass())
+			RClass* parentClass = getSupperClass();
+			Object* parentDefaultObject = nullptr;
+			if (parentClass != nullptr)
 			{
-				if (mClassDefaultObject == nullptr)
+				parentDefaultObject = parentClass->getDefaultObject();
+			}
+			if ((parentDefaultObject != nullptr) ||  this == Object::StaticClass())
+			{
+				if (!mClassDefaultObject )
 				{
-					mClassDefaultObject = staticAllocateObject(this, getOuter(), TEXT(""), EObjectFlags(RF_Public | RF_ClassDefaultObject | RF_ArchetypeObject));
+					Object* obj = staticAllocateObject(this, getOuter(), TEXT(""), EObjectFlags(RF_Public | RF_ClassDefaultObject | RF_ArchetypeObject));
 					const bool bShouldInitialzedProperties = false;
-					(*classConstructor)(ObjectInitializer(mClassDefaultObject, nullptr, false, bShouldInitialzedProperties));
+					ObjectInitializer objectinitializer(obj, nullptr, false, bShouldInitialzedProperties);
+					(*classConstructor)(objectinitializer);
+					mClassDefaultObject = objectinitializer.getSharedPtr();
 				}
 			}
 		}
-		return mClassDefaultObject;
+		return mClassDefaultObject.get();
 	}
 }

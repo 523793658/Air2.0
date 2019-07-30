@@ -249,4 +249,43 @@ namespace Air
 		friend wstring lex::toString(const MD5Hash& hash);
 		friend void lex::fromString(MD5Hash& hash, const TCHAR* buffer);
 	};
+
+#define PRIME_NUM	0x9e3779b9
+
+		size_t constexpr CTHashImpl(char const* str, size_t seed)
+		{
+			return 0 == *str ? seed : CTHashImpl(str + 1, seed ^ (*str + PRIME_NUM + (seed << 6) + (seed >> 2)));
+		}
+
+
+
+#if AIR_COMPILER_MSVC
+		template<size_t N>
+		struct EnsureConst
+		{
+			static size_t constexpr value = N;
+		};
+
+#define CT_HASH(x) (EnsureConst<CTHashImpl(x, 0)>::value)
+#else
+#define CT_HASH(x) (CTHashImpl(x, 0))
+#endif
+
+		template<typename SizeT>
+		inline void hashCombineImpl(SizeT& seed, SizeT value)
+		{
+			seed ^= value + PRIME_NUM + (seed << 6) + (seed >> 2);
+		}
+
+		inline size_t RT_HASH(char const* str)
+		{
+			size_t seed = 0;
+			while (*str != 0)
+			{
+				hashCombineImpl(seed, static_cast<size_t>(*str));
+				++str;
+			}
+			return seed;
+		}
+#undef PRIME_NUM
 }

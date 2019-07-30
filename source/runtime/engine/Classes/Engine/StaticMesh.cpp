@@ -102,12 +102,12 @@ namespace Air
 
 	bool operator == (const StaticMaterial& lhs, const MaterialInterface& rhs)
 	{
-		return (lhs.mMaterialInterface == &rhs);
+		return (lhs.mMaterialInterface.get() == &rhs);
 	}
 
 	bool operator == (const MaterialInterface& lhs, const StaticMaterial& rhs)
 	{
-		return (&lhs == rhs.mMaterialInterface);
+		return (&lhs == rhs.mMaterialInterface.get());
 	}
 
 	void MeshSectionInfoMap::remove(int32 LODIndex, int32 sectionIndex)

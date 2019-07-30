@@ -6,6 +6,7 @@
 namespace Air
 {
 	class AActor;
+	class World;
 	enum class EUpdateTransformFlags : int32
 	{
 		None = 0x0,
@@ -32,7 +33,7 @@ namespace Air
 
 		class AActor* getOwner() const;
 
-		virtual World* getWorld() const override final { return (mWorldPrivate ? mWorldPrivate : getWorld_Uncached()); }
+		virtual World* getWorld() const override final { return (mWorldPrivate ? mWorldPrivate.get() : getWorld_Uncached()); }
 
 		bool hasBeenCreated()const { return bHasBeenCreated; }
 
@@ -92,7 +93,7 @@ namespace Air
 
 		void recreateRenderState_Concurrent();
 
-		void destroyRenderState_Concurrent();
+		virtual void destroyRenderState_Concurrent();
 
 		void registerComponent();
 
@@ -137,7 +138,7 @@ namespace Air
 	private:
 		mutable AActor* mOwnerPrivate;
 
-		World* mWorldPrivate{ nullptr };
+		std::shared_ptr<World> mWorldPrivate;
 
 		bool bHasBeenCreated{ false };
 

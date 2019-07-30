@@ -12,13 +12,14 @@ namespace Air
 
 	class Application : public Object
 	{
+		GENERATED_RCLASS_BODY(Application, Object)
 	protected:
 		ViewportCameraTransform* mCamera;
 		DemoEngine* mEngine;
 		World* mWorld;
 		URL mCurrentURL;
 	public:
-		virtual ~Application() = 0 {};
+		virtual ~Application() PURE_VIRTRUAL();
 		
 		virtual void init(DemoEngine* inEngine) 
 		{
@@ -31,7 +32,7 @@ namespace Air
 
 		virtual void release() {}
 
-		virtual string getTitle() = 0;
+		virtual string getTitle() PURE_VIRTRUAL(Application::getTitle, return "";);
 
 		virtual void start();
 	};

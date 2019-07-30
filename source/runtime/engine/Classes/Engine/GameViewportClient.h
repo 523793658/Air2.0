@@ -36,7 +36,7 @@ namespace Air
 
 		virtual void draw(Viewport* viewport, Canvas* canvas) override;
 
-		virtual LocalPlayer* setInitialLocalPlayer(wstring& outError);
+		virtual std::shared_ptr<LocalPlayer> setInitialLocalPlayer(wstring& outError);
 
 	private:
 		SceneView* calcSceneView(SceneViewFamily* viewFamily, const EStereoscopicPass stereoPass);

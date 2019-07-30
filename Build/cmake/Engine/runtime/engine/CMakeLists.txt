@@ -107,6 +107,7 @@ SET(SOURCE_FILE
     ${engine_SOURCE_DIR}/RawMesh.cpp
     ${engine_SOURCE_DIR}/StaticMeshVertexData.h
     ${engine_SOURCE_DIR}/StaticMeshVertexData.cpp
+    ${engine_SOURCE_DIR}/FinalPostProcessSettings.h
     )
 SET(Materials_Source
     ${engine_SOURCE_DIR}/Materials/MeshMaterialShader.h
@@ -180,6 +181,8 @@ SET(Classes_Engine_Source
     ${engine_SOURCE_DIR}/Classes/Engine/Light.cpp
     ${engine_SOURCE_DIR}/Classes/Engine/DirectionalLight.h
     ${engine_SOURCE_DIR}/Classes/Engine/DirectionalLight.cpp
+    ${engine_SOURCE_DIR}/Classes/Engine/SkyLight.h
+    ${engine_SOURCE_DIR}/Classes/Engine/SkyLight.cpp
     ${engine_SOURCE_DIR}/Classes/Engine/TextureStreamingTypes.h
     ${engine_SOURCE_DIR}/Classes/Engine/TextureStreamingTypes.cpp
     ${engine_SOURCE_DIR}/Classes/Engine/MeshMerging.h
@@ -224,6 +227,8 @@ SET(Classes_Components_Source
     ${engine_SOURCE_DIR}/Classes/Components/DirectionalLightComponent.cpp
     ${engine_SOURCE_DIR}/Classes/Components/LightComponent.h
     ${engine_SOURCE_DIR}/Classes/Components/LightComponent.cpp
+    ${engine_SOURCE_DIR}/Classes/Components/SkyLightComponent.h
+    ${engine_SOURCE_DIR}/Classes/Components/SkyLightComponent.cpp
     )
 SOURCE_GROUP(Classes\\Components FILES ${Classes_Components_Source})
     
@@ -301,7 +306,14 @@ SET(Classes_Materials_Source
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionFunctionInput.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionFunctionOutput.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionScalarParameter.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionVectorParameter.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionParameter.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureBase.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureSample.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureObject.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureObjectParameter.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureSampleParameter.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureSampleParameter2D.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollectionInstance.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollectionInstance.cpp
     )

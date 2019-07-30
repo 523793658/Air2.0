@@ -2,6 +2,8 @@
 #include "EngineMininal.h"
 #include "HAL/StringView.h"
 #include "MaterialShared.h"
+#include "Classes/Materials/MaterialExpressionTextureSample.h"
+#include "Classes/Engine/EngineType.h"
 namespace Air
 {
 	enum EMaterialForceCastFlags
@@ -66,6 +68,10 @@ namespace Air
 		virtual int32 max(int32 a, int32 b) = 0;
 		virtual int32 clamp(int32 x, int32 a, int32 b) = 0;
 
+		virtual int32 textureSample(int32 texture, int32 coordinate, enum EMaterialSamplerType samplerType, int32 mipValue0Index = INDEX_NONE, int32 mipValue1Index = INDEX_NONE, ETextureMipValueMode mipValueMode = TMVM_None, ESamplerSourceMode samplerSource = SSM_FromTextureAsset, int32 textureReferenceIndex = INDEX_NONE) = 0;
+
+		virtual int32 textureParameter(wstring parameterName, std::shared_ptr<RTexture> defaultValue, int32& textureReferenceIndex, ESamplerSourceMode samplerSource = SSM_FromTextureAsset) = 0;
+
 		virtual int32 saturate(int32 x) = 0;
 
 		virtual int32 appendVector(int32 a, int32 b) = 0;
@@ -79,6 +85,9 @@ namespace Air
 		virtual Guid popMaterialAttribute() = 0;
 
 		virtual int32 scalarParameter(wstring parameterName, float defaultValue) = 0;
+	
+		virtual int32 texture(std::shared_ptr<RTexture> inTexture, int32& textureReferenceIndex, ESamplerSourceMode samplerSource = SSM_FromTextureAsset, ETextureMipValueMode mipValueMode = TMVM_None) = 0;
+		virtual int32 getTextureReferenceIndex(std::shared_ptr<RTexture> texture) { return INDEX_NONE; }
 	};
 
 	class ScopedMaterialCompilerAttribute

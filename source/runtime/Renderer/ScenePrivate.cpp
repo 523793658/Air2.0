@@ -213,4 +213,53 @@ namespace Air
 				});
 		}
 	}
+
+	void Scene::setSkyLight(SkyLightSceneProxy* light)
+	{
+		BOOST_ASSERT(light);
+		mNumEnabledSkyLights_GameThread++;
+
+		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
+			SetSkyLightCommand,
+			Scene*, scene, this,
+			SkyLightSceneProxy*, lightProxy, light,
+			{
+				BOOST_ASSERT(!scene->mSkyLightStack.contains(lightProxy));
+				scene->mSkyLightStack.push(lightProxy);
+				const bool bHadSkyLight = scene->mSkyLight != nullptr;
+				scene->mSkyLight = lightProxy;
+				if (!bHadSkyLight)
+				{
+					scene->bScenesPrimitivesNeedStaticMeshElementUpdate = true;
+				}
+			}
+		);
+	}
+
+	void Scene::disableSkyLight(SkyLightSceneProxy* light)
+	{
+		BOOST_ASSERT(light);
+		mNumEnabledSkyLights_GameThread--;
+		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
+			DisableSkyLightCommand,
+			Scene*, scene, this,
+			SkyLightSceneProxy*, lightProxy, light,
+			{
+				const bool bHadSkyLight = scene->mSkyLight != nullptr;
+				scene->mSkyLightStack.removeSingle(lightProxy);
+				if (scene->mSkyLightStack.size() > 0)
+				{
+					scene->mSkyLight = scene->mSkyLightStack.last();
+				}
+				else
+				{
+					scene->mSkyLight = nullptr;
+				}
+				if ((scene->mSkyLight != nullptr) != bHadSkyLight)
+				{
+					scene->bScenesPrimitivesNeedStaticMeshElementUpdate = true;
+				}
+			}
+		);
+	}
 }

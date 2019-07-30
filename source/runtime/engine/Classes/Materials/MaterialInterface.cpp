@@ -28,7 +28,7 @@ namespace Air
 	void MaterialInterface::updateMaterialRenderProxy(MaterialRenderProxy& proxy)
 	{
 		BOOST_ASSERT(&proxy);
-		EMaterialShadingModel mateiralShadingMode = getShadingModel();
+		EMaterialShadingModel materialShadingMode = getShadingModel();
 	}
 
 	uint32 MaterialInterface::getFeatureLevelsToCompileForRendering() const
@@ -93,11 +93,11 @@ namespace Air
 
 	MaterialRelevance MaterialInterface::getRelevance(ERHIFeatureLevel::Type inFeatureLevel) const
 	{
-		const RMaterial* material = getMaterial();
+		std::shared_ptr<const RMaterial>& material = getMaterial();
 		return getRelevance_Internal(material, inFeatureLevel);
 	}
 
-	MaterialRelevance MaterialInterface::getRelevance_Internal(const RMaterial* material, ERHIFeatureLevel::Type inFeatureLevel) const
+	MaterialRelevance MaterialInterface::getRelevance_Internal(std::shared_ptr<const RMaterial>& material, ERHIFeatureLevel::Type inFeatureLevel) const
 	{
 		if (material)
 		{

@@ -17,14 +17,14 @@ namespace Air
 
 		float3 getLastInputVector() const;
 
-		class APawn* getPawnOwner() const;
+		const std::shared_ptr<class APawn>& getPawnOwner() const;
 
 		float3 getInputVector() const;
 
 	private:
 
 	protected:
-		class APawn* mPawnOwner;
+		std::shared_ptr<class APawn> mPawnOwner;
 
 		friend class APawn;
 	};

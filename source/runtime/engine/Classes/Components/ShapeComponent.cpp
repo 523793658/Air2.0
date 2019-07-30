@@ -30,7 +30,7 @@ namespace Air
 	class CustomMeshSceneProxy : public PrimitiveSceneProxy
 	{
 	private:
-		MaterialInterface* mMaterial;
+		std::shared_ptr<MaterialInterface> mMaterial;
 		CustomMesh* mMesh;
 
 	public:

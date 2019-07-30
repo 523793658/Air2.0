@@ -34,6 +34,11 @@ namespace Air
 		void initResourceFromPossiblyParallelRendering();
 
 	protected:
+		ERHIFeatureLevel::Type getFeatureLevel() const { return mFeatureLevel == ERHIFeatureLevel::Num ? GMaxRHIFeatureLevel : mFeatureLevel; }
+
+		FORCEINLINE bool hasValidFeatureLevel()const { return mFeatureLevel < ERHIFeatureLevel::Num; }
+
+	protected:
 		bool mInitialized{ false };
 
 		ERHIFeatureLevel::Type mFeatureLevel;
@@ -261,7 +266,20 @@ namespace Air
 	class RENDER_CORE_API TextureReference : public RenderResource
 	{
 	public:
+		void beginInit_RenderThread();
+
+		void beginRelease_GameThread();
+
+		virtual void initRHI() override;
+
+		virtual void releaseRHI() override;
+	public:
 		TextureReferenceRHIRef mTextureReferenceRHI;
+		
+	private:
+		bool bInitialized_GameThread{ false };
+
+		LastRenderTimeContainer mLastRenderTimeRHI;
 	};
 
 

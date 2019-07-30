@@ -23,9 +23,9 @@ namespace Air
 		inWorldContext.addRef(mWorld);
 	}
 
-	LocalPlayer* GameViewportClient::setInitialLocalPlayer(wstring& outError)
+	std::shared_ptr<LocalPlayer> GameViewportClient::setInitialLocalPlayer(wstring& outError)
 	{
-		GameInstance* viewportGameInstance = GEngine->getWorldContextFromViewportChecked(this).mOwningGameInstance;
+		std::shared_ptr<GameInstance> viewportGameInstance = GEngine->getWorldContextFromViewportChecked(this).mOwningGameInstance;
 
 		if (viewportGameInstance == nullptr)
 		{
@@ -95,9 +95,9 @@ namespace Air
 
 		std::map<LocalPlayer*, SceneView*> playerViewMap;
 
-		for (LocalPlayerIterator it(GEngine, myWorld); it; ++it)
+		for (LocalPlayerIterator it(GEngine.get(), myWorld); it; ++it)
 		{
-			LocalPlayer* localPlayer = *it;
+			LocalPlayer* localPlayer = (*it).get();
 			if (localPlayer)
 			{
 				const int32 numViews = 1;

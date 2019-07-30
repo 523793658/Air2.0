@@ -489,7 +489,7 @@ namespace Air
 		,mShaderPipeline(inShaderPipeline)
 		,mShaderType(inShaderType)
 		,mSourceHash(inShaderType->getSourceHash())
-		,mSerializationHistory(inShaderType->getSerializationHistory())
+		,mSerializationHistory(&inShaderType->getSerializationHistory())
 		,mTarget(inTarget)
 	{
 		if (inVertexFactoryType)
@@ -517,7 +517,7 @@ namespace Air
 		mVFSerializationHistory = inShaderId.mVFSerializationHistory ? *inShaderId.mVFSerializationHistory : SerializationHistory();
 		mShaderTypeName = inShaderId.mShaderType->getName();
 		mSourceHash = inShaderId.mSourceHash;
-		mSerializationHistory = inShaderId.mSerializationHistory;
+		mSerializationHistory = *inShaderId.mSerializationHistory;
 		mTarget = inShaderId.mTarget;
 	}
 

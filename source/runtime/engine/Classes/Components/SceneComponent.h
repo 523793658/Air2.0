@@ -22,7 +22,7 @@ namespace Air
 
 		FORCEINLINE SceneComponent* getAttachParent() const
 		{
-			return mAttachParent;
+			return mAttachParent.get();
 		}
 
 		virtual void detachFromComponent(const DetachmentTransformRules& detachmentRules);
@@ -154,7 +154,7 @@ namespace Air
 		void propagateTransformUpdate(bool bTransformChange, EUpdateTransformFlags updateTransformFlags = EUpdateTransformFlags::None, ETeleportType teleport = ETeleportType::None);
 
 	private:  
-		SceneComponent* mAttachParent{ nullptr };
+		std::shared_ptr<SceneComponent> mAttachParent{ nullptr };
 		TArray<SceneComponent*> mAttachChildren;
 
 		RotationConversionCache mRelativeRotationCache;

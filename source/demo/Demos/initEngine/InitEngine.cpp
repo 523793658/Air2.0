@@ -9,6 +9,8 @@
 #include "Classes/Materials/Material.h"
 #include "Classes/Factories/Factory.h"
 #include "Classes/Materials/MaterialInstanceDynamic.h"
+#include "Classes/Engine/SkyLight.h"
+#include "TextureCube.h"
 namespace Demo
 {
 	using namespace Air;
@@ -35,28 +37,34 @@ namespace Demo
 
 
 		//CubeActor *actor = mWorld->spawnActor<CubeActor>(spawnInfo);
-		AStaticMeshActor* actor = mWorld->spawnActor<AStaticMeshActor>(spawnInfo);
-		ADirectionalLight* light = mWorld->spawnActor<ADirectionalLight>(spawnInfo);
+		std::shared_ptr<AStaticMeshActor> actor = mWorld->spawnActor<AStaticMeshActor>(spawnInfo);
+		std::shared_ptr<ADirectionalLight> light = mWorld->spawnActor<ADirectionalLight>(spawnInfo);
+		std::shared_ptr<ASkyLight> skyLight = mWorld->spawnActor<ASkyLight>(spawnInfo);
 
 		light->setLightColor(LinearColor(1.0f, 1.0f, 1.0f, 1.0f));
 		
 		auto tex = loadObjectAsync<RTexture>(TEXT("assets/textures/uffizi_cross.dds"));
 		mWorld->setSkyTexture(tex);
+		skyLight->getLightComponent()->setCubemap(std::dynamic_pointer_cast<RTextureCube>(tex));
+		
 
-		RMaterial* material = RMaterial::getDefaultMaterial(MD_Surface);
+
+		std::shared_ptr<MaterialInterface>& material = std::dynamic_pointer_cast
+			<MaterialInterface>(RMaterial::getDefaultMaterial(MD_Surface));
 
 		StaticMeshComponent* component = actor->findComponentByClass<StaticMeshComponent>();
 
-		auto materialInstance = RMaterialInstanceDynamic::create(material, nullptr);
+		std::shared_ptr<RMaterialInstanceDynamic> materialInstance = RMaterialInstanceDynamic::create(material, nullptr);
 
-		materialInstance->setScalarParameterValue(TEXT("BaseColor"), 0.1f);
+		//materialInstance->setScalarParameterValue(TEXT("BaseColor"), 0.1f);
+		materialInstance->setVectorParameterValue(TEXT("BaseColor"), LinearColor(LinearColor::Red));
 
-		component->setMaterial(0, materialInstance);
+		component->setMaterial(0, materialInstance.get());
 
-		RStaticMesh* mesh = newObject<RStaticMesh>(nullptr);
-		Factory::createFromFile(mesh, TEXT("assets/meshes/Shape_Sphere.FBX"), TEXT("Test"), EObjectFlags::RF_NoFlags);
+		std::shared_ptr<RStaticMesh> mesh = newObject<RStaticMesh>();
+		Factory::createFromFile(mesh.get(), TEXT("assets/meshes/Shape_Sphere.FBX"), TEXT("Test"), EObjectFlags::RF_NoFlags);
 		mesh->postLoad();
-		component->setStaticMesh(mesh);
+		component->setStaticMesh(mesh.get());
 	}
 
 	void DemoInitEngine::init(DemoEngine* inEngine)
@@ -206,7 +214,6 @@ namespace Demo
 		
 
 	}
-
 
 	DECALRE_DEMO(DemoInitEngine);
 }

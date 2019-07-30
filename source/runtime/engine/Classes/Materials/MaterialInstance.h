@@ -65,9 +65,9 @@ namespace Air
 	public:
 		ENGINE_API virtual EBlendMode getBlendMode() const override;
 
-		ENGINE_API virtual RMaterial* getMaterial() override;
+		ENGINE_API virtual std::shared_ptr<RMaterial> getMaterial() override;
 
-		ENGINE_API virtual const RMaterial* getMaterial() const override;
+		ENGINE_API virtual std::shared_ptr<const RMaterial> getMaterial() const override;
 
 		ENGINE_API virtual bool isMasked() const override;
 
@@ -102,7 +102,7 @@ namespace Air
 		void cacheResourceShaderForRendering();
 
 	protected:
-		ENGINE_API void setParentInternal(class MaterialInterface* newParent, bool recacheShaders);
+		ENGINE_API void setParentInternal(std::shared_ptr<class MaterialInterface>& newParent, bool recacheShaders);
 
 		ENGINE_API virtual bool hasOverridenBaseProperties() const;
 
@@ -140,7 +140,7 @@ namespace Air
 		MaterialResource * mStaticPermutationMaterialResources[EMaterialQualityLevel::Num][ERHIFeatureLevel::Num];
 
 	public:
-		class MaterialInterface* mParent;
+		std::shared_ptr<class MaterialInterface> mParent;
 
 		float mOpacityMaskClipValue;
 

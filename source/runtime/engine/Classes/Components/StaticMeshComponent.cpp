@@ -20,7 +20,7 @@ namespace Air
 		}
 
 
-		AActor *owner = getOwner();
+		AActor* owner = getOwner();
 		if (World* world = getWorld())
 		{
 			if (world->hasBegunPlay() && !areDynamicDataChangeAllowed() && owner != nullptr)
@@ -29,7 +29,7 @@ namespace Air
 			}
 		}
 
-		mStaticMesh = newMesh;
+		mStaticMesh = std::dynamic_pointer_cast<RStaticMesh>(newMesh->shared_from_this());
 
 		markRenderStateDirty();
 		markCachedMaterialParameterNameIndicesDirty();

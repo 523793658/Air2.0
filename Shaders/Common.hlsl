@@ -345,4 +345,21 @@ void drawRectangle(in float4 inPosition, out float4 outPosition)
 	outPosition.xy *= float2(1, -1);
 	
 }
+
+#if FEATURE_LEVEL >= FEATURE_LEVEL_SM5
+#define TANGENTTOWORLD0		TEXCOORD10
+#define TANGENTTOWORLD1		TEXCOORD11
+
+#define TANGENTTOWORLD_INTERPOLATOR_BLOCK	float4 Normal : TEXCOORD10_centroid; float4 Tangent : TEXCOORD11_centroid;
+
+#else 
+#define TANGENTTOWORLD0		TEXCOORD10
+#define TANGENTTOWORLD1		TEXCOORD11
+#if METAL_PROFILE || COMPILER_GLSL_ES3_1
+#define TANGENTTOWORLD_INTERPOLATOR_BLOCK float4 Normal : TANGENTTOWORLD0; float4 Tangent : TANGENTTOWORLD1
+#else 
+#define TANGENTTOWORLD_INTERPOLATOR_BLOCK MaterialFloat4 Normal : TANGENTTOWORLD0; MaterialFloat4 Tangent : TANGENTTOWORLD1
+#endif
+#endif
+
 #include "Random.hlsl"

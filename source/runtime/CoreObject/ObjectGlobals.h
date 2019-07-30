@@ -14,6 +14,11 @@ namespace Air
 
 		~ObjectInitializer();
 
+		std::shared_ptr<Object> getSharedPtr()
+		{
+			return mObjectSharedPtr;
+		}
+
 		void postConstructInit();
 
 		FORCEINLINE Object* getObj() const
@@ -21,7 +26,7 @@ namespace Air
 			return mObj;
 		}
 
-		Object* createDefaultSubObject(Object* outer, wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient) const;
+		std::shared_ptr<Object> createDefaultSubObject(Object* outer, wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient) const;
 
 		static ObjectInitializer& get();
 
@@ -94,6 +99,10 @@ namespace Air
 			};
 			TArray<Override, TInlineAllocator<8>> mOverrides;
 		};
+		void initSharedPtr();
+		friend class ObjectBase;
+	public:
+		std::shared_ptr<class Object> mObjectSharedPtr;
 
 	private:
 		Object* mObj;
@@ -108,55 +117,58 @@ namespace Air
 		mutable Overrides mComponentOverrides;
 	};
 
+	COREOBJECT_API void freeObject(Object* obj);
+
+
 	COREOBJECT_API Object* staticAllocateObject(RClass* Class, Object* inOuter, wstring name, EObjectFlags setFlags, EInternalObjectFlags = EInternalObjectFlags::None, bool bCanReuseSubobjects = false, bool * bOutReusedSubObject = nullptr);
 
-	COREOBJECT_API Object* staticConstructObject_Internal(RClass* inClass, Object* inOuter = nullptr, wstring name = TEXT(""), EObjectFlags setFlags = RF_NoFlags, EInternalObjectFlags internalSetFlags = EInternalObjectFlags::None, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false);
+	COREOBJECT_API std::shared_ptr<Object> staticConstructObject_Internal(RClass* inClass, Object* inOuter = nullptr, wstring name = TEXT(""), EObjectFlags setFlags = RF_NoFlags, EInternalObjectFlags internalSetFlags = EInternalObjectFlags::None, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false);
 	
 	template<class T>
 	FUNCTION_NON_NULL_RETURN_START
-		T* newObject(Object* outer, RClass* inClass, wstring name = TEXT(""), EObjectFlags flags = RF_NoFlags, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false)
+		std::shared_ptr<T> newObject(Object* outer, RClass* inClass, wstring name = TEXT(""), EObjectFlags flags = RF_NoFlags, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false)
 	FUNCTION_NON_NULL_RETURN_END
 	{
-		return static_cast<T*>(staticConstructObject_Internal(inClass, outer, name, flags, EInternalObjectFlags::None, inTemplate, bCopyTransientsFromClassDefaults));
+		return std::static_pointer_cast<T>(staticConstructObject_Internal(inClass, outer, name, flags, EInternalObjectFlags::None, inTemplate, bCopyTransientsFromClassDefaults));
 	}
 
 	template<class T>
 	FUNCTION_NON_NULL_RETURN_START
-		T* newObject(Object* outer = nullptr)
+		std::shared_ptr<T> newObject(Object* outer = nullptr)
 	FUNCTION_NON_NULL_RETURN_END
 	{
-		return static_cast<T*>(staticConstructObject_Internal(T::StaticClass(), outer, TEXT(""), RF_NoFlags, EInternalObjectFlags::None, nullptr, false));
+		return std::static_pointer_cast<T>(staticConstructObject_Internal(T::StaticClass(), outer, TEXT(""), RF_NoFlags, EInternalObjectFlags::None, nullptr, false));
 	}
 
 
 	template<class T>
 	FUNCTION_NON_NULL_RETURN_START
-		T* newObject(Object* outer, wstring name, EObjectFlags flags = RF_NoFlags, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false)
+		std::shared_ptr<T> newObject(Object* outer, wstring name, EObjectFlags flags = RF_NoFlags, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false)
 	FUNCTION_NON_NULL_RETURN_END
 	{
-		return static_cast<T*>(staticConstructObject_Internal(T::StaticClass(), outer, name, flags, EInternalObjectFlags::None, inTemplate, bCopyTransientsFromClassDefaults));
+		return std::static_pointer_cast<T>(staticConstructObject_Internal(T::StaticClass(), outer, name, flags, EInternalObjectFlags::None, inTemplate, bCopyTransientsFromClassDefaults));
 	}
 
 	template<class T>
 	FUNCTION_NON_NULL_RETURN_START
-		T* newObject(Object* outer, wstring className, wstring name, EObjectFlags flags = RF_NoFlags, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false)
+		std::shared_ptr<T> newObject(Object* outer, wstring className, wstring name, EObjectFlags flags = RF_NoFlags, Object* inTemplate = nullptr, bool bCopyTransientsFromClassDefaults = false)
 		FUNCTION_NON_NULL_RETURN_END
 	{
 		return newObject<T>(outer, SimpleReflectionManager::getClass(className), name, flags, inTemplate, bCopyTransientsFromClassDefaults);
 	}
 
 
-	COREOBJECT_API Object* staticLoadObject(RClass* inClass, Object* inOuter, const TCHAR* name, const TCHAR* filename = nullptr, uint32 loadFlags = LOAD_None);
+	COREOBJECT_API std::shared_ptr<Object> staticLoadObject(RClass* inClass, std::shared_ptr<Object> inOuter, const TCHAR* name, const TCHAR* filename = nullptr, uint32 loadFlags = LOAD_None);
 
 
 	bool resolveName(Object*& inPackage, wstring& inOutName, bool create, bool bThrow, uint32 loadFlags = LOAD_None);
 
 
-	template<class T>
+	/*template<class T>
 	inline T* loadObject(const TCHAR* filename = nullptr, uint32 loadFlags = LOAD_None)
 	{
 		return T::loadFromFile(filename);
-	}
+	}*/
 
 	template<class T, typename... Args>
 	inline std::shared_ptr<T> loadObjectAsync(Args&&... args)
@@ -173,6 +185,6 @@ namespace Air
 	template<class T>
 	inline const T* getDefault()
 	{
-		return (const T*)T::StaticClass()->getDefaultObject();
+		return dynamic_cast<T*>( T::StaticClass()->getDefaultObject());
 	}
 }

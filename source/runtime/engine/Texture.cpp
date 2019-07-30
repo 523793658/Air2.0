@@ -13,7 +13,10 @@ namespace Air
 	RTexture::RTexture(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
 	{
-
+		if (App::canEverRender() && !isTemplate())
+		{
+			mTextureReference.beginInit_RenderThread();
+		}
 	}
 
 	void RTexture::postLoad()

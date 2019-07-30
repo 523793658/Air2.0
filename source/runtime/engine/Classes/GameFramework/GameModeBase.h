@@ -6,15 +6,15 @@ namespace Air
 	class Player;
 	class AGameStateBase;
 	class ASpectatorPawn;
-	class ENGINE_API GameModeBase : public Info
+	class ENGINE_API GameModeBase : public AInfo
 	{
-		GENERATED_RCLASS_BODY(GameModeBase, Info)
+		GENERATED_RCLASS_BODY(GameModeBase, AInfo)
 	public:
-		virtual APlayerController* spawnPlayerController(ENetRole inRemoteRole, float3 const & spawnLocation, Rotator const& spawnRotation);
+		virtual std::shared_ptr<APlayerController> spawnPlayerController(ENetRole inRemoteRole, float3 const & spawnLocation, Rotator const& spawnRotation);
 
 		virtual wstring initNewPlayer(APlayerController* newPlayerController);
 
-		virtual APlayerController* login(Player* newPlayer, ENetRole inRemoteRole, const wstring& portal, const wstring& options);
+		virtual std::shared_ptr<APlayerController> login(Player* newPlayer, ENetRole inRemoteRole, const wstring& portal, const wstring& options);
 
 		virtual void preInitializeComponents() override;
 
@@ -24,7 +24,7 @@ namespace Air
 	public:
 		TSubclassOf<AGameStateBase> mGameStateClass;
 
-		AGameStateBase* mGameState;
+		std::shared_ptr<AGameStateBase> mGameState;
 
 		TSubclassOf<ASpectatorPawn> mSpectatorClass;
 

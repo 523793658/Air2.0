@@ -29,12 +29,12 @@ namespace Air
 	struct StaticMaterial
 	{
 		StaticMaterial()
-			:mMaterialInterface(nullptr)
+			:mMaterialInterface()
 			,mMaterialSlotName(Name_None)
 			,mImportedMaterialSlotName(Name_None)
 		{}
 
-		StaticMaterial(class MaterialInterface* inMaterialInterface, wstring inMaterialSlotName = Name_None
+		StaticMaterial(std::shared_ptr<class MaterialInterface>& inMaterialInterface, wstring inMaterialSlotName = Name_None
 #if WITH_EDITORONLY_DATA
 			, wstring inImportedMaterialSlotName = Name_None
 #endif
@@ -53,7 +53,7 @@ namespace Air
 		ENGINE_API friend bool operator == (const StaticMaterial& lhs, const MaterialInterface& rhs);
 		ENGINE_API friend bool operator == (const MaterialInterface& lhs, const StaticMaterial& rhs);
 
-		class MaterialInterface* mMaterialInterface;
+		std::shared_ptr<class MaterialInterface> mMaterialInterface;
 
 		wstring mMaterialSlotName;
 

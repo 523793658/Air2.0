@@ -3,25 +3,7 @@
 	<BlendMode>Opaque</BlendMode>
 	<ShadingModel>DefaultLit</ShadingModel>
     <MaterialExpressions>
-        <MaterialExpression class="RMaterialExpressionScalarParameter">
-            <RMaterialExpressionParameter>
-                <RMaterialExpression isParameterExpression="1" guid="" id="1">
-                    <ExpressionOutputs>
-                        <ExpressionOutput>
-                            <Name></Name>
-                            <Mask>1</Mask>
-                            <MaskR>1</MaskR>
-                            <MaskG>1</MaskG>
-                            <MaskB>1</MaskB>
-                            <MaskA>1</MaskA>
-                        </ExpressionOutput>
-                    </ExpressionOutputs>
-                </RMaterialExpression>
-                <ParameterName>BaseColor</ParameterName>
-            </RMaterialExpressionParameter>
-            <DefaultValue>1.0</DefaultValue>
-            <SliderMin>0.0</SliderMin>
-            <SliderMax>1.0</SliderMax>
+        <MaterialExpression class="RMaterialExpressionTextureSampleParameter2D" id="0">
         </MaterialExpression>
     </MaterialExpressions>
 
@@ -30,7 +12,7 @@
             <ExpressionInput>
                 <OutputIndex>0</OutputIndex>
                 <InputName></InputName>
-                <ExpressionID>1</ExpressionID>
+                <ExpressionID>0</ExpressionID>
             </ExpressionInput>
         </MaterialInput>
     </MaterialInputs>

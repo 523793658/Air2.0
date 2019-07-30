@@ -259,6 +259,11 @@ namespace Air
 		static bool isShaderCompilerWorkerRunning(ProcHandle& workerHandle);
 
 		ProcHandle launchWorker(const wstring & workingDirectory, uint32 processId, uint32 threadId, const wstring & workerInputFile, const wstring & workerOutputFile);
+
+		bool isCompiling() const
+		{
+			return mNumOutstandingJobs > 0 || mPendingFinalizeShaderMaps.size() > 0;
+		}
 	};
 
 

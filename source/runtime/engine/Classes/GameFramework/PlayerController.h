@@ -10,7 +10,7 @@ namespace Air
 	{
 		GENERATED_RCLASS_BODY(APlayerController, AController)
 	public:
-		AActor * getViewTarget() const;
+		AActor* getViewTarget() const;
 
 		virtual void setViewTarget(class AActor* newViewTarget);
 
@@ -25,9 +25,9 @@ namespace Air
 		virtual void initInputSystem();
 
 
-		virtual bool popInputComponent(InputComponent* inInputComponent);
+		virtual bool popInputComponent(std::shared_ptr<InputComponent> inInputComponent);
 
-		virtual void pushInputComponent(InputComponent* inInputComponent);
+		virtual void pushInputComponent(std::shared_ptr<InputComponent> inInputComponent);
 
 		virtual void postInitializeComponents() override;
 
@@ -85,13 +85,13 @@ namespace Air
 
 		virtual void destroySpectatorPawn();
 
-		virtual ASpectatorPawn* spawnSpectatorPawn();
+		virtual std::shared_ptr<ASpectatorPawn> spawnSpectatorPawn();
 
-		virtual void setSpectatorPawn(class ASpectatorPawn* newSpectatorPawn);
+		virtual void setSpectatorPawn(std::shared_ptr<class ASpectatorPawn> newSpectatorPawn);
 
 		virtual void processPlayerInput(const float deltaTime, const bool bGamePaused);
 
-		virtual void buildInputStack(TArray<InputComponent*>& inputStack);
+		virtual void buildInputStack(TArray<std::shared_ptr<InputComponent>>& inputStack);
 
 		void processForceFeedbackAndHaptics(const float deltaTime, const bool bGamePaused) {  }
 
@@ -101,11 +101,11 @@ namespace Air
 	public:
 		float3 getSpawnLocation() const { return mSpawnLocation; }
 	public:
-		class Player* mPlayer;
+		std::shared_ptr<class Player> mPlayer;
 
-		class PlayerCameraManager* mPlayerCameraManager;
+		std::shared_ptr<class PlayerCameraManager> mPlayerCameraManager;
 
-		class PlayerInput* mPlayerInput;
+		std::shared_ptr<class PlayerInput> mPlayerInput;
 
 		float mLocalPlayerCachedLODDistanceFactor;
 
@@ -122,18 +122,18 @@ namespace Air
 		Rotator mTargetViewRotation;
 
 	protected:
-		TArray<InputComponent*> mCurrentInputStack;
+		TArray<std::shared_ptr<InputComponent>> mCurrentInputStack;
 
 	public:
 		//Spectating
 
-		class ASpectatorPawn* getSpectatorPawn() const { return mSpectatorPawn; }
+		class ASpectatorPawn* getSpectatorPawn() const { return mSpectatorPawn.get(); }
 
 	protected:
 		virtual void beginSpectatingState();
 
 	private:
-		class ASpectatorPawn* mSpectatorPawn;
+		std::shared_ptr<class ASpectatorPawn> mSpectatorPawn;
 
 		Rotator mRotationInput;
 

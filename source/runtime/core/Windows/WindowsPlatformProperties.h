@@ -31,5 +31,10 @@ namespace Air
 		{
 			return "Windows";
 		}
+
+		static FORCEINLINE bool hasEditorOnlyData()
+		{
+			return HAS_EDITOR_DATA;
+		}
 	};
 }

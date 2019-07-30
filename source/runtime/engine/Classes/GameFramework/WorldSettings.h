@@ -3,9 +3,9 @@
 #include "Classes/GameFramework/Info.h"
 namespace Air
 {
-	class WorldSettings : public Info
+	class WorldSettings : public AInfo
 	{
-		GENERATED_RCLASS_BODY(WorldSettings, Info)
+		GENERATED_RCLASS_BODY(WorldSettings, AInfo)
 	public:
 
 		virtual void notifyMatchStarted();

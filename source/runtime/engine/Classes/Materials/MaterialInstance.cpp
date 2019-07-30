@@ -8,6 +8,7 @@
 #include "Classes/Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInstanceSupport.h"
 #include "RenderingThread.h"
+#include "MaterialInterface.h"
 namespace Air
 {
 	MaterialInstance::MaterialInstance(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
@@ -58,13 +59,13 @@ namespace Air
 		}
 	}
 
-	void MaterialInstance::setParentInternal(class MaterialInterface* newParent, bool recacheShaders)
+	void MaterialInstance::setParentInternal(std::shared_ptr<class MaterialInterface>& newParent, bool recacheShaders)
 	{
 		if (!mParent || mParent != nullptr)
 		{
-			MaterialInstance* parentAsMaterialInstance = static_cast<MaterialInstance*>(newParent);
+			std::shared_ptr<MaterialInstance> parentAsMaterialInstance = std::dynamic_pointer_cast<MaterialInstance>(newParent);
 			bool bSetParent = false;
-			if (parentAsMaterialInstance != nullptr && parentAsMaterialInstance->isChildOf(this))
+			if (parentAsMaterialInstance && parentAsMaterialInstance->isChildOf(this))
 			{
 				AIR_LOG(LogMaterial, Warning, TEXT("%s is not a valid parent for %s as it is already a child for materialInstance"), newParent->getName().c_str(), getName().c_str());
 
@@ -140,7 +141,7 @@ namespace Air
 	{
 		if (bHasStaticPermutationResource)
 		{
-			RMaterial* baseMaterial = getMaterial();
+			std::shared_ptr<RMaterial>& baseMaterial = getMaterial();
 			for (int32 featureLevelIndex = 0; featureLevelIndex < ERHIFeatureLevel::Num; featureLevelIndex++)
 			{
 				EShaderPlatform shaderPlatform = GShaderPlatformForFeatureLevel[featureLevelIndex];
@@ -154,7 +155,7 @@ namespace Air
 					}
 
 					const bool bQualityLevelHasDifferentNodes = qualityLevelUsed[qualityLevelIndex];
-					currentResource->setMaterial(baseMaterial, (EMaterialQualityLevel::Type)qualityLevelIndex, bQualityLevelHasDifferentNodes, (ERHIFeatureLevel::Type)featureLevelIndex, this);
+					currentResource->setMaterial(baseMaterial.get(), (EMaterialQualityLevel::Type)qualityLevelIndex, bQualityLevelHasDifferentNodes, (ERHIFeatureLevel::Type)featureLevelIndex, std::dynamic_pointer_cast<MaterialInstance>( this->shared_from_this()));
 				}
 			}
 		}
@@ -162,7 +163,7 @@ namespace Air
 
 	void MaterialInstance::cacheShaderForResources(EShaderPlatform shaderPlatform, const TArray<MaterialResource *>& resourcesToCache, bool bApplyCompltedShaderMapForRendering)
 	{
-		RMaterial* baseMaterial = getMaterial();
+		std::shared_ptr<RMaterial>& baseMaterial = getMaterial();
 		baseMaterial->cacheExpressionTextureReferences();
 
 		for (int32 resourceIndex = 0; resourceIndex < resourcesToCache.size(); resourceIndex++)
@@ -192,7 +193,7 @@ namespace Air
 	{
 		BOOST_ASSERT(isInGameThread());
 
-		const RMaterial* material = getMaterial();
+		std::shared_ptr<const RMaterial>& material = getMaterial();
 		if (mParent && material && material->bUsedAsSpecialEngineMaterial == false && ((Math::abs(getOpacityMaskClipValue() - mParent->getOpacityMaskClipValue()) > SMALL_NUMBER) ||
 			(getBlendMode() != mParent->getBlendMode()) || (getShadingModel() != mParent->getShadingModel()) || (isTwoSided() != mParent->isTwoSided())))
 		{
@@ -203,7 +204,7 @@ namespace Air
 
 	void MaterialInstance::initResources()
 	{
-		MaterialInterface* safeParent = nullptr;
+		std::shared_ptr<MaterialInterface> safeParent;
 		if (mParent)
 		{
 			safeParent = mParent;
@@ -337,7 +338,7 @@ namespace Air
 		while (material != parentMaterialInterface && material != nullptr)
 		{
 			const MaterialInstance* materialInstance = dynamic_cast<const MaterialInstance*>(material);
-			material = (materialInstance != nullptr) ? materialInstance->mParent : nullptr;
+			material = (materialInstance != nullptr) ? materialInstance->mParent.get() : nullptr;
 		}
 		return (material != nullptr);
 	}
@@ -377,7 +378,7 @@ namespace Air
 		return mParent ? mParent->getMaterialResource(inFeatureLvel, qualityLevel) : nullptr;
 	}
 
-	const RMaterial* MaterialInstance::getMaterial() const
+	std::shared_ptr<const RMaterial> MaterialInstance::getMaterial() const
 	{
 		BOOST_ASSERT(isInGameThread() || isAsyncLoading());
 		if (mReentrantflag)
@@ -395,7 +396,7 @@ namespace Air
 		}
 	}
 
-	RMaterial* MaterialInstance::getMaterial() 
+	std::shared_ptr<RMaterial> MaterialInstance::getMaterial() 
 	{
 		BOOST_ASSERT(isInGameThread() || isAsyncLoading());
 		if (mReentrantflag)

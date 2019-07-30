@@ -1,5 +1,10 @@
 #pragma once
 
+#ifndef VISUALIZE_LIGHT_CULLING
+#define VISUALIZE_LIGHT_CULLING 0
+#endif
+
+
 struct LightAccumulator
 {
 	float3 TotalLight;

@@ -359,7 +359,7 @@ namespace Air
 					size_t const index = array_index * info.mNumMipmaps + level;
 					if (isCompressedFormat(info.mFormat))
 					{
-						uint32 const blockSize = GPixelFormats[info.mFormat].BlockBytes * 4;
+						uint32 const blockSize = GPixelFormats[info.mFormat].BlockBytes;
 						uint32 image_size = ((width + 3) / 4) * ((height + 3) / 4)*blockSize;
 						base[index] = texData.mDataBlock.size();
 						texData.mDataBlock.resize(base[index] + image_size);
@@ -367,7 +367,6 @@ namespace Air
 						texData.mInitData[index].mSlicePitch = image_size;
 
 						reader->serialize(&texData.mDataBlock[base[index]], image_size);
-						BOOST_ASSERT(reader->totalSize() == image_size);
 					}
 					else
 					{

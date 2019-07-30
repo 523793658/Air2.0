@@ -86,15 +86,15 @@ namespace Air
 
 #define DECLARE_SIMPLER_REFLECTION(ClassName)	\
 	class ClassName##Factory : public TClass<ClassName>{\
-	private:	\
+	public:	\
 		friend class ClassName;\
 		ClassName##Factory()	\
 		{\
 			SimpleReflectionManager::registerClass(#ClassName, this, typeid(ClassName::ParentType));\
 		}	\
 	private:	\
-		static ClassName##Factory mInstance;	\
+		static ClassName##Factory* mInstance;	\
 	};	\
-	ClassName##Factory ClassName##Factory::mInstance; \
-	RClass* ClassName::mClassInstance = &ClassName##Factory::mInstance;
+	ClassName##Factory* ClassName##Factory::mInstance = new ClassName##Factory(); \
+	RClass* ClassName::mClassInstance = ClassName##Factory::mInstance;
 }

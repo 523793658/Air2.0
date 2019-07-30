@@ -1270,9 +1270,7 @@ namespace Air
 		{
 			if (bypass())
 			{
-				DomainShaderRHIParamRef t;
-				IRHICommandContext& ct = getContext();
-				ct.RHISetShaderConstantBuffer(t, baseIndex, constantBuffer.mBypassConstant);
+				CMD_CONTEXT(RHISetShaderConstantBuffer)(shader, baseIndex, constantBuffer.mBypassConstant);
 				return;
 			}
 			new (allocCommand<RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>>())RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>(this, shader, baseIndex, constantBuffer);
@@ -1554,6 +1552,11 @@ namespace Air
 			GDynamicRHI->RHIUnlockTextureCubeFace(texture, faceIndex, arrayIndex, mipIndex, bLockWithinMiptail);
 		}
 
+		FORCEINLINE TextureReferenceRHIRef createTextureReference(LastRenderTimeContainer* lastRenderTime)
+		{
+			return GDynamicRHI->RHICreateTextureReference(lastRenderTime);
+		}
+
 		void updateTextureReference(TextureReferenceRHIParamRef textureRef, TextureRHIParamRef newTexture);
 	};
 
@@ -1805,6 +1808,10 @@ namespace Air
 		RHICommandListExecutor::getImmediateCommandList().unlockTextureCubeFace(texture, faceIndex, arrayIndex, mipIndex, bLockWithinMiptail);
 	}
 
+	FORCEINLINE TextureReferenceRHIRef RHICreateTextureReference(LastRenderTimeContainer* lastRenderTime)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createTextureReference(lastRenderTime);
+	}
 }
 
 

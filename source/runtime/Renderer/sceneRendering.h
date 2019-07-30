@@ -14,6 +14,7 @@ namespace Air
 	struct FILCUpdatePrimTaskData;
 	class DynamicPrimitiveResource;
 	class PrimitiveSceneInfo;
+	class SceneRenderTargets;
 
 	class VisibleLightViewInfo
 	{

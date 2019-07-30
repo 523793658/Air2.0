@@ -11,8 +11,10 @@
 #include "rapidxml/src/rapidxml.hpp"
 #include "Misc/FileHelper.h"
 #include "Texture.h"
+#include "HAL/PlatformProperties.h"
 #include "MaterialCompiler.h"
 #include "Classes/Materials/MaterialExpression.h"
+#include "Classes/Materials/MaterialExpressionMaterialFunctionCall.h"
 namespace Air
 {
 
@@ -178,7 +180,7 @@ namespace Air
 			}
 		}
 
-		virtual bool getTextureValue(const wstring parameterName, const RTexture** outValue, const MaterialRenderContext& context) const override
+		virtual bool getTextureValue(const wstring parameterName, std::shared_ptr<const RTexture>& outValue, const MaterialRenderContext& context) const override
 		{
 			const MaterialResource* materialResource = mMaterial->getMaterialResource(context.mMaterial.getFeatureLevel());
 			if (materialResource && materialResource->getRenderingThreadShaderMap())
@@ -234,7 +236,7 @@ namespace Air
 
 				for (int32 textureIndex = 0, numTextures = mExpressionTextureReferences.size(); textureIndex < numTextures; ++textureIndex)
 				{
-					RTexture* texture = mExpressionTextureReferences[textureIndex];
+					std::shared_ptr<RTexture> texture = mExpressionTextureReferences[textureIndex];
 					if (texture)
 					{
 						texture->conditionalPostLoad();
@@ -334,6 +336,10 @@ namespace Air
 		mMaterialPropertyTable[MP_Metallic] = &mMetallic;
 		mMaterialPropertyTable[MP_Specular] = &mSpecular;
 		mMaterialPropertyTable[MP_Roughness] = &mRoughness;
+		for (int32 index = 0; index < 8; index++)
+		{
+			mMaterialPropertyTable[MP_CustomizedUVs0 + index] = &mCustomizedUVs[index];
+		}
 	}
 
 	MaterialRenderProxy* RMaterial::getRenderProxy(bool selected, bool bHovered /* = false */) const
@@ -342,14 +348,14 @@ namespace Air
 		return mDefaultMaterialInstances[selected ? 1 : (bHovered ? 2 : 0)];
 	}
 
-	RMaterial* RMaterial::getMaterial()
+	std::shared_ptr<RMaterial> RMaterial::getMaterial()
 	{
-		return this;
+		return std::dynamic_pointer_cast<RMaterial>(this->shared_from_this());
 	}
 
-	const RMaterial* RMaterial::getMaterial() const
+	std::shared_ptr<const RMaterial> RMaterial::getMaterial() const
 	{
-		return this;
+		return std::dynamic_pointer_cast<const RMaterial>(this->shared_from_this());
 	}
 
 
@@ -530,7 +536,7 @@ namespace Air
 					while (expressionNode)
 					{
 						wstring className = expressionNode->first_attribute(TEXT("class"))->value();
-						RMaterialExpression* materialExpression = newObject<RMaterialExpression>((*materialDesc.mResource).get(), className, TEXT(""));
+						std::shared_ptr<RMaterialExpression> materialExpression = newObject<RMaterialExpression>((*materialDesc.mResource).get(), className, TEXT(""));
 						materialExpression->serialize(expressionNode);
 						expressionNode = expressionNode->next_sibling(TEXT("MaterialExpression"));
 					}
@@ -700,6 +706,12 @@ namespace Air
 
 	void RMaterial::rebuildExpressionTextureReferences()
 	{
+		if (PlatformProperties::hasEditorOnlyData())
+		{
+			rebuildMaterialFunctionInfo();
+			rebuildMaterialParameterCollectionInfo();
+		}
+
 		mExpressionTextureReferences.empty();
 		appendReferencedTextures(mExpressionTextureReferences);
 	}
@@ -759,9 +771,33 @@ namespace Air
 		}
 	}
 
-	void RMaterial::appendReferencedTextures(TArray<RTexture*>& inOutTextures) const
+	void RMaterial::appendReferencedTextures(TArray<std::shared_ptr<RTexture>>& inOutTextures) const
 	{
+		for (int32 expressionIndex = 0; expressionIndex < mExpressions.size(); expressionIndex++)
+		{
+			std::shared_ptr<RMaterialExpression> expression = mExpressions[expressionIndex];
+			RMaterialExpressionMaterialFunctionCall* materialFunctionNode = dynamic_cast<RMaterialExpressionMaterialFunctionCall*>(expression.get());
+			if (materialFunctionNode && materialFunctionNode->mMaterialFunction)
+			{
+				TArray<RMaterialFunction*> functions;
+				functions.add(materialFunctionNode->mMaterialFunction);
+				materialFunctionNode->mMaterialFunction->getDependenctFunction(functions);
 
+				for (int32 functionIndex = 0; functionIndex < functions.size(); functionIndex++)
+				{
+					RMaterialFunction* currentFunction = functions[functionIndex];
+					currentFunction->appendReferencedTextures(inOutTextures);
+				}
+			}
+			else if (expression)
+			{
+				std::shared_ptr<RTexture> referencedTexture = expression->getReferencedTexture();
+				if (referencedTexture)
+				{
+					inOutTextures.addUnique(referencedTexture);
+				}
+			}
+		}
 	}
 
 	void RMaterial::compileProperty(MaterialCompiler* compiler, wstring** properties, uint32 forceCastFlags /* = 0 */)
@@ -775,17 +811,24 @@ namespace Air
 	}
 
 
+	void RMaterial::rebuildMaterialFunctionInfo()
+	{
+		
+	}
+
+	void RMaterial::rebuildMaterialParameterCollectionInfo()
+	{
+	}
 
 
 
 
-
-	RMaterial* RMaterial::getDefaultMaterial(EMaterialDomain domain)
+	std::shared_ptr<RMaterial>& RMaterial::getDefaultMaterial(EMaterialDomain domain)
 	{
 		initDefaultMaterials();
 		BOOST_ASSERT(domain >= MD_Surface && domain < MD_MAX);
 		BOOST_ASSERT(GDefaultMaterials[domain] != nullptr);
-		return GDefaultMaterials[domain].get();
+		return GDefaultMaterials[domain];
 	}
 
 	void RMaterial::cacheExpressionTextureReferences()
@@ -852,6 +895,18 @@ namespace Air
 		case MP_BaseColor: return mBaseColor.compileWithDefault(compiler, prop);
 		case MP_Normal: return mNormal.compileWithDefault(compiler, prop);
 		default:
+			if (prop >= MP_CustomizedUVs0 && prop <= MP_CustomizedUVs7)
+			{
+				const int32 textureCoordinateIndex = prop - MP_CustomizedUVs0;
+				if (mCustomizedUVs[textureCoordinateIndex].mExpression && textureCoordinateIndex < mNumCustomizedUVs)
+				{
+					return mCustomizedUVs[textureCoordinateIndex].compileWithDefault(compiler, prop);
+				}
+				else
+				{
+					return compiler->textureCoordinate(textureCoordinateIndex, false, false);
+				}
+			}
 			break;
 		}
 		BOOST_ASSERT(false);
@@ -879,7 +934,7 @@ namespace Air
 		{
 			if (mExpressions[i]->mID == id)
 			{
-				return mExpressions[i];
+				return mExpressions[i].get();
 			}
 		}
 		return nullptr;

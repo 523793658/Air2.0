@@ -7,7 +7,7 @@ namespace Air
 		GENERATED_RCLASS_BODY(MeshComponent, PrimitiveComponent)
 	public:
 
-		virtual class MaterialInterface* getMaterial(int32 elementIndex) const override;
+		virtual std::shared_ptr<class MaterialInterface> getMaterial(int32 elementIndex) const override;
 
 		virtual void setMaterial(int32 elementIndex, class MaterialInterface* material) override;
 
@@ -18,6 +18,6 @@ namespace Air
 		uint32 bCachedMaterialParameterIndicesAreDirty : 1;
 
 	private:
-		TArray<class MaterialInterface*> mOverrideMaterials;
+		TArray<std::shared_ptr<class MaterialInterface>> mOverrideMaterials;
 	};
 }

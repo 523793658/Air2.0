@@ -2,6 +2,7 @@
 #include "RenderingThread.h"
 #include "Misc/ScopedEvent.h"
 #include "RHI.h"
+#include "Misc/App.h"
 #include "RHICommandList.h"
 namespace Air
 {
@@ -137,5 +138,78 @@ namespace Air
 				resource->releaseResource();
 			});
 		flushRenderingCommands();
+	}
+
+	float GMipLevelFadingAgeThreshold = 0.5f;
+
+	void MipBaseFade::setNewMipCount(float actualMipCount, float targetMipCount, double lastRenderTime, EMipFadeSettings fadeSetting)
+	{
+		BOOST_ASSERT(actualMipCount >= 0 && targetMipCount <= actualMipCount);
+		float timeSinceLastRendered = float(App::getCurrentTime() - lastRenderTime);
+		if (mTotalMipCount == 0 || timeSinceLastRendered >= GMipLevelFadingAgeThreshold || GEnableMipLevelFading < 0.0f)
+		{
+			mTotalMipCount = actualMipCount;
+			mMipCountDelta = 0.0f;
+			mMipCountFadingRate = 0.0f;
+			mStartTime = GRenderingRealtimeClock.getCurrentDeltaTime();
+			mBiasOffset = 0.0f;
+			return;
+		}
+
+		float currentTargetMipCount = mTotalMipCount - mBiasOffset + mMipCountDelta;
+
+		if (Math::isNearlyEqual(mTotalMipCount, actualMipCount) && Math::isNearlyEqual(targetMipCount, currentTargetMipCount))
+		{
+			return;
+		}
+
+		float currentInterpolatedMipCount = mTotalMipCount - calcMipBias();
+
+		currentInterpolatedMipCount = Math::clamp<float>(currentInterpolatedMipCount, 0, actualMipCount);
+
+		mStartTime = GRenderingRealtimeClock.getCurrentTime();
+		mTotalMipCount = actualMipCount;
+		mMipCountDelta = targetMipCount - currentInterpolatedMipCount;
+
+		if (Math::abs(mMipCountDelta) < 0.01)
+		{
+			mMipCountDelta = 0.0f;
+			mBiasOffset = 0.0f;
+			mMipCountFadingRate = 0.0f;
+		}
+		else
+		{
+			mBiasOffset = mTotalMipCount - currentInterpolatedMipCount;
+			if (mMipCountDelta > 0.0f)
+			{
+				mMipCountFadingRate = 1.0f / (mMipCountDelta);
+			}
+			else
+			{
+				mMipCountFadingRate = -1.f / (mMipCountDelta);
+			}
+		}
+	}
+
+	void TextureReference::beginInit_RenderThread()
+	{
+		bInitialized_GameThread = true;
+		beginInitResource(this);
+	}
+
+	void TextureReference::beginRelease_GameThread()
+	{
+		beginReleaseResource(this);
+		bInitialized_GameThread = false;
+	}
+
+	void TextureReference::initRHI()
+	{
+		mTextureReferenceRHI = RHICreateTextureReference(&mLastRenderTimeRHI);
+	}
+
+	void TextureReference::releaseRHI()
+	{
+		mTextureReferenceRHI.safeRelease();
 	}
 }

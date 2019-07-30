@@ -11,7 +11,7 @@ namespace Air
 
 	StaticMeshComponent* AStaticMeshActor::getStaticMeshComponent()const
 	{
-		return mStaticMeshComponennt;
+		return mStaticMeshComponennt.get();
 	}
 
 	DECLARE_SIMPLER_REFLECTION(AStaticMeshActor);

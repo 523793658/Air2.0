@@ -9,7 +9,7 @@ namespace Air
 
 	}
 
-	LightComponent* ALight::getLightComponent() const
+	const std::shared_ptr<LightComponent>& ALight::getLightComponent() const
 	{
 		return mLightComponent;
 	}

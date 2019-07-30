@@ -5,7 +5,6 @@
 #include "DynamicRHI.h"
 #include "RHICommandList.h"
 #include "PackedNormal.h"
-
 namespace Air
 {
 	PixelFormatInfo GPixelFormats[PF_MAX] =
@@ -182,6 +181,62 @@ namespace Air
 		}
 	};
 
+	class SolidColorTextureCube : public Texture
+	{
+	public:
+		SolidColorTextureCube(const Color& inColor, EPixelFormat inPixelFormat = PF_B8G8R8A8)
+			:mColor(inColor)
+			,mPixelFormat(inPixelFormat)
+		{
+
+		}
+		virtual void initRHI() override
+		{
+			RHIResourceCreateInfo createInfo;
+			TextureCubeRHIRef textureCube = RHICreateTextureCube(1, mPixelFormat, 1, 0, createInfo);
+			mTextureRHI = textureCube;
+			for (uint32 faceIndex = 0; faceIndex < 6; faceIndex++)
+			{
+				uint32 destStride;
+				Color* destBuffer = (Color*)RHILockTextureCubeFace(textureCube, faceIndex, 0, 0, RLM_WriteOnly, destStride, false);
+				*destBuffer = mColor;
+				RHIUnlockTextureCubeFace(textureCube, faceIndex, 0, 0, false);
+			}
+			SamplerStateInitializerRHI samplerStateInitializer(SF_Point, AM_Wrap, AM_Wrap, AM_Wrap);
+			mSamplerStateRHI = RHICreateSamplerState(samplerStateInitializer);
+		}
+
+		virtual uint32 getWidth() const override
+		{
+			return 1;
+		}
+
+		virtual uint32 getHeight() const override
+		{
+			return 1;
+		}
+
+	private:
+		Color mColor;
+		EPixelFormat mPixelFormat;
+	};
+
+
+	class WhiteTextureCube : public SolidColorTextureCube
+	{
+	public:
+		WhiteTextureCube() : SolidColorTextureCube(Color::White) {}
+	};
+	Texture* GWhiteTextureCube = new TGlobalResource<WhiteTextureCube>();
+
+	class BlackTextureCube : public SolidColorTextureCube
+	{
+	public:
+		BlackTextureCube():SolidColorTextureCube(Color::Black){}
+	};
+
+	Texture* GBlackTextureCube = new TGlobalResource<BlackTextureCube>();
+
 	Texture* GBlackTexture = new TGlobalResource<ColoredTexture<0, 0, 0, 255>>;
 	Texture* GWhiteTexture = new TGlobalResource<ColoredTexture<0, 0, 0, 255>>;
 
@@ -222,5 +277,28 @@ namespace Air
 		ar << n.mZ;
 		ar << n.mW;
 		return ar;
+	}
+
+	void copyTextureData2D(const void* source, void* dest, uint32 height, EPixelFormat format, uint32 sourceStirde, uint32 destStride)
+	{
+		const uint32 blockSizeY = GPixelFormats[format].BlockSizeY;
+		const uint32 numBlocksY = (height + blockSizeY - 1) / blockSizeY;
+
+		if (sourceStirde == destStride || destStride == 0)
+		{
+			Memory::memcpy(dest, source, numBlocksY * sourceStirde);
+		}
+		else
+		{
+			const int32 numBytesPerRow = Math::min<uint32>(sourceStirde, destStride);
+			for (uint32 blockY = 0; blockY < numBlocksY; ++blockY)
+			{
+				Memory::memcpy(
+					(uint8*)dest + destStride * blockY,
+					(uint8*)source + sourceStirde * blockY,
+					numBytesPerRow
+				);
+			}
+		}
 	}
 }

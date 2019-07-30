@@ -22,7 +22,7 @@ namespace Air
 		}
 	}
 
-	Object* Factory::createFromFile(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
+	std::shared_ptr<Object> Factory::createFromFile(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
 	{
 		wstring extension = Paths::getExtension(filename);
 		boost::to_lower(extension);

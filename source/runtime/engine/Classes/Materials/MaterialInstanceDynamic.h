@@ -14,9 +14,9 @@ namespace Air
 
 		void setVectorParameterValue(wstring parameterName, LinearColor& value);
 
-		static RMaterialInstanceDynamic* create(class MaterialInterface* parentMaterial, class Object* inOuter);
+		static std::shared_ptr<RMaterialInstanceDynamic> create(std::shared_ptr<class MaterialInterface>& parentMaterial, class Object* inOuter);
 
-		static RMaterialInstanceDynamic* create(class MaterialInterface* parentMaterial, class Object* inOuter, wstring name);
+		static std::shared_ptr<RMaterialInstanceDynamic> create(std::shared_ptr<class MaterialInterface>& parentMaterial, class Object* inOuter, wstring name);
 
 	};
 }

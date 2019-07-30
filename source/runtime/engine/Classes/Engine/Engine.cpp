@@ -33,8 +33,8 @@ namespace Air
 
 	LocalPlayer* Engine::getFirstGamePlayer(World* inWorld)
 	{
-		const TArray<class LocalPlayer*>& player = getGamePlayers(inWorld);
-		return player.size() != 0 ? player[0] : nullptr;
+		const TArray<std::shared_ptr<class LocalPlayer>>& player = getGamePlayers(inWorld);
+		return player.size() != 0 ? player[0].get() : nullptr;
 	}
 
 

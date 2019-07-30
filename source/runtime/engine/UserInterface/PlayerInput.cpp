@@ -206,7 +206,7 @@ namespace Air
 		}
 	}
 
-	void PlayerInput::processInputStack(const TArray<InputComponent *>& inputComponentStack, const float deltaTime, const bool bGamePaused)
+	void PlayerInput::processInputStack(const TArray<std::shared_ptr<InputComponent>>& inputComponentStack, const float deltaTime, const bool bGamePaused)
 	{
 		APlayerController* playerController = getOuterAPlayerController();
 
@@ -291,7 +291,7 @@ namespace Air
 
 		for (; stackIndex >= 0; --stackIndex)
 		{
-			InputComponent* const ic = inputComponentStack[stackIndex];
+			std::shared_ptr<InputComponent> const ic = inputComponentStack[stackIndex];
 			if (ic)
 			{
 				BOOST_ASSERT(!mKeysToConsume.size() && !mFoundChords.size() && !mEventIndices.size());
@@ -410,7 +410,7 @@ namespace Air
 
 		for (; stackIndex >= 0; --stackIndex)
 		{
-			InputComponent* ic = inputComponentStack[stackIndex];
+			std::shared_ptr<InputComponent> ic = inputComponentStack[stackIndex];
 			if (ic)
 			{
 				for (InputAxisBinding& axisBinding : ic->mAxisBindings)
@@ -763,7 +763,7 @@ namespace Air
 		{
 			const InputSettings* defaultInputSettings = getDefault<InputSettings>();
 
-			APlayerController const * const playerController = getOuterAPlayerController();
+			/*APlayerController const * const playerController = getOuterAPlayerController();*/
 
 			float const FOVScale = 1.0f;
 			newVal *= FOVScale;

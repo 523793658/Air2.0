@@ -196,6 +196,6 @@ typedef WindowsPlatformTypes PlatformTypes;
 #endif
 
 #if defined(_MSC_VER)
-#define AIR_COMPILER_MSVC
+#define AIR_COMPILER_MSVC			1
 
 #endif // 

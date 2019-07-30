@@ -537,9 +537,9 @@ namespace Air
 	{
 		bool bUseMikkTSpace{ false };
 
-		bool bRecomputeNormals{ true };
+		bool bRecomputeNormals{ false };
 
-		bool bRecomputeTangents{ true };
+		bool bRecomputeTangents{ false };
 
 		bool bRemoveDegenerates{ true };
 
@@ -552,5 +552,18 @@ namespace Air
 		bool bUseFullPrecisionUVs{ false };
 
 		float3 mBuildScale3D{ float3::One };
+	};
+
+	enum EMaterialSamplerType
+	{
+		SamplerType_Color,
+		SamplerType_Grayscale,
+		SamplerType_Alpha,
+		SamplerType_Normal,
+		SamplerType_Masks,
+		SamplerType_DistanceFieldFont,
+		SamplerType_LinearColor,
+		SamplerType_LinearGrayscale,
+		SamplerType_Max,
 	};
 }

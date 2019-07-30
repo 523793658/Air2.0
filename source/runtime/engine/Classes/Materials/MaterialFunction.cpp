@@ -8,5 +8,14 @@ namespace Air
 
 	}
 
+	void RMaterialFunction::getDependenctFunction(TArray<RMaterialFunction*>& dependentFunctions) const
+	{
+	}
+
+	void RMaterialFunction::appendReferencedTextures(TArray<std::shared_ptr<RTexture>>& inOutTextures) const
+	{
+
+	}
+
 	DECLARE_SIMPLER_REFLECTION(RMaterialFunction);
 }

@@ -403,4 +403,47 @@ namespace Air
 		}
 		MeshMaterialShader::setMesh(RHICmdList, getPixelShader(), vertexFactory, view, proxy, batchElement, drawRenderState);
 	}
+
+	void BasePassReflectionParameters::set(RHICommandList& RHICmdList, PixelShaderRHIParamRef pixelShaderRHI, const ViewInfo* view)
+	{
+		SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+		mSkyLightReflectionParameters.setParameters(RHICmdList, pixelShaderRHI, (const Scene*)(view->mFamily->mScene), view->mFamily->mEngineShowFlags.SkyLighting);
+	}
+
+	void SkyLightReflectionParameters::getSkyParametersFromScene(const Scene* scene, bool bApplySkyLight, Texture*& outSkyLightTextureResource, Texture*& outSkyLightBlendDestinationTextureResource, float& outApplySkyLightMask, float& outSkyMipCount, bool& bSkyLightIsDynamic, float& outBlendFraction, float& outSkyAverageBrightness)
+	{
+		outSkyLightTextureResource = GBlackTextureCube;
+		outSkyLightBlendDestinationTextureResource = GBlackTextureCube;
+		outApplySkyLightMask = 0;
+		bSkyLightIsDynamic = false;
+		outBlendFraction = 0;
+		outSkyAverageBrightness = 1.0f;
+		if (scene && scene->mSkyLight && scene->mSkyLight->mProcessedTexture && bApplySkyLight)
+		{
+			const SkyLightSceneProxy& skyLight = *scene->mSkyLight;
+			outSkyLightTextureResource = skyLight.mProcessedTexture;
+			outBlendFraction = skyLight.mBlendFraction;
+			if (skyLight.mBlendFraction > 0.0f && skyLight.mBlendDestinationProcessedTexture)
+			{
+				if (skyLight.mBlendFraction < 1.0f)
+				{
+					outSkyLightBlendDestinationTextureResource = skyLight.mBlendDestinationProcessedTexture;
+				}
+				else
+				{
+					outSkyLightTextureResource = skyLight.mBlendDestinationProcessedTexture;
+					outBlendFraction = 0;
+				}
+			}
+			outApplySkyLightMask = 1;
+			bSkyLightIsDynamic = !skyLight.bHasStaticLighting && !skyLight.bWantsStaticShadowing;
+			outSkyAverageBrightness = skyLight.mAverageBrightness;
+		}
+		outSkyMipCount = 1;
+		if (outSkyLightTextureResource)
+		{
+			int32 cubemapWith = outSkyLightTextureResource->getWidth();
+			outSkyMipCount = Math::log2(cubemapWith) + 1.0f;
+		}
+	}
 }

@@ -7,9 +7,9 @@ namespace Air
 {
 	class ASpectatorPawn;
 	class AController;
-	class ENGINE_API AGameStateBase : public Info
+	class ENGINE_API AGameStateBase : public AInfo
 	{
-		GENERATED_RCLASS_BODY(AGameStateBase, Info)
+		GENERATED_RCLASS_BODY(AGameStateBase, AInfo)
 	public:
 		TSubclassOf<GameModeBase> mGameModeClass;
 		GameModeBase* mAuthorityGameMode;

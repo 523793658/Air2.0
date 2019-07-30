@@ -155,7 +155,7 @@ namespace Air
 
 		void tick(float deltaTime);
 
-		void processInputStack(const TArray<InputComponent*>& inputComponentStack, const float deltaTime, const bool bGamePaused);
+		void processInputStack(const TArray<std::shared_ptr<InputComponent>>& inputComponentStack, const float deltaTime, const bool bGamePaused);
 
 		static void addEngineDefinedAxisMapping(const InputAxisKeyMapping& axisMapping);
 

@@ -71,7 +71,7 @@ namespace Air
 
 		const LODInfo& proxyLODInfo = mLODs[lodIndex];
 
-		MaterialInterface* material = proxyLODInfo.mSections[sectionIndex].mMaterial;
+		std::shared_ptr<MaterialInterface> material = proxyLODInfo.mSections[sectionIndex].mMaterial;
 		outMeshBatch.mMaterialRenderProxy = material->getRenderProxy(bUseSelectedMaterial, bUseHoveredMaterial);
 		outMeshBatch.mVertexFactory = &lod.mVertexFactory;
 

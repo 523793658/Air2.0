@@ -473,6 +473,11 @@ namespace Air
 		return createD3D11Texture2D<D3D11BaseTextureCube>(size, size, 6, false, true, format, numMips, 1, flags, createInfo);
 	}
 
+	TextureReferenceRHIRef D3D11DynamicRHI::RHICreateTextureReference(LastRenderTimeContainer* lastRenderTime)
+	{
+		return new D3D11TextureReference(this, lastRenderTime);
+	}
+
 	void* D3D11DynamicRHI::RHILockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
 	{
 		D3D11TextureCube* textureCube = ResourceCast(texture);

@@ -69,6 +69,10 @@ namespace Air
 
 		virtual void addLight(LightComponent* light) override;
 
+		virtual void setSkyLight(SkyLightSceneProxy* light) override;
+
+		virtual void disableSkyLight(SkyLightSceneProxy* light) override;
+
 		template<typename LightMapPolicyType>
 		TStaticMeshDrawList<TBasePassDrawingPolicy<LightMapPolicyType>>& getBasePassDrawList(EBasePassDrawListType drawType);
 
@@ -118,17 +122,25 @@ namespace Air
 		TArray<PrimitiveComponentId> mPrimitiveComponentIds;
 		TSparseArray<LightSceneInfoCompact> mLights;
 		
-		LightSceneInfo* mSunLight;
+		LightSceneInfo* mSunLight{ nullptr };
+
+		TArray<SkyLightSceneProxy*> mSkyLightStack;
+
+		SkyLightSceneProxy* mSkyLight{ nullptr };
 
 		SceneLightOctree mLightOctree;
 
 		ScenePrimitiveOctree mPrimitiveOctree;
+
+		bool bScenesPrimitivesNeedStaticMeshElementUpdate{ true };
 
 	protected:
 		World* mWorld{ nullptr };
 
 	private:
 		int32 mNumVisibleLights_GameThread{ 0 };
+
+		int32 mNumEnabledSkyLights_GameThread{ 0 };
 		ERHIFeatureLevel::Type mFeatureLevel;
 	};
 }

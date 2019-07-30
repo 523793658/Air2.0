@@ -26,9 +26,9 @@ namespace Air
 		}
 	}
 
-	MaterialInterface* PrimitiveComponent::getMaterial(int32 elementIndex) const
+	std::shared_ptr<MaterialInterface> PrimitiveComponent::getMaterial(int32 elementIndex) const
 	{
-		return nullptr;
+		return std::shared_ptr<MaterialInterface>();
 	}
 
 	void PrimitiveComponent::setMaterial(int32 elementIndex, class MaterialInterface* material)

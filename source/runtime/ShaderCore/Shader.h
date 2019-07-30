@@ -310,12 +310,12 @@ namespace Air
 
 		ShaderType* mShaderType;
 		SHAHash mSourceHash;
-		const SerializationHistory& mSerializationHistory;
+		const SerializationHistory* mSerializationHistory;
 
 		ShaderTarget mTarget;
 
 		ShaderId(const SerializationHistory& inSerializationHistory) :
-			mSerializationHistory(inSerializationHistory)
+			mSerializationHistory(&inSerializationHistory)
 		{}
 
 		SHADER_CORE_API ShaderId(const SHAHash& inMaterialShaderMapHash, const ShaderPipelineType * inShaderPipeline, VertexFactoryType* inVertexFactoryType, ShaderType* inShaderType, ShaderTarget inTarget);
@@ -329,6 +329,7 @@ namespace Air
 		{
 			return Crc::memCrc_DEPRECATED((const void*)&mMaterialShaderMapHash, sizeof(mMaterialShaderMapHash));
 		}
+		
 
 		bool operator == (const ShaderId& rhs) const
 		{

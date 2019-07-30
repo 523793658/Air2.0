@@ -10,8 +10,8 @@ namespace Air
 	struct ExpressionInput
 	{
 #if WITH_EDITORONLY_DATA
-		class RMaterialExpression* mExpression;
-		uint32 mExpressionId;
+		class RMaterialExpression* mExpression{ nullptr };
+		int32 mExpressionId{ -1 };
 
 #endif
 

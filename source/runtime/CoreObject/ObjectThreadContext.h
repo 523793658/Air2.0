@@ -37,7 +37,7 @@ namespace Air
 		int32 mObjBeginLoadCount{ 0 };
 		TArray<Object*> mObjLoaded;
 		int32 mIsInConstructor{ 0 };
-		Object* mConstructedObject{ nullptr };
+		Object* mConstructedObject;
 
 		bool isRoutingPostLoad;
 	};

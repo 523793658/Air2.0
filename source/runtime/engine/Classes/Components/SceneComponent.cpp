@@ -182,7 +182,7 @@ namespace Air
 
 	AActor* SceneComponent::getAttachmentRootActor() const
 	{
-		const SceneComponent* const attachmentRootComponent = getAttachmentRoot();
+		const SceneComponent* attachmentRootComponent = getAttachmentRoot();
 		return attachmentRootComponent ? attachmentRootComponent->getOwner() : nullptr;
 	}
 
@@ -346,7 +346,7 @@ namespace Air
 			}
 
 			mPrimaryComponentTick.addPrerequisite(inParent, inParent->mPrimaryComponentTick);
-			mAttachParent = inParent;
+			mAttachParent = std::dynamic_pointer_cast<SceneComponent>(inParent->shared_from_this());
 			mAttachSocketName = inSocketName;
 			onAttachmentChange();
 
@@ -452,7 +452,7 @@ namespace Air
 	{
 		BOOST_ASSERT(!bRegistered);
 		BOOST_ASSERT(mAttachParent == nullptr || !mAttachParent->mAttachChildren.contains(this));
-		mAttachParent = inParent;
+		mAttachParent = std::dynamic_pointer_cast<SceneComponent>(inParent->shared_from_this());
 		mAttachSocketName = inSocketName;
 	}
 

@@ -10,6 +10,7 @@ namespace Air
 	static ActorComponent* GTestRegisterComponentTickFunctions = nullptr;
 
 	ActorComponent::ActorComponent(const ObjectInitializer& objectInitializer /* = ObjectInitializer::get() */)
+		:ParentType(objectInitializer)
 	{
 		mOwnerPrivate = getTypedOuter<AActor>();
 		mPrimaryComponentTick.mTickGroup = TG_DuringPhysics;
@@ -66,7 +67,7 @@ namespace Air
 		Object::postInitProperties();
 		if (mOwnerPrivate)
 		{
-			mOwnerPrivate->addOwnedComponent(this);
+			mOwnerPrivate->addOwnedComponent(std::dynamic_pointer_cast<ActorComponent>(this->shared_from_this()));
 		}
 	}
 
@@ -113,7 +114,7 @@ namespace Air
 			onComponentCreated();
 		}
 
-		mWorldPrivate = inWorld;
+		mWorldPrivate = std::dynamic_pointer_cast<World>(inWorld->shared_from_this());
 
 		executeRegisterEvents();
 
@@ -256,7 +257,7 @@ namespace Air
 			AActor* myOwner = getOwner();
 			if (!myOwner || !myOwner->isTemplate())
 			{
-				Level* componentLevel = (myOwner ? myOwner->getLevel() : getWorld()->mPersistentLevel);
+				Level* componentLevel = (myOwner ? myOwner->getLevel() : getWorld()->mPersistentLevel.get());
 				tickFunction->setTickFunctionEnable(tickFunction->bStartWithTickEnabled || tickFunction->isTickFunctionEnabled());
 				tickFunction->registerTickFunction(componentLevel);
 				return true;
@@ -387,7 +388,7 @@ namespace Air
 
 	World* ActorComponent::getWorld_Uncached() const
 	{
-		World* componentWorld = nullptr;
+		World* componentWorld;
 		AActor* myOwner = getOwner();
 		if (myOwner && !myOwner->hasAnyFlags(RF_ClassDefaultObject))
 		{

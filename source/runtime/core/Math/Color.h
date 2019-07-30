@@ -2,7 +2,9 @@
 #include "CoreType.h"
 #include "Containers/String.h"
 #include "Math.h"
+#include "boost/lexical_cast.hpp"
 #include <algorithm>
+#include <regex>
 namespace Air
 {
 	struct Color;
@@ -116,6 +118,25 @@ namespace Air
 			return Math::square(R) < DELTA && Math::square(G) < DELTA && Math::square(B) < DELTA;
 		}
 
+		static LinearColor fromString(wstring s)
+		{
+			std::wregex reg(TEXT("^R=(\\d+(.\\d+)?),G=(\\d+(.\\d+)?),B=(\\d+(.\\d+)?),A=(\\d+(.\\d+)?)$"));
+			std::wsmatch result;
+			if (std::regex_match(s, result, reg))
+			{
+				return LinearColor(
+					boost::lexical_cast<float>(result[1].str()),
+					boost::lexical_cast<float>(result[3].str()),
+					boost::lexical_cast<float>(result[5].str()),
+					boost::lexical_cast<float>(result[7].str())
+				);
+			}
+			else
+			{
+				return Black;
+			}
+		}
+
 		static const LinearColor White;
 		static const LinearColor Gray;
 		static const LinearColor Black;
@@ -200,5 +221,7 @@ namespace Air
 		static CORE_API Color makeRandomColor();
 
 		static CORE_API const Color White;
+
+		static CORE_API const Color Black;
 	};
 }

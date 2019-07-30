@@ -10,7 +10,7 @@ namespace Air
 		
 
 	protected:
-		PrimitiveComponent*	mPrimitiveComponent;
+		std::shared_ptr<class PrimitiveComponent>	mPrimitiveComponent;
 	};
 
 	class ENGINE_API SphereActor : public SimpleShapeActor

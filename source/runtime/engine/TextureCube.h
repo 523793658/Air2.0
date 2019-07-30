@@ -7,7 +7,11 @@ namespace Air
 	{
 		GENERATED_RCLASS_BODY(RTextureCube, RTexture);
 		
+
 	public:
+
+		virtual EMaterialValueType getMaterialType() override { return MCT_TextureCube; }
+
 
 #include "TextureInterface.inl"
 

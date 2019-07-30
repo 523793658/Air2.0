@@ -67,14 +67,14 @@ namespace Air
 		}
 		FORCEINLINE ValueType& findChecked(const KeyType& key)
 		{
-			auto it = find(key);
+			const auto it = find(key);
 			BOOST_ASSERT(it != end());
 			return it->second;
 		}
 
 		const KeyType* findKey(ValueType value) const
 		{
-			for (auto it : *this)
+			for (auto& it : *this)
 			{
 				if (it.second == value)
 				{
@@ -86,7 +86,7 @@ namespace Air
 
 		void append(TMap other)
 		{
-			for (auto it : other)
+			for (auto& it : other)
 			{
 				(*this)[it.first] = it.second;
 			}

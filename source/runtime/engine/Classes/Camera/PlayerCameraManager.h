@@ -26,12 +26,12 @@ namespace Air
 
 		bool equal(const TViewTarget& otherTarget) const;
 
-		void setNewTarget(AActor* newTarget);
+		void setNewTarget(std::shared_ptr<AActor> newTarget);
 
 		class APawn* getTargetPawn() const;
 
 
-		class AActor* mTarget;
+		std::shared_ptr<class AActor> mTarget;
 
 		struct MinimalViewInfo mPOV;
 
@@ -49,7 +49,7 @@ namespace Air
 	public:
 		AActor* getViewTarget() const;
 		void setViewTarget(class AActor* newTarget);
-		void assignViewTarget(AActor* newTarget, TViewTarget& vt);
+		void assignViewTarget(AActor* newTarget, TViewTarget vt);
 		virtual void initializeFor(class APlayerController* pc);
 
 		virtual void updateCamera(float deltaTime);
@@ -90,7 +90,7 @@ namespace Air
 
 		struct TViewTarget mViewTarget;
 		struct TViewTarget mPendingViewTarget;
-		class APlayerController* mPCOwner;
+		std::shared_ptr<class APlayerController> mPCOwner;
 		float mDefaultAspectRatio;
 		float mDefaultOrthoWidth{ 512 };
 		float mDefaultFOV;
@@ -105,6 +105,6 @@ namespace Air
 		float mLockedFOV{ 0.0f };
 
 	private:
-		class SceneComponent* mTransformComponent;
+		std::shared_ptr<class SceneComponent> mTransformComponent;
 	};
 }

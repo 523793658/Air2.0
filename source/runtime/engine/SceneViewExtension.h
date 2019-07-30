@@ -19,7 +19,7 @@ namespace Air
 
 		virtual void setupViewFamily(SceneViewFamily& inSceneViewFamily) {}
 
-		virtual void setViewPoint(APlayerController* player, MinimalViewInfo& inViewInfo) {}
+		virtual void setViewPoint(std::shared_ptr<APlayerController> player, MinimalViewInfo& inViewInfo) {}
 
 		virtual void setupView(SceneViewFamily& inViewFamily, SceneView& inView) {};
 

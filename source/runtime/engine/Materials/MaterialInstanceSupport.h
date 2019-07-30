@@ -15,7 +15,7 @@ namespace Air
 
 		MaterialInstanceResource(MaterialInstance* inOwner, bool bInSelected, bool bInHovered);
 
-		void GameThread_setParent(MaterialInterface* parentMaterialInterface);
+		void GameThread_setParent(std::shared_ptr<MaterialInterface>& parentMaterialInterface);
 
 		template<typename ValueType>
 		void RenderThread_UpdateParameter(const wstring name, ValueType& value)
@@ -46,7 +46,7 @@ namespace Air
 
 		bool getVectorValue(const wstring parameterName, LinearColor* outValue, const MaterialRenderContext& context) const override;
 
-		bool getTextureValue(const wstring parameterName, const RTexture** outValue, const MaterialRenderContext& context) const override;
+		bool getTextureValue(const wstring parameterName, std::shared_ptr<const RTexture>& outValue, const MaterialRenderContext& context) const override;
 
 		template<typename ValueType>
 		const ValueType* RenderThread_findParameterByName(wstring name) const
@@ -75,9 +75,9 @@ namespace Air
 		TArray<TNamedParameter<const RTexture*>> mTextureParameterArray;
 		TArray<TNamedParameter<LinearColor>> mVectorParameterArray;
 
-		MaterialInterface* mParent;
-		MaterialInstance* mOwner;
-		MaterialInterface* mGameThreadParent;
+		std::shared_ptr<MaterialInterface> mParent;
+		std::shared_ptr<MaterialInstance> mOwner;
+		std::shared_ptr<MaterialInterface> mGameThreadParent;
 	};
 
 	template<> FORCEINLINE TArray<MaterialInstanceResource::TNamedParameter<float>>& MaterialInstanceResource::getValueArray() { return mScalarParameterArray; }

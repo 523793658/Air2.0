@@ -8,6 +8,6 @@ namespace Air
 		GENERATED_RCLASS_BODY(Player, Object)
 	public:
 
-		class APlayerController* mPlayerComtroller;
+		std::shared_ptr<class APlayerController> mPlayerComtroller;
 	};
 }

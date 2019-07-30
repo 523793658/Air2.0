@@ -80,6 +80,14 @@ namespace Air
 		MP_Metallic,
 		MP_Specular,
 		MP_Roughness,
+		MP_CustomizedUVs0,
+		MP_CustomizedUVs1,
+		MP_CustomizedUVs2,
+		MP_CustomizedUVs3,
+		MP_CustomizedUVs4,
+		MP_CustomizedUVs5,
+		MP_CustomizedUVs6,
+		MP_CustomizedUVs7,
 		MP_Max,
 	};
 

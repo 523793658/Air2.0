@@ -35,7 +35,7 @@ namespace Air
 	}
 
 
-	Object* FbxFactory::createFromFileInner(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
+	std::shared_ptr<Object> FbxFactory::createFromFileInner(Object* inObject, wstring filename, wstring name, EObjectFlags flags)
 	{
 		FbxImportConfig* importConfig = new FbxImportConfig();
 
@@ -105,7 +105,7 @@ namespace Air
 				int32 importedMeshCount = 0;
 				if (importConfig->mMeshTypeToImport == FBXIT_StaticMesh)
 				{
-					RStaticMesh* newStaticMesh = nullptr;
+					std::shared_ptr<RStaticMesh> newStaticMesh = nullptr;
 					if (bCombineMeshes)
 					{
 						TArray<FbxNode*> fbxMeshArray;
@@ -123,7 +123,7 @@ namespace Air
 				}
 			}
 		}
-		return newObject;
+		return std::dynamic_pointer_cast<Object>(newObject->shared_from_this());
 	}
 
 }

@@ -35,6 +35,10 @@ namespace Air
 
 	extern RENDER_CORE_API class Texture* GWhiteTexture;
 
+	extern RENDER_CORE_API class Texture* GBlackTextureCube;
+
+	extern RENDER_CORE_API class Texture* GWhiteTextureCube;
+
 	RENDER_CORE_API SIZE_T calcTextureMipWidthInBlocks(uint32 width, EPixelFormat format, uint32 mipIndex);
 
 	RENDER_CORE_API SIZE_T calcTextureMipHeightInBlocks(uint32 height, EPixelFormat format, uint32 MipIndex);
@@ -82,6 +86,8 @@ namespace Air
 	RENDER_CORE_API VertexDeclarationRHIRef& getVertexDeclarationVector4();
 
 	RENDER_CORE_API int2 calcMipMapExtent(uint32 textureWidth, uint32 textureHeight, EPixelFormat format, uint32 mipIndex);
+
+	RENDER_CORE_API void copyTextureData2D(const void* source, void* dest, uint32 height, EPixelFormat format, uint32 sourceStirde, uint32 destStride);
 
 #define NUM_DEBUG_UTIL_COLORS (32)
 }

@@ -26,7 +26,7 @@ namespace Air
 
 		DemoViewportClient* getViewportClient()
 		{
-			return mViewportClient;
+			return mViewportClient.get();
 		}
 	private:
 		void initDemoApplication();
@@ -35,10 +35,10 @@ namespace Air
 		std::weak_ptr<class SWindow> mViewportWindow;
 		std::shared_ptr<class SViewport> mViewportWidget;
 		std::shared_ptr<class SceneViewport> mSceneViewport;
-		DemoViewportClient* mViewportClient{ nullptr };
+		std::shared_ptr<DemoViewportClient> mViewportClient;
 
 		Application* mApplication;
-		class PlayerInput* mPlayerInput;
-		GameInstance* mGameInstance;
+		std::shared_ptr<class PlayerInput> mPlayerInput;
+		std::shared_ptr<GameInstance> mGameInstance;
 	};
 }

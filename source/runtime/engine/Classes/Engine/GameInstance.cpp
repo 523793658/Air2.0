@@ -18,7 +18,7 @@ namespace Air
 	{
 	}
 
-	const TArray<LocalPlayer*>& GameInstance::getLocalPlayers() const
+	const TArray<std::shared_ptr<LocalPlayer>>& GameInstance::getLocalPlayers() const
 	{
 		return mLocalPlayers;
 	}
@@ -36,10 +36,10 @@ namespace Air
 	void GameInstance::initializeStandalone(EWorldType::Type inType)
 	{
 		mWorldContext = &getEngine()->createNewWorldContext(inType);
-		mWorldContext->mOwningGameInstance = this;
+		mWorldContext->mOwningGameInstance = std::dynamic_pointer_cast<GameInstance>(this->shared_from_this());
 
-		World* dummyWorld = World::createWorld(inType, false);
-		dummyWorld->setGameInstance(this);
+		std::shared_ptr<World>& dummyWorld = World::createWorld(inType, false);
+		dummyWorld->setGameInstance(std::dynamic_pointer_cast<GameInstance>( this->shared_from_this()));
 		mWorldContext->setCurrentWorld(dummyWorld);
 		init();
 	}
@@ -48,10 +48,10 @@ namespace Air
 	ViewportClient* GameInstance::getGameViewportClient() const
 	{
 		WorldContext* const wc = getWorldContext();
-		return wc ? wc->mGameViewport : nullptr;
+		return wc ? wc->mGameViewport.get() : nullptr;
 	}
 
-	int32 GameInstance::addLocalPlayer(LocalPlayer* newLocalPlayer, int32 ControllerId)
+	int32 GameInstance::addLocalPlayer(std::shared_ptr<LocalPlayer> newLocalPlayer, int32 ControllerId)
 	{
 		if (newLocalPlayer == nullptr)
 		{
@@ -69,15 +69,15 @@ namespace Air
 		return insertIndex;
 	}
 
-	LocalPlayer* GameInstance::createInitialPlayer(wstring &outError)
+	std::shared_ptr<LocalPlayer> GameInstance::createInitialPlayer(wstring &outError)
 	{
 		return createLocalPlayer(0, outError, false);
 	}
 
-	LocalPlayer* GameInstance::createLocalPlayer(int32 ControllerId, wstring& outError, bool bSpawnActor)
+	std::shared_ptr<LocalPlayer> GameInstance::createLocalPlayer(int32 ControllerId, wstring& outError, bool bSpawnActor)
 	{
 		//BOOST_ASSERT(getEngine()->mlocal)
-		LocalPlayer* newPlayer = nullptr;
+		std::shared_ptr<LocalPlayer> newPlayer;
 		int32 insertIndex = INDEX_NONE;
 		const int32 maxSplitesscreenPlayers = 1;
 		if (findLocalPlayerFromControllerId(ControllerId) != nullptr)
@@ -120,9 +120,9 @@ namespace Air
 		return newPlayer;
 	}
 
-	LocalPlayer* GameInstance::findLocalPlayerFromControllerId(const int32 controllerID) const
+	std::shared_ptr<LocalPlayer> GameInstance::findLocalPlayerFromControllerId(const int32 controllerID) const
 	{
-		for (LocalPlayer* lp : mLocalPlayers)
+		for (const std::shared_ptr<LocalPlayer>& lp : mLocalPlayers)
 		{
 			if (lp && (lp->getControllerId() == controllerID))
 			{
@@ -172,7 +172,7 @@ namespace Air
 		return true;
 	}
 
-	GameModeBase* GameInstance::createGameModeForURL(URL inURL)
+	std::shared_ptr<GameModeBase> GameInstance::createGameModeForURL(URL inURL)
 	{
 		World* world = getWorld();
 
@@ -186,11 +186,11 @@ namespace Air
 	{
 		if (inWorld == nullptr)
 		{
-			for (LocalPlayer* player : mLocalPlayers)
+			for (const std::shared_ptr<LocalPlayer>& player : mLocalPlayers)
 			{
 				if (player && player->mPlayerComtroller)
 				{
-					return player->mPlayerComtroller;
+					return player->mPlayerComtroller.get();
 				}
 			}
 		}
@@ -200,7 +200,7 @@ namespace Air
 			{
 				if (*iterator != nullptr && (*iterator)->isLocalController())
 				{
-					return *iterator;
+					return (*iterator).get();
 				}
 			}
 		}

@@ -1,9 +1,18 @@
 #include "ObjectBase.h"
 #include "Object.h"
+#include "ObjectGlobals.h"
 namespace Air
 {
+	ObjectBase::ObjectBase(const ObjectInitializer& objectInitializer)
+	{
+		const_cast<ObjectInitializer&>(objectInitializer).initSharedPtr();
+	}
+
 	ObjectBase::ObjectBase(EObjectFlags inFlags)
-		:mObjectFlags(inFlags)
+		: mObjectFlags(inFlags)
+		, mInternalIndex(INDEX_NONE)
+		, mClassPrivate(nullptr)
+		, mOuterPrivate(nullptr)
 	{
 
 	}

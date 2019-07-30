@@ -39,8 +39,8 @@ namespace Air
 
 		uint32 bAddDefaultMovementBindings : 1;
 
-		SphereComponent* mCollisionComponent;
+		std::shared_ptr<SphereComponent> mCollisionComponent;
 	private:
-		PawnMovementComponent* mMovementComponent;
+		std::shared_ptr<PawnMovementComponent> mMovementComponent;
 	};
 }

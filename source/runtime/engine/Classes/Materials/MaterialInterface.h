@@ -6,6 +6,7 @@
 #include "Classes/Engine/EngineType.h"
 #include "RHI.h"
 #include "RenderCommandFence.h"
+#include "Misc/Guid.h"
 #include "PrimitiveViewRelevance.h"
 namespace Air
 {
@@ -86,9 +87,9 @@ namespace Air
 
 		ENGINE_API MaterialRelevance getRelevance(ERHIFeatureLevel::Type inFeatureLevel) const;
 
-		virtual class RMaterial* getMaterial() PURE_VIRTRUAL(MaterialInterface::getMaterial, return nullptr;);
+		virtual std::shared_ptr<class RMaterial> getMaterial() PURE_VIRTRUAL(MaterialInterface::getMaterial, return std::shared_ptr<class RMaterial>(););
 
-		virtual const class RMaterial* getMaterial() const PURE_VIRTRUAL(MaterialInterface::getMaterial, return nullptr;);
+		virtual std::shared_ptr<const class RMaterial> getMaterial() const PURE_VIRTRUAL(MaterialInterface::getMaterial, return std::shared_ptr<const class RMaterial>(););
 
 		virtual void recacheConstantExpressions() const {};
 
@@ -121,7 +122,7 @@ namespace Air
 	private:
 		static void postLoadDefaultMaterials();
 
-		MaterialRelevance getRelevance_Internal(const RMaterial* material, ERHIFeatureLevel::Type inFeatureLevel) const;
+		MaterialRelevance getRelevance_Internal(std::shared_ptr<const RMaterial>& material, ERHIFeatureLevel::Type inFeatureLevel) const;
 	private: 
 		uint32 mFeatureLevelsToForceCompile;
 

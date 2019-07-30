@@ -63,12 +63,11 @@ namespace Air
 			inPlayer->mPlayerComtroller->mPlayer = nullptr;
 		}
 
-		mPlayer = inPlayer;
+		mPlayer = std::dynamic_pointer_cast<Player>( inPlayer->shared_from_this());
 
-		inPlayer->mPlayerComtroller = this;
+		inPlayer->mPlayerComtroller = std::dynamic_pointer_cast<APlayerController>(this->shared_from_this());
 
-		LocalPlayer* lp = dynamic_cast<LocalPlayer*>(inPlayer);
-		if (lp != nullptr)
+		if (inPlayer != nullptr)
 		{
 			setAsLocalPlayerController();
 			initInputSystem();
@@ -90,7 +89,7 @@ namespace Air
 
 
 	}
-	bool APlayerController::popInputComponent(InputComponent* inInputComponent)
+	bool APlayerController::popInputComponent(std::shared_ptr<InputComponent> inInputComponent)
 	{
 		if (inInputComponent)
 		{
@@ -103,7 +102,7 @@ namespace Air
 		return false;
 	}
 
-	void APlayerController::pushInputComponent(InputComponent* inInputComponent)
+	void APlayerController::pushInputComponent(std::shared_ptr<InputComponent> inInputComponent)
 	{
 		if (inInputComponent)
 		{
@@ -111,7 +110,7 @@ namespace Air
 			mCurrentInputStack.removeSingle(inInputComponent);
 			for (int32 index = mCurrentInputStack.size() - 1; index >= 0; --index)
 			{
-				InputComponent* ic = mCurrentInputStack[index];
+				std::shared_ptr<InputComponent>& ic = mCurrentInputStack[index];
 				if (ic == nullptr)
 				{
 					mCurrentInputStack.removeAt(index);
@@ -150,7 +149,7 @@ namespace Air
 	void APlayerController::spawnPlayerCameraManager()
 	{
 		ActorSpawnParameters spawnInfo;
-		spawnInfo.mOwner = this;
+		spawnInfo.mOwner = std::dynamic_pointer_cast<AActor>(this->shared_from_this());
 		spawnInfo.objectFlags |= RF_Transient;
 		mPlayerCameraManager = getWorld()->spawnActor<PlayerCameraManager>(spawnInfo);
 		if (mPlayerCameraManager != nullptr)
@@ -205,9 +204,9 @@ namespace Air
 		setSpectatorPawn(spawnSpectatorPawn());
 	}
 
-	ASpectatorPawn* APlayerController::spawnSpectatorPawn()
+	std::shared_ptr<ASpectatorPawn> APlayerController::spawnSpectatorPawn()
 	{
-		ASpectatorPawn* spawnedSpectator = nullptr;
+		std::shared_ptr< ASpectatorPawn> spawnedSpectator;
 
 		if ((getSpectatorPawn() == nullptr) && isLocalController())
 		{
@@ -217,7 +216,7 @@ namespace Air
 				if (RClass* spectatorClass = gameState->mSpectatorClass)
 				{
 					ActorSpawnParameters spawnParams;
-					spawnParams.mOwner = this;
+					spawnParams.mOwner = std::dynamic_pointer_cast<AActor>(this->shared_from_this());
 					spawnParams.objectFlags |= RF_Transient;
 					spawnedSpectator = world->spawnActor<ASpectatorPawn>(spectatorClass, getSpawnLocation(), getControllerRotation(), spawnParams);
 					if (spawnedSpectator)
@@ -280,21 +279,21 @@ namespace Air
 
 	}
 
-	void APlayerController::setSpectatorPawn(class ASpectatorPawn* newSpectatorPawn)
+	void APlayerController::setSpectatorPawn(std::shared_ptr<class ASpectatorPawn> newSpectatorPawn)
 	{
 		if (isInState(Spectating))
 		{
 			removePawnTickDependency(mSpectatorPawn);
-			mSpectatorPawn = newSpectatorPawn;
+			mSpectatorPawn = std::dynamic_pointer_cast<ASpectatorPawn>(newSpectatorPawn->shared_from_this());
 			if (newSpectatorPawn)
 			{
-				attachToPawn(newSpectatorPawn);
-				addPawnTickDependency(newSpectatorPawn);
-				autoManageActiveCameraTarget(newSpectatorPawn);
+				attachToPawn(newSpectatorPawn.get());
+				addPawnTickDependency(newSpectatorPawn.get());
+				autoManageActiveCameraTarget(newSpectatorPawn.get());
 			}
 			else
 			{
-				APawn* const myPawn = getPawn();
+				APawn* myPawn = getPawn();
 				attachToPawn(myPawn);
 				addPawnTickDependency(myPawn);
 				if (myPawn)
@@ -375,7 +374,7 @@ namespace Air
 	void APlayerController::clientRestart(class APawn* newPawn)
 	{
 		setPawn(newPawn);
-		getPawn()->mController = this;
+		getPawn()->mController = std::dynamic_pointer_cast<AController>(this->shared_from_this());
 		getPawn()->pawnClientRestart();
 	}
 
@@ -399,7 +398,7 @@ namespace Air
 	{
 		if (mRole > ROLE_SimulatedProxy)
 		{
-			if (!mPlayerInput && (mPlayer == nullptr || dynamic_cast<LocalPlayer*>(mPlayer) != nullptr))
+			if (!mPlayerInput && (mPlayer || std::dynamic_pointer_cast<LocalPlayer>(mPlayer) ))
 			{
 				initInputSystem();
 			}
@@ -434,7 +433,7 @@ namespace Air
 	void APlayerController::playerTick(float deltaTime)
 	{
 		tickPlayerInput(deltaTime, deltaTime == 0.f);
-		if ((mPlayer != nullptr) && (mPlayer->mPlayerComtroller == this))
+		if ((mPlayer != nullptr) && (mPlayer->mPlayerComtroller.get() == this))
 		{
 			bool bUpdateRotation = false;
 			if (isInState(Playing))
@@ -473,7 +472,7 @@ namespace Air
 		{
 		}
 		setControlRotation(viewRotation);
-		APawn* const p = getPawnOrSpectator();
+		APawn* p = getPawnOrSpectator();
 		if (p)
 		{
 			p->faceRotation(viewRotation, deltaTime);
@@ -490,7 +489,7 @@ namespace Air
 
 	void APlayerController::processPlayerInput(const float deltaTime, const bool bGamePaused)
 	{
-		TArray<InputComponent*> inputStack;
+		TArray<std::shared_ptr<InputComponent>> inputStack;
 		{
 			buildInputStack(inputStack);
 		}
@@ -514,7 +513,7 @@ namespace Air
 	{
 
 	}
-	void APlayerController::buildInputStack(TArray<InputComponent *>& inputStack)
+	void APlayerController::buildInputStack(TArray<std::shared_ptr<InputComponent>>& inputStack)
 	{
 		APawn* controlledPawn = getPawnOrSpectator();
 		if (controlledPawn)
@@ -525,9 +524,9 @@ namespace Air
 				{
 					inputStack.push(controlledPawn->mInputComponent);
 				}
-				for (ActorComponent* actorComponent : controlledPawn->getComponents())
+				for (const std::shared_ptr<ActorComponent>& actorComponent : controlledPawn->getComponents())
 				{
-					InputComponent* pawnInputComponent = dynamic_cast<InputComponent*>(actorComponent);
+					std::shared_ptr<InputComponent> pawnInputComponent = std::dynamic_pointer_cast<InputComponent>(actorComponent);
 					if (pawnInputComponent && pawnInputComponent != controlledPawn->mInputComponent)
 					{
 						inputStack.push(pawnInputComponent);
@@ -535,7 +534,7 @@ namespace Air
 				}
 			}
 		}
-		for (Level* level : getWorld()->getLevels())
+		for (const std::shared_ptr<Level>& level : getWorld()->getLevels())
 		{
 		}
 
@@ -546,7 +545,7 @@ namespace Air
 
 		for (int32 idx = 0; idx < mCurrentInputStack.size(); ++idx)
 		{
-			InputComponent* ic = mCurrentInputStack[idx];
+			std::shared_ptr<InputComponent> ic = mCurrentInputStack[idx];
 			if (ic)
 			{
 				inputStack.push(ic);

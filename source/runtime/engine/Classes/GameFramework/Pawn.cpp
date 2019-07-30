@@ -23,18 +23,18 @@ namespace Air
 
 	void APawn::possessedBy(AController* newController)
 	{
-		AController* const oldController = mController;
-		mController = newController;
+		std::shared_ptr<AController> const oldController = mController;
+		mController = std::dynamic_pointer_cast<AController>(newController->shared_from_this());
 		if (mController->mPlayerState != nullptr)
 		{
 			mPlayerState = mController->mPlayerState;
 		}
 
-		if (APlayerController* playerController = dynamic_cast<APlayerController*>(mController))
+		if (std::shared_ptr<APlayerController> playerController = std::dynamic_pointer_cast<APlayerController>(mController))
 		{
 
 		}
-		if (oldController != newController)
+		if (oldController.get() != newController)
 		{
 			
 		}
@@ -42,7 +42,7 @@ namespace Air
 
 	void APawn::unPossessed()
 	{
-		AController* const oldController = mController;
+		std::shared_ptr<AController> const oldController = mController;
 		mPlayerState = nullptr;
 		setOwner(nullptr);
 		mController = nullptr;
@@ -57,7 +57,7 @@ namespace Air
 	void APawn::pawnClientRestart()
 	{
 		restart();
-		APlayerController* pc = dynamic_cast<APlayerController*>(mController);
+		std::shared_ptr<APlayerController>& pc = std::dynamic_pointer_cast<APlayerController>(mController);
 		if (pc && pc->isLocalController())
 		{
 			if (pc->bAutoManagerActiveCameraTarget)
@@ -69,7 +69,7 @@ namespace Air
 				mInputComponent = createPlayerInputComponent();
 				if (mInputComponent)
 				{
-					setupPlayerInputComponent(mInputComponent);
+					setupPlayerInputComponent(mInputComponent.get());
 					mInputComponent->registerComponent();
 
 				}
@@ -88,7 +88,7 @@ namespace Air
 		mBaseEyeHeight = 0.0f;
 	}
 
-	InputComponent* APawn::createPlayerInputComponent()
+	std::shared_ptr<InputComponent> APawn::createPlayerInputComponent()
 	{
 		static const wstring inputComponentName(TEXT("PawnInputComponent0"));
 		return newObject<InputComponent>(this, inputComponentName);
@@ -118,7 +118,7 @@ namespace Air
 	{
 		if (val != 0.f && mController && mController->isLocalPlayerController())
 		{
-			APlayerController* const pc = dynamic_cast<APlayerController*>(mController);
+			std::shared_ptr<APlayerController> pc = std::dynamic_pointer_cast<APlayerController>(mController);
 			pc->addPitchInput(val);
 		}
 	}
@@ -127,7 +127,7 @@ namespace Air
 	{
 		if (val != 0.f && mController && mController->isLocalPlayerController())
 		{
-			APlayerController* const pc = dynamic_cast<APlayerController*>(mController);
+			std::shared_ptr<APlayerController> const pc = std::dynamic_pointer_cast<APlayerController>(mController);
 			pc->addYawInput(val);
 		}
 	}
@@ -136,7 +136,7 @@ namespace Air
 	{
 		if (val != 0.f && mController && mController->isLocalPlayerController())
 		{
-			APlayerController* const pc = dynamic_cast<APlayerController*>(mController);
+			std::shared_ptr<APlayerController> const pc = std::dynamic_pointer_cast<APlayerController>(mController);
 			pc->addRollInput(val);
 		}
 	}
@@ -174,7 +174,7 @@ namespace Air
 		{
 			for (ConstPlayerControllerIterator iterator = getWorld()->getPlayerControllerIterator(); iterator; ++iterator)
 			{
-				APlayerController* playerController = *iterator;
+				std::shared_ptr<APlayerController> playerController = *iterator;
 				if (playerController && playerController->mPlayerCameraManager->getViewTargetPawn() == this)
 				{
 					return playerController->mTargetViewRotation;

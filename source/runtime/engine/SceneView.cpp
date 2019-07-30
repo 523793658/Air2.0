@@ -387,4 +387,9 @@ namespace Air
 		}
 
 	}
+
+	EShaderPlatform SceneView::getShaderPlatform() const
+	{
+		return GShaderPlatformForFeatureLevel[getFeatureLevel()];
+	}
 }

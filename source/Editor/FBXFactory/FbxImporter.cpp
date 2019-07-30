@@ -10,6 +10,8 @@
 #include "StaticMeshResources.h"
 #include "Misc/FileHelper.h"
 
+using namespace fbxsdk;
+
 namespace AirFbx
 {
 	static const int32 LARGE_MESH_MATERIAL_INDEX_THRESHOLD = 64;
@@ -355,9 +357,9 @@ namespace AirFbx
 	{
 		if (getImportOptions()->bConvertScene)
 		{
-			FbxAxisSystem::ECoordSystem coordSystem = FbxAxisSystem::eLeftHanded;
+			FbxAxisSystem::ECoordSystem coordSystem = FbxAxisSystem::eRightHanded;
 			FbxAxisSystem::EUpVector upVector = FbxAxisSystem::eYAxis;
-			FbxAxisSystem::EFrontVector frontVector = (FbxAxisSystem::EFrontVector) - FbxAxisSystem::eParityOdd;
+			FbxAxisSystem::EFrontVector frontVector = FbxAxisSystem::eParityOdd;
 			FbxAxisSystem airImportAxis(upVector, frontVector, coordSystem);
 			FbxAxisSystem sourceSetup = mScene->GetGlobalSettings().GetAxisSystem();
 			if (sourceSetup != airImportAxis)
@@ -455,7 +457,7 @@ namespace AirFbx
 
 	}
 
-	RStaticMesh* AFbxImporter::importStaticMeshAsSingle(TArray<FbxNode *>& meshNodeArray, const wstring inName, EObjectFlags flags, FbxStaticMeshImportData* templateImportData, RStaticMesh* inStaticMesh, int LODIndex, void* existMeshDataPtr /* = nullptr */)
+	std::shared_ptr<RStaticMesh> AFbxImporter::importStaticMeshAsSingle(TArray<FbxNode *>& meshNodeArray, const wstring inName, EObjectFlags flags, FbxStaticMeshImportData* templateImportData, RStaticMesh* inStaticMesh, int LODIndex, void* existMeshDataPtr /* = nullptr */)
 	{
 		bool bBuildStatus = true;
 		if (meshNodeArray.size() == 0)
@@ -483,7 +485,7 @@ namespace AirFbx
 
 		checkSmoothingInfo(meshNodeArray[0]->GetMesh());
 
-		RStaticMesh* staticMesh = nullptr;
+		std::shared_ptr<RStaticMesh> staticMesh;
 		TMap<float3, Color> existingVertexColorData;
 
 		EVertexColorImportOption::Type vertexColorImportOption = mImportOptions->mVertexColorImportOption;
@@ -495,7 +497,7 @@ namespace AirFbx
 
 		if (inStaticMesh != nullptr)
 		{
-			staticMesh = inStaticMesh;
+			staticMesh = std::dynamic_pointer_cast<RStaticMesh>(inStaticMesh->shared_from_this());
 		}
 		else
 		{
@@ -557,7 +559,7 @@ namespace AirFbx
 			FbxNode* node = meshNodeArray[meshIndex];
 			if (node->GetMesh())
 			{
-				if (!buildStaticMeshFromGeometry(node, staticMesh, meshMaterials, LODIndex, newRawMesh, vertexColorImportOption, existingVertexColorData, mImportOptions->mVertexOverrideColor))
+				if (!buildStaticMeshFromGeometry(node, staticMesh.get(), meshMaterials, LODIndex, newRawMesh, vertexColorImportOption, existingVertexColorData, mImportOptions->mVertexOverrideColor))
 				{
 					bBuildStatus = false;
 					break;
@@ -777,7 +779,7 @@ namespace AirFbx
 				{
 				}
 			}
-			FbxStaticMeshImportData* importData = FbxStaticMeshImportData::getImportDataForStaticMesh(staticMesh, templateImportData);
+			FbxStaticMeshImportData* importData = FbxStaticMeshImportData::getImportDataForStaticMesh(staticMesh.get(), templateImportData);
 			
 		}
 
@@ -820,7 +822,7 @@ namespace AirFbx
 		}
 		if (materialCount == 0)
 		{
-			RMaterial* defaultMaterial = RMaterial::getDefaultMaterial(MD_Surface);
+			std::shared_ptr<RMaterial> defaultMaterial = RMaterial::getDefaultMaterial(MD_Surface);
 			BOOST_ASSERT(defaultMaterial);
 			FbxMaterial* newMaterial = new (meshMaterials)FbxMaterial;
 			newMaterial->mMaterial = defaultMaterial;
@@ -1158,7 +1160,7 @@ namespace AirFbx
 		float3 out;
 		out[0] = vec[0];
 		out[1] = vec[1];
-		out[2] = vec[2];
+		out[2] = -vec[2];
 		return out;
 	}
 
@@ -1167,7 +1169,7 @@ namespace AirFbx
 		float3 out;
 		out[0] = dir[0];
 		out[1] = dir[1];
-		out[2] = dir[2];
+		out[2] = -dir[2];
 		return out;
 	}
 
@@ -1428,7 +1430,7 @@ namespace AirFbx
 						meshInfo.name = makeString(geoNode ? geoNode->GetName() : "None");
 					}
 					meshInfo.bTriangulated = mesh->IsTriangleMesh();
-					meshInfo.mateiralNum = geoNode ? geoNode->GetMaterialCount() : 0;
+					meshInfo.materialNum = geoNode ? geoNode->GetMaterialCount() : 0;
 					meshInfo.faceNum = mesh->GetPolygonCount();
 					meshInfo.vertexNum = mesh->GetControlPointsCount();
 

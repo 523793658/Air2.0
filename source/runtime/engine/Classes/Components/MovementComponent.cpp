@@ -105,7 +105,7 @@ namespace Air
 
 	void MovementComponent::setUpdatedComponent(SceneComponent* newUpdatedComponent)
 	{
-		if (mUpdatedComponent && mUpdatedComponent != newUpdatedComponent)
+		if (mUpdatedComponent && mUpdatedComponent.get() != newUpdatedComponent)
 		{
 			if (!mUpdatedComponent->isPendingKill())
 			{
@@ -113,8 +113,8 @@ namespace Air
 			}
 			mUpdatedComponent->mPrimaryComponentTick.removePrerequisite(this, mPrimaryComponentTick);
 		}
-		mUpdatedComponent = isValid(newUpdatedComponent) ? newUpdatedComponent : nullptr;
-		mUpdatedPrimitive = dynamic_cast<PrimitiveComponent*>(mUpdatedComponent);
+		mUpdatedComponent = isValid(newUpdatedComponent) ? std::dynamic_pointer_cast<SceneComponent>(newUpdatedComponent->shared_from_this()) : std::shared_ptr<SceneComponent>();
+		mUpdatedPrimitive = std::dynamic_pointer_cast<PrimitiveComponent>(mUpdatedComponent);
 		if (mUpdatedComponent && !mUpdatedComponent->isPendingKill())
 		{
 			mUpdatedComponent->mPrimaryComponentTick.addPrerequisite(this, mPrimaryComponentTick);
@@ -124,12 +124,12 @@ namespace Air
 
 	void MovementComponent::onRegister()
 	{
-		mUpdatedPrimitive = dynamic_cast<PrimitiveComponent*>(mUpdatedComponent);
+		mUpdatedPrimitive = std::dynamic_pointer_cast<PrimitiveComponent>(mUpdatedComponent);
 		ParentType::onRegister();
 		const World* myWorld = getWorld();
 		if (myWorld && myWorld->isGameWorld())
 		{
-			SceneComponent* newUpdatedComponent = mUpdatedComponent;
+			SceneComponent* newUpdatedComponent = mUpdatedComponent.get();
 			if (!mUpdatedComponent && bAutoRegisterUpdatedComponent)
 			{
 				AActor* myActor = getOwner();

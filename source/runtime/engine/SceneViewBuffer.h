@@ -21,6 +21,9 @@ namespace Air
 #define VIEW_CONSTANT_BUFFER_MEMBER_EX(type, identifier, precision)	\
 	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(type, identifier, precision)
 
+#define VIEW_CONSTANT_BUFFER_MEMBER_ARRAY(type, identifier, dimension) \
+	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_ARRAY(type, identifier, dimension)
+
 #define VIEW_CONSTANT_BUFFER_MEMBER_TABLE	\
 	VIEW_CONSTANT_BUFFER_MEMBER(Matrix, TranslatedWorldToClip)\
 	VIEW_CONSTANT_BUFFER_MEMBER(Matrix, WorldToClip)	\
@@ -51,6 +54,8 @@ namespace Air
 	VIEW_CONSTANT_BUFFER_MEMBER(float4, ViewSizeAndInvSize)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float4, BufferSizeAndInvSize)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float4, SceneTextureMinMax)\
+	VIEW_CONSTANT_BUFFER_MEMBER(LinearColor, SkyLightColor)\
+	VIEW_CONSTANT_BUFFER_MEMBER_ARRAY(float4, SkyIrradianceEnvironmentMap, [7])\
 	VIEW_CONSTANT_BUFFER_MEMBER(uint32, Random)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float, RealTime)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float, GameTime)\

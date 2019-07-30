@@ -1,3 +1,4 @@
+#include "LightAccumulator.hlsl"
 #include "Common.hlsl"
 #define SHADINGMODELID_UNLIT				0
 #define SHADINGMODELID_DEFAULT_LIT			1
@@ -193,5 +194,10 @@ ScreenSpaceData getScreenSpaceData(float2 uv, bool bGetNormalizedNormal = true)
 	o.AmbientOcclusion = 1;
 	o.DirectionalOcclusion = 1;
 	return o;
+}
+
+uint getShadingModelId(float2 uv)
+{
+	return decodeShadingModelId(Texture2DSampleLevel(GBuffers.GBufferBTexture, GBuffers.GBufferBTextureSampler, uv, 0).a);
 }
 	

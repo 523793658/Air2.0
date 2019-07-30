@@ -8,6 +8,9 @@ namespace Air
 	struct RenderingCompositePass;
 	struct RenderingCompositeOutputRef;
 	struct RenderingCompositeOutput;
+	struct PooledRenderTargetDesc;
+	struct IPooledRenderTarget;
+	class SceneRenderTargetItem;
 	class RenderingCompositionGraph
 	{
 	public:

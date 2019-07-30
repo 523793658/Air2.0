@@ -9,7 +9,9 @@
 #include "Classes/Materials/MaterialExpressionFunctionOutput.h"
 #include "Materials/MaterialConstantExpressions.h"
 #include "Classes/Materials/MaterialParameterCollection.h"
+
 #include "Class.h"
+#include "Texture.h"
 
 namespace Air
 {
@@ -136,6 +138,8 @@ namespace Air
 			, mPlatform(inPlatform)
 			, mQualityLevel(inQualityLevel)
 			, mFeatureLevel(inFeatureLevel)
+			, mNumUserTexCoords(0)
+			, mNumUserVertexTexCoords(0)
 		{
 			Memory::memzero(mSharedPixelProperties);
 			mSharedPixelProperties[MP_Normal] = true;
@@ -512,6 +516,17 @@ printf_b(formattedCode, TEXT("Material.VectorExpressions[%u]%s"), vectorInputInd
 
 		}
 
+		int32 errorUnlessFeatureLevelSupported(ERHIFeatureLevel::Type requiredFeatureLevel)
+		{
+			if (mFeatureLevel < requiredFeatureLevel)
+			{
+				wstring featureLevelName;
+				getFeatureLevelName(mFeatureLevel, featureLevelName);
+				return errorf(TEXT("Node not supported in feature level %s"), featureLevelName.c_str());
+			}
+			return 0;
+		}
+
 
 		int32 addConstantExpression(MaterialConstantExpression* constantExpression, EMaterialValueType type, const TCHAR* format, ...)
 		{
@@ -629,7 +644,7 @@ printf_b(formattedCode, TEXT("Material.VectorExpressions[%u]%s"), vectorInputInd
 						AIR_LOG(LogMaterial, Fatal, TEXT("should never get here!"));
 						return INDEX_NONE;
 					}
-					return addInlinedCodeChunk(destType, TEXT("%s%s"), getParameterCode(code), mask);
+					return addInlinedCodeChunk(destType, TEXT("%s%s"), getParameterCode(code).c_str(), mask);
 				}
 				else if (numSourceComponents < numDestComponents)
 				{
@@ -642,7 +657,7 @@ printf_b(formattedCode, TEXT("Material.VectorExpressions[%u]%s"), vectorInputInd
 					return addInlinedCodeChunk(destType,
 						TEXT("%s(%s%s%s%s)"),
 						HLSLTypeString(destType),
-						getParameterCode(code),
+						getParameterCode(code).c_str(),
 						numPadComponents >= 1 ? (bReplicateValue ? commaParameterColdeString.c_str() : TEXT(",0")) : TEXT(""),
 						numPadComponents >= 2 ? (bReplicateValue ? commaParameterColdeString.c_str() : TEXT(",0")) : TEXT(""),
 						numPadComponents >= 3 ? (bReplicateValue ? commaParameterColdeString.c_str() : TEXT(",0")) : TEXT(""));
@@ -1107,40 +1122,212 @@ printf_b(formattedCode, TEXT("Material.VectorExpressions[%u]%s"), vectorInputInd
 			if (coordinateIndex >= maxNumCoordinates)
 			{
 				return errorf(TEXT("Only %u texture coordinate sets can be used by this feature level, currently using %u"), maxNumCoordinates, coordinateIndex + 1);
-				if (mShaderFrequency == SF_Vertex)
-				{
-					mNumUserVertexTexCoords = Math::max(coordinateIndex + 1, mNumUserVertexTexCoords);
-
-				}
-				else
-				{
-					mNumUserTexCoords = Math::max(coordinateIndex + 1, mNumUserTexCoords);
-				}
-				wstring sampleCode;
-				if (unMirrorU && unMirrorV)
-				{
-					sampleCode = TEXT("UnMirrorUV(Parameters.TexCoords[%u].xy, Parameters)");
-				}
-				else if (unMirrorU)
-				{
-					sampleCode = TEXT("UnMirrorU(Parameters.TexCoords[%u].xy, Parameters)");
-				}
-				else if (unMirrorV)
-				{
-					sampleCode = TEXT("UnMirrorV(Parameters.TexCoords[%u].xy, Parameters)");
-				}
-				else
-				{
-					sampleCode = TEXT("Parameters.TexCoords[%u].xy");
-				}
-				return addInlinedCodeChunk(MCT_Float2, sampleCode.c_str(), coordinateIndex);
 			}
+			if (mShaderFrequency == SF_Vertex)
+			{
+				mNumUserVertexTexCoords = Math::max(coordinateIndex + 1, mNumUserVertexTexCoords);
+
+			}
+			else
+			{
+				mNumUserTexCoords = Math::max(coordinateIndex + 1, mNumUserTexCoords);
+			}
+			wstring sampleCode;
+			if (unMirrorU && unMirrorV)
+			{
+				sampleCode = TEXT("UnMirrorUV(parameters.TexCoords[%u].xy, parameters)");
+			}
+			else if (unMirrorU)
+			{
+				sampleCode = TEXT("UnMirrorU(parameters.TexCoords[%u].xy, parameters)");
+			}
+			else if (unMirrorV)
+			{
+				sampleCode = TEXT("UnMirrorV(parameters.TexCoords[%u].xy, parameters)");
+			}
+			else
+			{
+				sampleCode = TEXT("parameters.TexCoords[%u].xy");
+			}
+			return addInlinedCodeChunk(MCT_Float2, sampleCode.c_str(), coordinateIndex);
 		}
 
 		virtual int32 scalarParameter(wstring parameterName, float defaultValue)
 		{
 			return addConstantExpression(new MaterialConstantExpressionScalarParameter(parameterName, defaultValue), MCT_Float, TEXT(""));
 		}
+
+		virtual int32 textureSample(int32 textureIndex, int32 coordinateIndex, enum EMaterialSamplerType samplerType, int32 mipValue0Index  = INDEX_NONE, int32 mipValue1Index = INDEX_NONE, ETextureMipValueMode mipValueMode = TMVM_None, ESamplerSourceMode samplerSource = SSM_FromTextureAsset, int32 textureReferenceIndex = INDEX_NONE) override
+		{
+			if (textureIndex == INDEX_NONE || coordinateIndex == INDEX_NONE)
+			{
+				return INDEX_NONE;
+			}
+
+			if (mFeatureLevel == ERHIFeatureLevel::ES2 && mShaderFrequency == SF_Vertex)
+			{
+				if (mipValueMode != TMVM_MipLevel)
+				{
+					errorf(TEXT("Sampling from vertex textures requires an absolute mip level on feature level es2!"));
+					return INDEX_NONE;
+				}
+			}
+			else if (mShaderFrequency != SF_Pixel && errorUnlessFeatureLevelSupported(ERHIFeatureLevel::ES3_1) == INDEX_NONE)
+			{
+				return INDEX_NONE;
+			}
+
+			EMaterialValueType textureType = getParameterType(textureIndex);
+
+			if (textureType != MCT_Texture2D && textureType != MCT_TextureCube)
+			{
+				errorf(TEXT("Sampling unknown texture type: %s"), describeType(textureType));
+				return INDEX_NONE;
+			}
+			if (mShaderFrequency != SF_Pixel && mipValueMode == TMVM_MipBias)
+			{
+				errorf(TEXT("MipBias is only supported in the pixel shader"));
+				return INDEX_NONE;
+			}
+
+			wstring mipValue0Code = TEXT("0.0f");
+			wstring mipValue1Code = TEXT("0.0f");
+
+			if (mipValue0Index != INDEX_NONE && (mipValueMode == TMVM_MipBias || mipValueMode == TMVM_MipLevel))
+			{
+				mipValue0Code = coerceParameter(mipValue0Index, MCT_Float1);
+			}
+			if (mShaderFrequency != SF_Pixel)
+			{
+				mipValueMode = TMVM_MipLevel;
+			}
+
+			wstring samplerStateCode;
+			if (samplerSource == SSM_FromTextureAsset)
+			{
+				samplerStateCode = TEXT("%sSampler");
+			}
+			else if (samplerSource == SSM_Wrap_WorldGroupSettings)
+			{
+				samplerStateCode = TEXT("GetMaterialSharedSampler(%sSampler, Material.Wrap_WroldGroupSettings)");
+			}
+			else if (samplerSource == SSM_Clamp_WorldGroupSettings)
+			{
+				samplerStateCode = TEXT("GetMaterialSharedSampler(%sSampler, Material.Clamp_WorldGroupSettings)");
+			}
+
+			wstring sampleCode = (textureType == MCT_TextureCube)
+				? TEXT("TextureCubeSample") : TEXT("Texture2DSample");
+
+			EMaterialValueType uvsType = (textureType == MCT_TextureCube) ? MCT_Float3 : MCT_Float2;
+
+			if (mipValueMode == TMVM_None)
+			{
+				sampleCode += wstring(TEXT("(%s,")) + samplerStateCode + TEXT(", %s)");
+			}
+			else if (mipValueMode == TMVM_MipLevel)
+			{
+				if (errorUnlessFeatureLevelSupported(ERHIFeatureLevel::ES3_1) == INDEX_NONE)
+				{
+					errorf(TEXT("Sampling for a specific mip-level is not supported for es2"));
+					return INDEX_NONE;
+				}
+				sampleCode += TEXT("Level(%s, %sSampler, %s, %s)");
+			}
+			else if (mipValueMode == TMVM_MipBias)
+			{
+				sampleCode += TEXT("Bias(%s, %sSampler, %s, %s)");
+			}
+			else if (mipValueMode == TMVM_Derivative)
+			{
+				if (mipValue0Index == INDEX_NONE)
+				{
+					return errorf(TEXT("Missing DDX(UVs) parameter"));
+				}
+				else if (mipValue1Index == INDEX_NONE)
+				{
+					return errorf(TEXT("Missing DDY(UVs) parameter"));
+				}
+				sampleCode += TEXT("Grad(%s, %sSampler, %s, %s, %s)");
+
+				mipValue0Code = coerceParameter(mipValue0Index, uvsType);
+				mipValue1Code = coerceParameter(mipValue1Index, uvsType);
+			}
+			else
+			{
+				BOOST_ASSERT(false);
+			}
+
+			switch (samplerType)
+			{
+			case Air::SamplerType_Color:
+				sampleCode = printf(TEXT("processMaterialColorTextureLookup(%s)"), sampleCode.c_str());
+				break;
+
+			case Air::SamplerType_Grayscale:
+				sampleCode = printf(TEXT("processMaterialLinearGreyscaleTextureLookup((%s).r).rrrr"), sampleCode.c_str());
+				break;
+			case Air::SamplerType_Normal:
+				sampleCode = printf(TEXT("unpackNormalMap(%s)"), sampleCode.c_str());
+				break;
+			case Air::SamplerType_Masks:
+				break;
+			case Air::SamplerType_DistanceFieldFont:
+			case Air::SamplerType_Alpha:
+				sampleCode = printf(TEXT("(%s).rrrr"), sampleCode.c_str());
+				break;
+			case Air::SamplerType_LinearColor:
+				sampleCode = printf(TEXT("processMaterialLinearColorTextureLookup(%s)"), sampleCode.c_str());
+				break;
+			case Air::SamplerType_LinearGrayscale:
+				sampleCode = printf(TEXT("processMaterialLinearGreyscaleTextureLookup((%s).r).rrrr"), sampleCode.c_str());
+				break;
+			}
+
+			wstring textureName = (textureType == MCT_TextureCube) ? coerceParameter(textureIndex, MCT_TextureCube) : coerceParameter(textureIndex, MCT_Texture2D);
+
+			wstring uvs = coerceParameter(coordinateIndex, uvsType);
+
+			int32 samplingCodeIndex = addCodeChunk(MCT_Float4, sampleCode.c_str(), textureName.c_str(), textureName.c_str(), uvs.c_str(), mipValue0Code.c_str(), mipValue1Code.c_str());
+
+			return samplingCodeIndex;
+		}
+
+		virtual int32 textureParameter(wstring parameterName, std::shared_ptr<RTexture> defaultValue, int32& textureReferenceIndex, ESamplerSourceMode samplerSource = SSM_FromTextureAsset)
+		{
+			if (mShaderFrequency != SF_Pixel && errorUnlessFeatureLevelSupported(ERHIFeatureLevel::SM4) == INDEX_NONE)
+			{
+				return INDEX_NONE;
+			}
+
+			EMaterialValueType shaderType = defaultValue->getMaterialType();
+			textureReferenceIndex = mMaterial->getReferencedTextures().find(defaultValue);
+			BOOST_ASSERT(textureReferenceIndex != INDEX_NONE);
+			return addConstantExpression(new MaterialConstantExpressionTextureParameter(parameterName, textureReferenceIndex, samplerSource), shaderType, TEXT(""));
+		}
+
+		virtual int32 texture(std::shared_ptr<RTexture> inTexture, int32& textureReferenceIndex, ESamplerSourceMode samplerSource = SSM_FromTextureAsset, ETextureMipValueMode mipValueMode = TMVM_None) override
+		{
+			if (mFeatureLevel == ERHIFeatureLevel::ES2 && mShaderFrequency == SF_Vertex)
+			{
+				if (mipValueMode != TMVM_MipLevel)
+				{
+					errorf(TEXT("Sampling from vertex textures requires an absolute mip level on feature level es2"));
+					return INDEX_NONE;
+				}
+			}
+			else if (mShaderFrequency != SF_Pixel && errorUnlessFeatureLevelSupported(ERHIFeatureLevel::ES3_1) == INDEX_NONE)
+			{
+				return INDEX_NONE;
+			}
+
+			EMaterialValueType shaderType = inTexture->getMaterialType();
+			textureReferenceIndex = mMaterial->getReferencedTextures().find(inTexture);
+			BOOST_ASSERT(textureReferenceIndex != INDEX_NONE);
+			return addConstantExpression(new MaterialConstantExpressionTexture(textureReferenceIndex, samplerSource), shaderType, TEXT(""));
+		}
+
 		wstring getMaterialShaderCode();
 	};
+
 }

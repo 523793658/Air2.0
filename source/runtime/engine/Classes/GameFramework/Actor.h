@@ -33,7 +33,7 @@ namespace Air
 
 		bool destroy(bool bNetForce = false, bool bShouldModifyLevel = true);
 
-		void addOwnedComponent(ActorComponent* component);
+		void addOwnedComponent(std::shared_ptr<ActorComponent> component);
 
 		template<typename ComponentType>
 		ComponentType* addComponent()
@@ -46,9 +46,9 @@ namespace Air
 		FORCEINLINE bool canEverTick() const { return mPrimaryActorTick.bCanEverTick; }
 
 
-		FORCEINLINE SceneComponent* getRootComponent() const { return mRootComponent; }
+		FORCEINLINE SceneComponent* getRootComponent() const { return mRootComponent.get(); }
 
-		void postSpawnInitialize(Transform const& userSpawnTransform, AActor* inOwner);
+		void postSpawnInitialize(Transform const& userSpawnTransform, std::shared_ptr<AActor> inOwner);
 
 		template<class T, class AllocatorType>
 		void getComponents(TArray<T*, AllocatorType>& outComponents, bool bIncludeFromChildActors = false) const
@@ -56,17 +56,17 @@ namespace Air
 			static_assert(TPointerIsConvertibleFromTo<T, const ActorComponent>::Value, "'T' template parameter to getComponents must be derived from ActorComponent");
 			outComponents.reset(mOwnedComponents.size());
 			TArray<ChildActorComponent*> childActorComponents;
-			for (ActorComponent* ownedComponent : mOwnedComponents)
+			for (const std::shared_ptr<ActorComponent>& ownedComponent : mOwnedComponents)
 			{
-				if (T* component = dynamic_cast<T*>(ownedComponent))
+				if (std::shared_ptr<T> component = std::dynamic_pointer_cast<T>(ownedComponent))
 				{
-					outComponents.add(component);
+					outComponents.add(component.get());
 				}
 				else if (bIncludeFromChildActors)
 				{
-					if (ChildActorComponent* childActorComponent = dynamic_cast<ChildActorComponent*>(ownedComponent))
+					if (std::shared_ptr<ChildActorComponent> childActorComponent = std::dynamic_pointer_cast<ChildActorComponent>(ownedComponent))
 					{
-						childActorComponents.add(childActorComponent);
+						childActorComponents.add(childActorComponent.get());
 					}
 				}
 			}
@@ -90,15 +90,15 @@ namespace Air
 		{
 			outComponents.reset(mOwnedComponents.size());
 			TArray<ChildActorComponent*> childActorComponents;
-			for (ActorComponent* component : mOwnedComponents)
+			for (const std::shared_ptr<ActorComponent>& component : mOwnedComponents)
 			{
 				if (component)
 				{
-					outComponents.add(component);
+					outComponents.add(component.get());
 				}
 				else if (bIncludeFromChildActors)
 				{
-					if (ChildActorComponent* childActorComponent = dynamic_cast<ChildActorComponent*>(component))
+					if (ChildActorComponent* childActorComponent = dynamic_cast<ChildActorComponent*>(component.get()))
 					{
 						childActorComponents.add(childActorComponent);
 					}
@@ -118,7 +118,7 @@ namespace Air
 			}
 		}
 
-		const TSet<ActorComponent*>& getComponents() const
+		const TSet<std::shared_ptr<ActorComponent>>& getComponents() const
 		{
 			return mOwnedComponents;
 		}
@@ -131,7 +131,7 @@ namespace Air
 		
 		virtual void registerAllComponents();
 
-		virtual void setOwner(AActor* newOwner);
+		virtual void setOwner(std::shared_ptr<AActor> newOwner);
 
 		virtual void postActorCreated();
 
@@ -166,11 +166,11 @@ namespace Air
 
 		void updateReplicatedComponent(ActorComponent* component);
 
-		inline bool isOwnedBy(const AActor* testOwner) const
+		inline bool isOwnedBy(std::shared_ptr<const AActor> testOwner) const
 		{
-			for (const AActor* arg = this; arg; arg = arg->mOwner)
+			for (const AActor* arg = this; arg; arg = arg->mOwner.get())
 			{
-				if (arg == testOwner)
+				if (arg == testOwner.get())
 				{
 					return true;
 				}
@@ -213,9 +213,9 @@ namespace Air
 
 		virtual void enableInput(class APlayerController* playerController);
 
-		virtual void endViewTarget(class APlayerController* pc);
+		virtual void endViewTarget(std::shared_ptr<class APlayerController> pc);
 
-		virtual void becomeViewTarget(class APlayerController* pc);
+		virtual void becomeViewTarget(std::shared_ptr<class APlayerController> pc);
 		void setActorTickEnabled(bool bEnabled);
 
 		FORCEINLINE_DEBUGGABLE bool hasAuthority() const
@@ -237,7 +237,7 @@ namespace Air
 
 		void detachRootComponentFromParent(bool bMaintainWorldPosition = true);
 
-		FORCEINLINE_DEBUGGABLE AActor* getOwner() const
+		FORCEINLINE_DEBUGGABLE std::shared_ptr<AActor> getOwner() const
 		{
 			return mOwner;
 		}
@@ -254,7 +254,7 @@ namespace Air
 		T* findComponentByClass() const
 		{
 			static_assert(std::is_base_of<ActorComponent, T>::value, "T is not derived from ActorComponent.");
-			return (T*)findComponentByClass(T::StaticClass());
+			return dynamic_cast<T*>(findComponentByClass(T::StaticClass()));
 		}
 
 		bool isChildActor() const;
@@ -284,13 +284,13 @@ namespace Air
 		void postActorConstruction();
 
 		template<class T>
-		static FORCEINLINE float3 templateGetActorLocation(const T* rootComponent)
+		static FORCEINLINE float3 templateGetActorLocation(const std::shared_ptr<T> rootComponent)
 		{
 			return (rootComponent != nullptr) ? rootComponent->getComponentLocation() : float3::Zero;
 		}
 
 		template<class T>
-		static FORCEINLINE Rotator templateGetActorRotation(const T* rootComponent)
+		static FORCEINLINE Rotator templateGetActorRotation(const std::shared_ptr<T> rootComponent)
 		{
 			return (rootComponent != nullptr) ? rootComponent->getComponentRotation() : Rotator::ZeroRotator;
 		}
@@ -312,7 +312,7 @@ namespace Air
 
 		EActorBeginPlayState mActorHasBegunPlay : 2;
 	private:
-		TSet<ActorComponent*> mOwnedComponents;
+		TSet<std::shared_ptr<ActorComponent>> mOwnedComponents;
 
 		TSet<ActorComponent*> mReplicatedComponents;
 
@@ -330,15 +330,15 @@ namespace Air
 
 		struct RepAttachment mAttachmentReplication;
 
-		AActor* mOwner;
+		std::shared_ptr<AActor> mOwner;
 	protected:
-		SceneComponent* mRootComponent;
+		std::shared_ptr<SceneComponent> mRootComponent;
 
-		class InputComponent* mInputComponent;
+		std::shared_ptr<class InputComponent> mInputComponent;
 		float mCreationTime;
 
 	public:
-		Level* mLevel;
+		std::shared_ptr<Level> mLevel;
 		TEnumAsByte<enum ENetRole> mRole;
 
 		TEnumAsByte<EAutoReceiveInput::Type> mAutoReceiveInput;
@@ -355,7 +355,7 @@ namespace Air
 
 		int32 mInputPriority;
 
-		TArray<AActor*> mChildren;
+		TArray<std::shared_ptr<AActor>> mChildren;
 	};
 
 	template<typename ExecuteTickLambda>

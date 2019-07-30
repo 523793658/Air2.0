@@ -1,7 +1,7 @@
 #include "Classes/Engine/WorldContext.h"
 namespace Air
 {
-	void WorldContext::setCurrentWorld(World* inWorld)
+	void WorldContext::setCurrentWorld(std::shared_ptr<World>& inWorld)
 	{
 		if (inWorld != nullptr)
 		{
@@ -12,9 +12,9 @@ namespace Air
 		{
 			if (mExternalReferences[index] && *mExternalReferences[index] == mThisCurrentWorld)
 			{
-				*mExternalReferences[index] = inWorld;
+				*mExternalReferences[index] = inWorld.get();
 			}
 		}
-		mThisCurrentWorld = inWorld;
+		mThisCurrentWorld = inWorld.get();
 	}
 }

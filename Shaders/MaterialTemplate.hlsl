@@ -21,11 +21,20 @@ struct PixelMaterialInputs
 %s
 };
 
+MaterialFloat4 processMaterialLinearColorTextureLookup(MaterialFloat4 textureValue)
+{
+    return textureValue;
+}
+
 %s
 
 
 struct MaterialPixelParameters
 {
+#if NUM_MATERIAL_TEXCOORDS
+    float2 TexCoords[NUM_MATERIAL_TEXCOORDS];
+#endif
+
 	half4 VertexColor;
 	half3 WorldNormal;
 	half3 ReflectionVector;
@@ -40,6 +49,10 @@ struct MaterialVertexParameters
 	float3 WorldPosition;
 	half3x3 TangentToWorld;
 	half4 VertexColor;
+
+#if NUM_MATERIAL_TEXCOORDS_VERTEX
+	float2 TexCoords[NUM_MATERIAL_TEXCOORDS_VERTEX];
+#endif
 };
 
 half getMaterialOpacityClipValue()
@@ -56,10 +69,10 @@ MaterialFloat3 reflectionAboutCustomWorldNormal(MaterialPixelParameters paramete
 	return -parameters.CameraVector + worldNormal * dot(worldNormal, parameters.CameraVector) * 2.0;
 }
 
-half3x3 assembleTangentToWorld(half3 tangentToWorld0, half4 tangentToWorld2)
+half3x3 assembleTangentToWorld(half3 tangentToWorld0, half4 tangentToWorld1)
 {
-	half3 tangentToWorld1 = cross(tangentToWorld2.xyz, tangentToWorld0) * tangentToWorld2.w;
-	return half3x3(tangentToWorld0, tangentToWorld1, tangentToWorld2.xyz);
+	half3 tangentToWorld2 = cross(tangentToWorld0, tangentToWorld1.xyz) * tangentToWorld1.w;
+	return half3x3(tangentToWorld0, tangentToWorld2, tangentToWorld1.xyz);
 }
 
 half3 getMaterialNormalRaw(PixelMaterialInputs pixelMaterialInputs)
@@ -79,6 +92,14 @@ float3 transformTangentNormalToWorld(in MaterialPixelParameters parameters, floa
 {
 	return normalize(float3(transformTangentVectorToWorld(parameters.TangentToWorld, tangentNormal)));
 }
+
+
+#if NUM_MATERIAL_TEXCOORDS
+void getMaterialCustomizedUVs(MaterialVertexParameters parameters, out float2 outTexCoords[NUM_MATERIAL_TEXCOORDS])
+{
+%s
+}
+#endif
 
 void calcPixelMaterialInputs(in out MaterialPixelParameters parameters, in out PixelMaterialInputs pixelMaterialInputs)
 {
@@ -158,7 +179,7 @@ MaterialPixelParameters makeInitializedMaterialPixelParameters()
 {
 	MaterialPixelParameters MPP;
 	MPP = (MaterialPixelParameters)0;
-	MPP.TangentToWorld = float3x3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+	MPP.TangentToWorld = float3x3(1, 0, 0, 0, 0, 1, 0, 1, 0);
 	return MPP;
 }
 

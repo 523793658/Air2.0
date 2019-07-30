@@ -12,6 +12,7 @@
 #include "ShaderParameters.h"
 #include "DebugViewModeHelpers.h"
 #include "SceneViewBuffer.h"
+#include "FinalPostProcessSettings.h"
 #include <set>
 namespace Air
 {
@@ -116,7 +117,7 @@ namespace Air
 		const SceneViewFamily* mViewFamily;
 		SceneViewStateInterface* mSceneViewStateInterface;
 
-		const AActor* mViewActor;
+		std::shared_ptr<AActor> mViewActor;
 		ViewElementDrawer* mViewElementDrawer;
 
 		LinearColor mBackgroundColor;
@@ -316,7 +317,7 @@ namespace Air
 
 		inline bool isPerspectiveProjection() const { return mViewMatrices.isPerspectiveProjection(); }
 
-		
+		EShaderPlatform getShaderPlatform() const;
 	public:
 
 		const SceneViewFamily* mFamily;
@@ -340,7 +341,7 @@ namespace Air
 
 		ViewElementDrawer* mDrawer;
 
-		const AActor* mViewActor;
+		std::shared_ptr<AActor> mViewActor;
 
 		IntRect mViewRect;
 
@@ -364,6 +365,7 @@ namespace Air
 
 		EStereoscopicPass mStereoPass;
 		EAntiAliasingMethod mAntiAliasingMethod;
+		FinalPostProcessSettings mFinalPostProcessSettings;
 
 		bool bRenderFirstInstanceOnly{ false };
 

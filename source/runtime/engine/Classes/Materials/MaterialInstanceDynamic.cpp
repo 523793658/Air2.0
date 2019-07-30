@@ -6,19 +6,19 @@ namespace Air
 		:ParentType(objectInitializer)
 	{}
 
-	RMaterialInstanceDynamic* RMaterialInstanceDynamic::create(class MaterialInterface* parentMaterial, class Object* inOuter, wstring name)
+	std::shared_ptr<RMaterialInstanceDynamic> RMaterialInstanceDynamic::create(std::shared_ptr<class MaterialInterface>& parentMaterial, class Object* inOuter, wstring name)
 	{
 		Object* outer = inOuter ? inOuter : nullptr;
-		RMaterialInstanceDynamic* mid = newObject<RMaterialInstanceDynamic>(outer, name);
+		std::shared_ptr<RMaterialInstanceDynamic> mid = newObject<RMaterialInstanceDynamic>(outer, name);
 		mid->setParentInternal(parentMaterial, false);
 		return mid;
 	}
 
 
-	RMaterialInstanceDynamic* RMaterialInstanceDynamic::create(class MaterialInterface* parentMaterial, class Object* inOuter)
+	std::shared_ptr<RMaterialInstanceDynamic> RMaterialInstanceDynamic::create(std::shared_ptr<class MaterialInterface>& parentMaterial, class Object* inOuter)
 	{
 		Object* outer = inOuter ? inOuter : nullptr;
-		RMaterialInstanceDynamic* mid = newObject<RMaterialInstanceDynamic>(outer);
+		std::shared_ptr<RMaterialInstanceDynamic> mid = newObject<RMaterialInstanceDynamic>(outer);
 		mid->setParentInternal(parentMaterial, false);
 		return mid;
 	}

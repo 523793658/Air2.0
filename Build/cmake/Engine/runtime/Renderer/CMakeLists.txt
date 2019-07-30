@@ -13,7 +13,11 @@ SET(SOURCE_FILE
     ${Renderer_SOURCE_DIR}/sceneRendering.cpp 
     ${Renderer_SOURCE_DIR}/DeferredShadingRenderer.h 
     ${Renderer_SOURCE_DIR}/DeferredShadingRenderer.cpp 
+    ${Renderer_SOURCE_DIR}/DistanceFieldSurfaceCacheLighting.h 
+    ${Renderer_SOURCE_DIR}/DistanceFieldSurfaceCacheLighting.cpp 
     ${Renderer_SOURCE_DIR}/BasePassRendering.h 
+    ${Renderer_SOURCE_DIR}/GlobalDistanceField.h 
+    ${Renderer_SOURCE_DIR}/GlobalDistanceField.cpp 
     ${Renderer_SOURCE_DIR}/BasePassRendering.cpp 
     ${Renderer_SOURCE_DIR}/RendererScene.cpp 
     ${Renderer_SOURCE_DIR}/ScenePrivate.h 
@@ -74,9 +78,18 @@ SET(PostProcess_Source
     )
 SOURCE_GROUP(PostProcess FILES ${PostProcess_Source})
 
+SET(CompositionLighting_Source
+	${Renderer_SOURCE_DIR}/CompositionLighting/CompositionLighting.h
+	${Renderer_SOURCE_DIR}/CompositionLighting/CompositionLighting.cpp
+	${Renderer_SOURCE_DIR}/CompositionLighting/PostProcessAmbient.h
+	${Renderer_SOURCE_DIR}/CompositionLighting/PostProcessAmbient.cpp
+)
+SOURCE_GROUP(CompositionLighting, FILES ${CompositionLighting_Source})
+
 ADD_LIBRARY(${LIB_NAME} ${AIR_PREFERRED_LIB_TYPE} 
     ${SOURCE_FILE}
     ${PostProcess_Source}
+    ${CompositionLighting_Source}
 )
 SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES FOLDER Engine/Runtime)
 

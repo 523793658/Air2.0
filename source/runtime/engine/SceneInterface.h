@@ -2,12 +2,16 @@
 #include "EngineMininal.h"
 #include "RHI.h"
 #include "Classes/Components/PrimitiveComponent.h"
+#include "Math/SHMath.h"
 namespace Air
 {
 	class FMaterial;
 	class MaterialShaderMap;
 	class LightComponent;
-
+	class SkyLightSceneProxy;
+	class SkyLightComponent;
+	class RTextureCube;
+	class Texture;
 	enum EBasePassDrawListType
 	{
 		EBasePass_Default = 0,
@@ -40,6 +44,12 @@ namespace Air
 
 		virtual void addLight(LightComponent* light) = 0;
 
+		virtual void setSkyLight(SkyLightSceneProxy* light) = 0;
+
+		virtual void disableSkyLight(SkyLightSceneProxy* light) = 0;
+
+		virtual void updateSkyCaptureContents(std::shared_ptr<const SkyLightComponent> captureComponent, bool bCaptureEmissiveOnly, std::shared_ptr<RTextureCube> sourceCubemap, Texture* outProcessedTexture, float& outAverageBrightness, SHVectorRGB3& outIrradianceEnvironmentMap) {}
+
 		virtual void setShaderMapsOnMaterialResources(const TMap<FMaterial*, MaterialShaderMap*>& materialsToUpdate) {}
 
 		static EShadingPath getShadingPath(ERHIFeatureLevel::Type inFeatureLevel)
@@ -65,5 +75,6 @@ namespace Air
 
 		virtual void updateParameterCollections(const TArray<class MaterialParameterCollectionInstanceResource*>& inParameterCollections) {}
 
+		EShaderPlatform getShaderPlatform() const { return GShaderPlatformForFeatureLevel[getFeatureLevel()]; }
 	};
 }

@@ -34,7 +34,7 @@ namespace Air
 
 	PawnMovementComponent* ADefaultPawn::getMovementComponent() const
 	{
-		return mMovementComponent;
+		return mMovementComponent.get();
 	}
 
 	void ADefaultPawn::lookUp(float val)

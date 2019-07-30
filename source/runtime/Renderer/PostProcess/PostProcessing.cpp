@@ -108,4 +108,6 @@ namespace Air
 	{
 		return view.mFamily->mEngineShowFlags.PostProcessing && featureLevel >= ERHIFeatureLevel::SM4;
 	}
+
+	IMPLEMENT_SHADER_TYPE(, PostProcessVS, TEXT("PostProcessBloom"), TEXT("MainPostprocessCommonVS"), SF_Vertex);
 }

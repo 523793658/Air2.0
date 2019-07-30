@@ -1,6 +1,5 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "sceneRendering.h"
 #include "PostProcess/RenderingCompositionGraph.h"
 namespace Air
 {
@@ -15,6 +14,34 @@ namespace Air
 		RenderingCompositePass* mSceneColor;
 		RenderingCompositePass* mSceneDepth;
 		RenderingCompositeOutputRef mFinalOutput;
+	};
+
+	class PostProcessVS : public GlobalShader
+	{
+		DECLARE_SHADER_TYPE(PostProcessVS, Global);
+
+		static bool shouldCache(EShaderPlatform platform)
+		{
+			return true;
+		}
+
+		PostProcessVS() {}
+
+		void setParameters(RenderingCompositePassContext& context)
+		{
+			GlobalShader::setParameters(context.mRHICmdList, getVertexShader(), context.mView);
+		}
+
+		void setParameters(RHICommandList& RHICmdList, const SceneView& view)
+		{
+			GlobalShader::setParameters(RHICmdList, getVertexShader(), view);
+		}
+	public:
+		PostProcessVS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+			:GlobalShader(initializer)
+		{
+
+		}
 	};
 
 	class PostProcessing

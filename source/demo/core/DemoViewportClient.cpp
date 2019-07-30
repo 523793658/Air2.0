@@ -45,12 +45,12 @@ namespace Air
 		mGameInstance = owningGameInstance;
 	}
 
-	LocalPlayer* DemoViewportClient::setupInitialLocalPlayer(wstring& outError)
+	std::shared_ptr<LocalPlayer> DemoViewportClient::setupInitialLocalPlayer(wstring& outError)
 	{
-		GameInstance* viewportGameInstance = GEngine->getWorldContextFromViewportChecked(this).mOwningGameInstance;
+		GameInstance* viewportGameInstance = GEngine->getWorldContextFromViewportChecked(this).mOwningGameInstance.get();
 		if (viewportGameInstance == nullptr)
 		{
-			return nullptr;
+			return std::shared_ptr<LocalPlayer>();
 		}
 		return viewportGameInstance->createInitialPlayer(outError);
 	}
@@ -77,12 +77,12 @@ namespace Air
 
 		TMap<LocalPlayer*, SceneView*> playerViewMap;
 
-		for (LocalPlayerIterator iterator(GEngine, myWorld); iterator; ++iterator)
+		for (LocalPlayerIterator iterator(GEngine.get(), myWorld); iterator; ++iterator)
 		{
-			LocalPlayer* localPlayer = *iterator;
+			std::shared_ptr<LocalPlayer>& localPlayer = *iterator;
 			if (localPlayer)
 			{
-				APlayerController* playerController = localPlayer->mPlayerComtroller;
+				APlayerController* playerController = localPlayer->mPlayerComtroller.get();
 				const int32 numViews = bEnableStereo ? 2 : 1;
 				for (int32 i = 0; i < numViews; i++)
 				{
@@ -112,7 +112,7 @@ namespace Air
 						if (i == 0)
 						{
 							localPlayer->mLastViewLocation = viewLocation;
-							playerViewMap.emplace(localPlayer, view);
+							playerViewMap.emplace(localPlayer.get(), view);
 						}
 					}
 				}

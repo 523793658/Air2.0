@@ -24,19 +24,19 @@ namespace Air
 		virtual void postInitProperties();
 
 		template<class TRetureType>
-		TRetureType* createDefaultSubObject(wstring subObjetName, bool bTransient = false)
+		std::shared_ptr<TRetureType> createDefaultSubObject(wstring subObjetName, bool bTransient = false)
 		{
 			RClass* returnType = TRetureType::StaticClass();
-			return static_cast<TRetureType*>(createDefaultSubObject(subObjetName, returnType, returnType, true, false, bTransient));
+			return std::static_pointer_cast<TRetureType>(createDefaultSubObject(subObjetName, returnType, returnType, true, false, bTransient));
 		}
 
 		template<typename TReturnType, typename TClassToConstructByDefault>
-		TReturnType* createDefaultSubObject(wstring subObjectName, bool bTransient = false)
+		std::shared_ptr<TReturnType> createDefaultSubObject(wstring subObjectName, bool bTransient = false)
 		{
-			return static_cast<TReturnType*>(createDefaultSubObject(subObjectName, TReturnType::StaticClass(), TClassToConstructByDefault::StaticClass(), true, false, bTransient));
+			return std::static_pointer_cast<TReturnType>(createDefaultSubObject(subObjectName, TReturnType::StaticClass(), TClassToConstructByDefault::StaticClass(), true, false, bTransient));
 		}
 
-		Object* createDefaultSubObject(wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient);
+		std::shared_ptr<Object> createDefaultSubObject(wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient);
 
 		virtual void postLoad();
 
@@ -44,10 +44,10 @@ namespace Air
 	protected:
 
 		template<typename TReturnType>
-		TReturnType* createAbsoluteDefaultSubobject(wstring subobjectName, bool bTransient = false)
+		std::shared_ptr<TReturnType> createAbsoluteDefaultSubobject(wstring subobjectName, bool bTransient = false)
 		{
 			RClass* ReTurnType = TReturnType::StaticClass();
-			return static_cast<TReturnType*>(createDefaultSubObject(subobjectName, ReTurnType, ReTurnType, true, true, bTransient));
+			return std::dynamic_pointer_cast<TReturnType>(createDefaultSubObject(subobjectName, ReTurnType, ReTurnType, true, true, bTransient));
 
 		}
 	public:
@@ -59,7 +59,7 @@ namespace Air
 
 	};
 
-	FORCEINLINE bool isValid(const Object* test)
+	FORCEINLINE bool isValid(Object* test)
 	{
 		return test && !test->isPendingKill();
 	}

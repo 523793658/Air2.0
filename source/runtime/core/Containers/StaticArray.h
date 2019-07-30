@@ -29,7 +29,7 @@ namespace Air
 
 		TStaticArray& operator = (TStaticArray&& other)
 		{
-			moveAssignItems((TElement*)mElements, (const TElement*)other.Elements, NumElements);
+			moveAssignItems((TElement*)mElements, (const TElement*)other.mElements, NumElements);
 			return *this;
 		}
 

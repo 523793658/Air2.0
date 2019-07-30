@@ -24,7 +24,7 @@ namespace Air
 
 
 	LightSceneProxy::LightSceneProxy(const LightComponent* inLightComponent)
-		:mLightComponent(inLightComponent)
+		:mLightComponent(std::dynamic_pointer_cast<const LightComponent>(inLightComponent->shared_from_this()))
 		,mLightType(inLightComponent->getLightType())
 		,bStaticLighting(inLightComponent->hasStaticLighting())
 		,bStaticShadowing(inLightComponent->hasStaticShadow())

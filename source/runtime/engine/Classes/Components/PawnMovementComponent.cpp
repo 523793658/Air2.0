@@ -33,21 +33,21 @@ namespace Air
 	{
 		if (newUpdatedComponent)
 		{
-			if (!dynamic_cast<APawn*>(newUpdatedComponent->getOwner()))
+			if (!newUpdatedComponent->getOwner())
 			{
 				return;
 			}
 		}
 
 		ParentType::setUpdatedComponent(newUpdatedComponent);
-		mPawnOwner = newUpdatedComponent ? dynamic_cast<APawn*>(newUpdatedComponent->getOwner()) : nullptr;
+		mPawnOwner = newUpdatedComponent ? std::dynamic_pointer_cast<APawn>(newUpdatedComponent->getOwner()->shared_from_this()) : std::shared_ptr<APawn>();
 	}
 
 	float3 PawnMovementComponent::getLastInputVector() const
 	{
 		return mPawnOwner ? mPawnOwner->internal_getLastMovementInputVector() : float3::Zero;
 	}
-	class APawn* PawnMovementComponent::getPawnOwner() const
+	const std::shared_ptr<class APawn>& PawnMovementComponent::getPawnOwner() const
 	{
 		return mPawnOwner;
 	}

@@ -131,7 +131,7 @@ namespace Air
 	void FMaterial::getReferencedTexturesHash(EShaderPlatform platform, SHAHash& outHash) const
 	{
 		SHA1 hashState;
-		const TArray<RTexture*>& referencedTextures = getReferencedTextures();
+		const TArray<std::shared_ptr<RTexture>>& referencedTextures = getReferencedTextures();
 		for (int32 textureIndex = 0; textureIndex < referencedTextures.size(); textureIndex++)
 		{
 			wstring textureName;
@@ -192,9 +192,9 @@ namespace Air
 		}
 	}
 
-	static inline bool shouldCacheMaterialShader(const MaterialShaderType* shaderType, EShaderPlatform platform, const FMaterial* mateiral)
+	static inline bool shouldCacheMaterialShader(const MaterialShaderType* shaderType, EShaderPlatform platform, const FMaterial* material)
 	{
-		return shaderType->shouldCache(platform, mateiral) && mateiral->shouldCache(platform, shaderType, nullptr);
+		return shaderType->shouldCache(platform, material) && material->shouldCache(platform, shaderType, nullptr);
 	}
 
 
@@ -229,7 +229,7 @@ namespace Air
 		for (TLinkedList<ShaderType*>::TIterator shaderTypeIt(ShaderType::getTypeList()); shaderTypeIt; shaderTypeIt.next())
 		{
 			MaterialShaderType* shaderType = shaderTypeIt->getMaterialShaderType();
-			if (shaderType && !isMateiralShaderComplete(material, shaderType, nullptr, bSilent))
+			if (shaderType && !isMaterialShaderComplete(material, shaderType, nullptr, bSilent))
 			{
 				return false;
 			}
@@ -259,7 +259,7 @@ namespace Air
 					for (int32 index = 0; index < stageTypes.size(); ++index)
 					{
 						auto* shaderType = stageTypes[index]->getMaterialShaderType();
-						if (!isMateiralShaderComplete(material, shaderType, pipeline, bSilent))
+						if (!isMaterialShaderComplete(material, shaderType, pipeline, bSilent))
 						{
 							return false;
 						}
@@ -331,7 +331,7 @@ namespace Air
 			selectionColorIndex = compiler->componentMask(compiler->vectorParameter(TEXT("SelectionColor"), LinearColor::Black), 1, 1, 1, 0);
 
 		}
-		MaterialInterface* materialInterface = mMaterialInstance ? dynamic_cast<MaterialInterface*>(mMaterialInstance) : dynamic_cast<MaterialInterface*>(mMaterial);
+		MaterialInterface* materialInterface = mMaterialInstance ? dynamic_cast<MaterialInterface*>(mMaterialInstance.get()) : dynamic_cast<MaterialInterface*>(mMaterial.get());
 		int32 ret = INDEX_NONE;
 		switch (prop)
 		{
@@ -604,7 +604,7 @@ namespace Air
 		new (members)ConstantBufferStruct::Member(TEXT("Clamp_WorldGroupSettings"), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 		nextMemberOffset += 8;
 		const uint32 structSize = align(nextMemberOffset, CONSTANT_BUFFER_STRUCT_ALIGNMENT);
-		mConstantBufferStruct.emplace(MaterialLayout.c_str(), TEXT("MaterialConstants"), TEXT("Mateiral"), constructMaterialCosntantBufferParameter, structSize, members, false);
+		mConstantBufferStruct.emplace(MaterialLayout.c_str(), TEXT("MaterialConstants"), TEXT("Material"), constructMaterialCosntantBufferParameter, structSize, members, false);
 	}
 
 	bool ConstantExpressionSet::isEmpty() const
@@ -710,27 +710,13 @@ namespace Air
 		return true;
 	}
 
-	static RTexture* getIndexedTexture(const FMaterial& material, int32 textureIndex)
-	{
-		const TArray<RTexture*> & referencedTextures = material.getReferencedTextures();
-		RTexture* indexedTexture = nullptr;
-		if (referencedTextures.isValidIndex(textureIndex))
-		{
-			indexedTexture = referencedTextures[textureIndex];
-		}
-		else
-		{
-			static bool bWarnedOnce = false;
-			BOOST_ASSERT(false);
-		}
-		return indexedTexture;
-	}
+	
 
-	void MaterialConstantExpressionTexture::getTextureValue(const MaterialRenderContext& context, const FMaterial& material, const RTexture* & outValue, ESamplerSourceMode& outSamplerSource) const
+	void MaterialConstantExpressionTexture::getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<const RTexture>& outValue, ESamplerSourceMode& outSamplerSource) const
 	{
 		BOOST_ASSERT(isInParallelRenderingThread());
 		outSamplerSource = mSamplerSource;
-		if (mTransientOverrideValue_RenderThread != nullptr)
+		if (mTransientOverrideValue_RenderThread)
 		{
 			outValue = mTransientOverrideValue_RenderThread;
 		}
@@ -785,10 +771,9 @@ namespace Air
 
 			for (int32 expressionIndex = 0; expressionIndex < mConstant2DTextureExpression.size(); expressionIndex++)
 			{
-				const RTexture* value;
+				std::shared_ptr<const RTexture> value;
 				ESamplerSourceMode sourceMode;
 				mConstant2DTextureExpression[expressionIndex]->getTextureValue(materialRenderContext, materialRenderContext.mMaterial, value, sourceMode);
-				BOOST_ASSERT(!value);
 				if (value && value->mResource)
 				{
 					*resourceTable++ = value->mTextureReference.mTextureReferenceRHI;
@@ -811,7 +796,7 @@ namespace Air
 			}
 			for (int32 expressionIndex = 0; expressionIndex < mConstantCubeTextureExpressions.size(); expressionIndex++)
 			{
-				const RTexture* value;
+				std::shared_ptr<const RTexture> value;
 				ESamplerSourceMode sourceMode;
 				mConstantCubeTextureExpressions[expressionIndex]->getTextureValue(materialRenderContext, materialRenderContext.mMaterial, value, sourceMode);
 				if (value && value->mResource)
@@ -1176,7 +1161,7 @@ namespace Air
 		return mMaterial->mMaterialDomain == MD_DeferredDecal;
 	}
 
-	const TArray<RTexture*>& MaterialResource::getReferencedTextures() const
+	const TArray<std::shared_ptr<RTexture>>& MaterialResource::getReferencedTextures() const
 	{
 		return mMaterial ? mMaterial->mExpressionTextureReferences : RMaterial::getDefaultMaterial(MD_Surface)->mExpressionTextureReferences;
 	}
@@ -1238,9 +1223,9 @@ namespace Air
 		return false;
 	}
 
-	inline bool MeshMaterialShaderMap::isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* mateiral, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, bool bSilent)
+	inline bool MeshMaterialShaderMap::isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* material, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, bool bSilent)
 	{
-		if (shouldCacheMeshShader(shaderType, platform, mateiral, inVertexFactoryType) && (!meshShaderMap || (pipeline && !meshShaderMap->hasShaderPipeline(pipeline)) || (!pipeline && !meshShaderMap->hasShader((ShaderType*)shaderType))))
+		if (shouldCacheMeshShader(shaderType, platform, material, inVertexFactoryType) && (!meshShaderMap || (pipeline && !meshShaderMap->hasShaderPipeline(pipeline)) || (!pipeline && !meshShaderMap->hasShader((ShaderType*)shaderType))))
 		{
 			if (!bSilent)
 			{
@@ -1263,9 +1248,9 @@ namespace Air
 		return mMaterial->mMaterialDomain == MD_LightFunction;
 	}
 
-	bool MaterialShaderMap::isMateiralShaderComplete(const FMaterial* mateiral, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, bool bSilent)
+	bool MaterialShaderMap::isMaterialShaderComplete(const FMaterial* material, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, bool bSilent)
 	{
-		if (shouldCacheMaterialShader(shaderType, mPlatform, mateiral) && ((pipelineType && !hasShaderPipeline(pipelineType)) || (!pipelineType && !hasShader((ShaderType*)shaderType))))
+		if (shouldCacheMaterialShader(shaderType, mPlatform, material) && ((pipelineType && !hasShaderPipeline(pipelineType)) || (!pipelineType && !hasShader((ShaderType*)shaderType))))
 		{
 			if (!bSilent)
 			{
@@ -1297,7 +1282,7 @@ namespace Air
 
 	uint32 MaterialShaderMap::mNextCompilingId = 2;
 
-	void MaterialShaderMap::compile(FMaterial* material, const MaterialShaderMapId& shaderMapId, TRefCountPtr<ShaderCompilerEnvironment> materialEnvironment, const MaterialCompilationOutput& inMateiralCompilationOutput, EShaderPlatform platform, bool bSynchronousCompile, bool bApplyCompletedShaderMapForRendering)
+	void MaterialShaderMap::compile(FMaterial* material, const MaterialShaderMapId& shaderMapId, TRefCountPtr<ShaderCompilerEnvironment> materialEnvironment, const MaterialCompilationOutput& inMaterialCompilationOutput, EShaderPlatform platform, bool bSynchronousCompile, bool bApplyCompletedShaderMapForRendering)
 	{
 		if (PlatformProperties::requiresCookedData())
 		{
@@ -1308,11 +1293,11 @@ namespace Air
 			BOOST_ASSERT(!material->bContainsInlineShaders);
 			BOOST_ASSERT(mNumRef > 0);
 
-			auto correspondingMateirals = mShaderMapsBeingCompiled.find(this);
-			if (correspondingMateirals != mShaderMapsBeingCompiled.end())
+			auto correspondingMaterials = mShaderMapsBeingCompiled.find(this);
+			if (correspondingMaterials != mShaderMapsBeingCompiled.end())
 			{
 				BOOST_ASSERT(!bSynchronousCompile);
-				correspondingMateirals->second.addUnique(material);
+				correspondingMaterials->second.addUnique(material);
 			}
 			else
 			{
@@ -1322,10 +1307,10 @@ namespace Air
 				TArray<FMaterial*> newCorrespondingMaterials;
 				newCorrespondingMaterials.add(material);
 				mShaderMapsBeingCompiled.emplace(this, newCorrespondingMaterials);
-				material->setupMaterialEnvironment(platform, inMateiralCompilationOutput.mConstantExpressionSet, *materialEnvironment);
+				material->setupMaterialEnvironment(platform, inMaterialCompilationOutput.mConstantExpressionSet, *materialEnvironment);
 
 				mFriendlyName = material->getFriendlyName();
-				mMaterialCompilationOutput = inMateiralCompilationOutput;
+				mMaterialCompilationOutput = inMaterialCompilationOutput;
 				mShaderMapId = shaderMapId;
 				mPlatform = platform;
 				bIsPersistent = material->isPersistent();
@@ -1440,7 +1425,7 @@ namespace Air
 						}
 					}
 				}
-				if (correspondingMateirals == mShaderMapsBeingCompiled.end())
+				if (correspondingMaterials == mShaderMapsBeingCompiled.end())
 				{
 
 				}
@@ -1502,9 +1487,16 @@ namespace Air
 
 	void MaterialResource::compilePropertyAndSetMaterialProperty(wstring** chunk, class MaterialCompiler* compiler, EShaderFrequency overrideShaderFrequency /* = SF_NumFrequencies */, bool bUsePreviousFrameTime /* = false */) const
 	{
-		MaterialInterface* materialInterface = mMaterialInstance ? static_cast<MaterialInterface*>(mMaterialInstance) : static_cast<MaterialInterface*>(mMaterial);
+		MaterialInterface* materialInterface = mMaterialInstance ? static_cast<MaterialInterface*>(mMaterialInstance.get()) : static_cast<MaterialInterface*>(mMaterial.get());
 
 		materialInterface->compileProperty(compiler, chunk);
+	}
+
+	void MaterialResource::setMaterial(class RMaterial* inMaterial, EMaterialQualityLevel::Type inQualityLevel, bool bInQualityLevelHasDifferentNodes, ERHIFeatureLevel::Type inFeatureLevel, std::shared_ptr<MaterialInstance> instance)
+	{
+		mMaterial = std::dynamic_pointer_cast<RMaterial>(inMaterial->shared_from_this());
+		mMaterialInstance = instance;
+		setQualityLevelProperties(inQualityLevel, bInQualityLevelHasDifferentNodes, inFeatureLevel);
 	}
 
 	void FMaterial::setupMaterialEnvironment(EShaderPlatform platform, const ConstantExpressionSet& inConstantExpressionSet, ShaderCompilerEnvironment& outEnvironment) const
@@ -1837,10 +1829,18 @@ namespace Air
 		const bool bHideAttribute = true;
 		mAttributeMap.reserve(MP_Max + 1);
 		add(Guid::newGuid(), TEXT("BaseColor"), MP_BaseColor, MCT_Float3, float4(0, 0, 0, 0), SF_Pixel);
-		add(Guid::newGuid(), TEXT("Normal"), MP_Normal, MCT_Float3, float4(1, 0, 0, 0), SF_Pixel);
+		add(Guid::newGuid(), TEXT("Normal"), MP_Normal, MCT_Float3, float4(0, 0, 1, 0), SF_Pixel);
 		add(Guid::newGuid(), TEXT("Metallic"), MP_Metallic, MCT_Float1, float4(0, 0, 0, 0), SF_Pixel);
 		add(Guid::newGuid(), TEXT("Specular"), MP_Specular, MCT_Float1, float4(0.5f, 0, 0, 0), SF_Pixel);
 		add(Guid::newGuid(), TEXT("Roughness"), MP_Roughness, MCT_Float1, float4(0.5f, 0, 0, 0), SF_Pixel);
+		add(Guid::newGuid(), TEXT("CustomizedUV0"), MP_CustomizedUVs0, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 0);
+		add(Guid::newGuid(), TEXT("CustomizedUV1"), MP_CustomizedUVs1, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 1);
+		add(Guid::newGuid(), TEXT("CustomizedUV2"), MP_CustomizedUVs2, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 2);
+		add(Guid::newGuid(), TEXT("CustomizedUV3"), MP_CustomizedUVs3, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 3);
+		add(Guid::newGuid(), TEXT("CustomizedUV4"), MP_CustomizedUVs4, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 4);
+		add(Guid::newGuid(), TEXT("CustomizedUV5"), MP_CustomizedUVs5, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 5);
+		add(Guid::newGuid(), TEXT("CustomizedUV6"), MP_CustomizedUVs6, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 6);
+		add(Guid::newGuid(), TEXT("CustomizedUV7"), MP_CustomizedUVs7, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 7);
 		add(Guid::newGuid(), TEXT("Missing"), MP_Max, MCT_Float1, float4(0, 0, 0, 0), SF_Pixel, INDEX_NONE, bHideAttribute);
 
 	}

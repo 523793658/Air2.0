@@ -53,7 +53,7 @@ namespace Air
 			break;
 		}
 
-		outInitOptions.mViewActor = mPlayerComtroller->getViewTarget();
+		outInitOptions.mViewActor = std::dynamic_pointer_cast<AActor>(mPlayerComtroller->getViewTarget()->shared_from_this());
 		outInitOptions.mViewElementDrawer = viewDrawer;
 		outInitOptions.mBackgroundColor = LinearColor::Black;
 		outInitOptions.mLodDistanceFactor = mPlayerComtroller->mLocalPlayerCachedLODDistanceFactor;
@@ -78,7 +78,7 @@ namespace Air
 			ActorSpawnParameters spawnInfo;
 			mPlayerComtroller = inWorld->spawnActor<APlayerController>(spawnInfo);
 			auto players = GEngine->getGamePlayers(inWorld);
-			const int32 playerIndex = players.find(this);
+			const int32 playerIndex = players.find(std::dynamic_pointer_cast<LocalPlayer>( this->shared_from_this()));
 			mPlayerComtroller->mNetPlayerIndex = playerIndex;
 		}
 		return mPlayerComtroller != nullptr;

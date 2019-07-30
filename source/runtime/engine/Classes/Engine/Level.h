@@ -30,7 +30,7 @@ namespace Air
 
 		ENGINE_API void initialize(const URL& url);
 
-		ENGINE_API void setWorldSettings(WorldSettings* worldSetting);
+		ENGINE_API void setWorldSettings(std::shared_ptr<WorldSettings> worldSetting);
 
 		ENGINE_API void sortActorList();
 
@@ -52,7 +52,9 @@ namespace Air
 			return mCachedLevelCollection;
 		}
 
-		WorldSettings* getWorldSettings(bool bChecked) const;
+		const WorldSettings* getWorldSettings(bool bChecked) const;
+
+		WorldSettings* getWorldSettings(bool bChecked);
 
 		void setCachedLevelToCollection(LevelCollection* const inCachedLevelCollection) { mCachedLevelCollection = inCachedLevelCollection; }
 
@@ -61,10 +63,10 @@ namespace Air
 	public:
 
 		URL mUrl;
-		World* mOwningWorld;
-		TArray<AActor*> mActors;
-		WorldSettings* mWorldSettings;
-		class Model* mModel;
+		std::shared_ptr<World> mOwningWorld;
+		TArray<std::shared_ptr<AActor>> mActors;
+		std::shared_ptr<WorldSettings> mWorldSettings;
+		std::shared_ptr<class Model> mModel;
 		TickTaskLevel* mTickTaskLevel{ nullptr };
 
 		uint8			bIsVisible : 1;

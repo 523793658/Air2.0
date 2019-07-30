@@ -25,10 +25,10 @@ namespace Air
 
 		FORCEINLINE AController* getController() const
 		{
-			return mController;
+			return mController.get();
 		}
 
-		void receivePossessed(AController* newController) {}
+		void receivePossessed(std::shared_ptr<AController> newController) {}
 
 		virtual void addControllerYawInput(float val);
 
@@ -59,15 +59,15 @@ namespace Air
 		bool inputEnabled() const { return bInputEnabled; }
 
 	protected:
-		virtual InputComponent* createPlayerInputComponent();
+		virtual std::shared_ptr<InputComponent> createPlayerInputComponent();
 
 		virtual void destroyPlayerInputComponent() {}
 
 		virtual void setupPlayerInputComponent(InputComponent* playerInputComponent) {}
 	public:
-		AController* mController;
+		std::shared_ptr<AController> mController;
 
-		class APlayerState* mPlayerState{ nullptr };
+		std::shared_ptr<class APlayerState> mPlayerState;
 
 		float mBaseEyeHeight;
 

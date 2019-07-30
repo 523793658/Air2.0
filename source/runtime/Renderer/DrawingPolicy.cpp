@@ -2,6 +2,20 @@
 #include "RHIUtilities.h"
 namespace Air
 {
+	DrawingPolicyRenderState::DrawingPolicyRenderState(RHICommandList* inDebugResetRHICmdList, const SceneView& sceneView)
+		:mBlendState(nullptr)
+		, mDepthStencilState(nullptr)
+		, mViewConstantBuffer(sceneView.mViewConstantBuffer)
+		, mStencilRef(0)
+		, mViewOverrideFlags(EDrawingPolicyOverrideFlags::None)
+		, mDitheredLODTransitionAlpha(0.0f)
+	{
+		mViewOverrideFlags |= sceneView.bReverseCulling ? EDrawingPolicyOverrideFlags::ReverseCullMode : EDrawingPolicyOverrideFlags::None;
+		mViewOverrideFlags |= sceneView.bRenderSceneTwoSided ?
+			EDrawingPolicyOverrideFlags::TwoSided :
+			EDrawingPolicyOverrideFlags::None;
+	}
+
 	void MeshDrawingPolicy::drawMesh(RHICommandList& rhiCmdList, const MeshBatch& mesh, int32 batchElementIndex, const bool bIsInstancedStereo /* = false */) const 
 	{
 		const MeshBatchElement& batchElement = mesh.mElements[batchElementIndex];

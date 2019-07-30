@@ -55,11 +55,11 @@ namespace Air
 		for (LevelCollection& lc : mLevelCollections)
 		{
 			TArray<Level*> levelsToTick;
-			for (Level* collectionLevel : lc.getLevels())
+			for (std::shared_ptr<Level> collectionLevel : lc.getLevels())
 			{
 				if (mLevels.contains(collectionLevel))
 				{
-					levelsToTick.add(collectionLevel);
+					levelsToTick.add(collectionLevel.get());
 				}
 			}
 			ScopedLevelCollectionContextSwitch levelContext(&lc, this);
@@ -111,7 +111,7 @@ namespace Air
 				{
 					for (ConstPlayerControllerIterator it = getPlayerControllerIterator(); it; ++it)
 					{
-						APlayerController* playerController = *it;
+						std::shared_ptr<APlayerController> playerController = *it;
 						if (!bIsPaused)
 						{
 							playerController->updateCameraManager(deltaTime);

@@ -4,6 +4,7 @@
 namespace Air
 {
 	Object::Object(const ObjectInitializer& objectInitializer)
+		:ObjectBase(objectInitializer)
 	{
 	}
 	Object::Object(EStaticConstructor, EObjectFlags inFlags)
@@ -70,7 +71,7 @@ namespace Air
 		return bOldResult;
 	}
 
-	Object* Object::createDefaultSubObject(wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient)
+	std::shared_ptr<Object> Object::createDefaultSubObject(wstring subObjectName, RClass* returnType, RClass* classToCreateByDefault, bool bIsRequired, bool bAbstract, bool bIsTransient)
 	{
 		ObjectInitializer* currentInitializer = ObjectThreadContext::get().topInitializer();
 		return currentInitializer->createDefaultSubObject(this, subObjectName, returnType, classToCreateByDefault, bIsRequired, bAbstract, bIsTransient);

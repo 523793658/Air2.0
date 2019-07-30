@@ -24,11 +24,11 @@ namespace Air
 		mReplaySpectatorPlayerControllerClass = APlayerController::StaticClass();
 	}
 
-	APlayerController* GameModeBase::spawnPlayerController(ENetRole inRemoteRole, float3 const & spawnLocation, Rotator const& spawnRotation)
+	std::shared_ptr<APlayerController> GameModeBase::spawnPlayerController(ENetRole inRemoteRole, float3 const & spawnLocation, Rotator const& spawnRotation)
 	{
 		ActorSpawnParameters spawnInfo;
 		spawnInfo.objectFlags |= RF_Transient;
-		APlayerController* newPC = getWorld()->spawnActor<APlayerController>(spawnInfo);
+		std::shared_ptr<APlayerController> newPC = getWorld()->spawnActor<APlayerController>(spawnInfo);
 		if (newPC)
 		{
 			if (inRemoteRole == ROLE_SimulatedProxy)
@@ -39,16 +39,16 @@ namespace Air
 		return newPC;
 	}
 
-	APlayerController* GameModeBase::login(Player* newPlayer, ENetRole inRemoteRole, const wstring& portal, const wstring& options)
+	std::shared_ptr<APlayerController> GameModeBase::login(Player* newPlayer, ENetRole inRemoteRole, const wstring& portal, const wstring& options)
 	{
-		APlayerController* newPlayerController = spawnPlayerController(inRemoteRole, float3::Zero, Rotator::ZeroRotator);
+		std::shared_ptr<APlayerController> newPlayerController = spawnPlayerController(inRemoteRole, float3::Zero, Rotator::ZeroRotator);
 
 		if (newPlayerController == nullptr)
 		{
 			return newPlayerController;
 		}
 
-		initNewPlayer(newPlayerController);
+		initNewPlayer(newPlayerController.get());
 		return newPlayerController;
 	}
 
@@ -71,7 +71,7 @@ namespace Air
 
 		mGameState = getWorld()->spawnActor<AGameStateBase>(mGameStateClass, spawnInfo);
 
-		getWorld()->setGameState(mGameState);
+		getWorld()->setGameState(mGameState.get());
 		if (mGameState)
 		{
 			mGameState->mAuthorityGameMode = this;
