@@ -1,4 +1,5 @@
 #include "Math/Color.h"
+#include "Math/Float16Color.h"
 namespace Air
 {
 	const LinearColor LinearColor::White(1.0f, 1.0f, 1.0f, 1.0f);
@@ -19,6 +20,13 @@ namespace Air
 		A = float(color.A) * OneOver255;
 	}
 
+	LinearColor::LinearColor(const Float16Color& c)
+	{
+		R = c.R.getFloat();
+		G = c.G.getFloat();
+		B = c.B.getFloat();
+		A = c.A.getFloat();
+	}
 
 	float LinearColor::sRGBToLinearTable[256] =
 	{

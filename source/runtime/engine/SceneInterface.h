@@ -48,7 +48,7 @@ namespace Air
 
 		virtual void disableSkyLight(SkyLightSceneProxy* light) = 0;
 
-		virtual void updateSkyCaptureContents(std::shared_ptr<const SkyLightComponent> captureComponent, bool bCaptureEmissiveOnly, std::shared_ptr<RTextureCube> sourceCubemap, Texture* outProcessedTexture, float& outAverageBrightness, SHVectorRGB3& outIrradianceEnvironmentMap) {}
+		virtual void updateSkyCaptureContents(const SkyLightComponent* captureComponent, bool bCaptureEmissiveOnly, std::shared_ptr<RTextureCube> sourceCubemap, Texture* outProcessedTexture, float& outAverageBrightness, SHVectorRGB3& outIrradianceEnvironmentMap) {}
 
 		virtual void setShaderMapsOnMaterialResources(const TMap<FMaterial*, MaterialShaderMap*>& materialsToUpdate) {}
 

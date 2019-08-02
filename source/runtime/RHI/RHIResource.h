@@ -742,6 +742,14 @@ namespace Air
 			, mStoreAction(ERenderTargetStoreAction::EStore)
 		{}
 
+		RHIRenderTargetView(TextureRHIParamRef inTexture, uint32 inMipIndex, uint32 inArraySliceIndex):
+			mTexture(inTexture)
+			,mMipIndex(inMipIndex)
+			,mArraySliceIndex(inArraySliceIndex)
+			,mLoadAction(ERenderTargetLoadAction::ELoad)
+			,mStoreAction(ERenderTargetStoreAction::EStore)
+		{}
+
 		RHIRenderTargetView(Texture2DRHIParamRef inTexture, uint32 inMapIndex, uint32 inArraySliceIndex, ERenderTargetLoadAction inLoadAction, ERenderTargetStoreAction inStoreAction):
 			mTexture(inTexture),
 			mMipIndex(inMapIndex),

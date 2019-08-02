@@ -327,6 +327,7 @@ SET(Math_File
     ${CORE_SOURCE_DIR}/Math/Float16.h 
     ${CORE_SOURCE_DIR}/Math/Float32.h
     ${CORE_SOURCE_DIR}/Math/SHMath.h
+    ${CORE_SOURCE_DIR}/Math/Float16Color.h
 	)
 SOURCE_GROUP("Math" FILES ${Math_File})
     

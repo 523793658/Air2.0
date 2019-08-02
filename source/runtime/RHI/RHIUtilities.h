@@ -127,6 +127,19 @@ namespace Air
 		RHICmdList.setRenderTargets(1, &RTV, &depthRTV, 0, nullptr);
 	}
 
+	inline void setRenderTarget(RHICommandList& RHICmdList, TextureRHIParamRef newRenderTarget, int32 mipIndex, int32 arraySliceIndex, TextureRHIParamRef newDepthStencilTarget, bool bWritableBarrier = false)
+	{
+		RHIRenderTargetView rtv(newRenderTarget, mipIndex, arraySliceIndex);
+		RHIDepthRenderTargetView DepthRTV(newDepthStencilTarget);
+		if (bWritableBarrier)
+		{
+			transitionSetRenderTargetsHelper(RHICmdList, newRenderTarget, newDepthStencilTarget, FExclusiveDepthStencil::DepthWrite_StencilWrite);
+		}
+		RHICmdList.setRenderTargets(1, &rtv, &DepthRTV, 0, nullptr);
+	}
+
+	
+
 	//inline void RHICreateTargetableShaderResource2DArray(
 	//	uint32 width, 
 	//	uint32 height,

@@ -80,6 +80,8 @@ namespace Air
 		MP_Metallic,
 		MP_Specular,
 		MP_Roughness,
+		MP_AmbientOcclusion,
+		MP_EmissiveColor,
 		MP_CustomizedUVs0,
 		MP_CustomizedUVs1,
 		MP_CustomizedUVs2,

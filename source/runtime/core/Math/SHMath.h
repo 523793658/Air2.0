@@ -129,6 +129,9 @@ namespace Air
 		}
 	};
 
+	typedef TSHVector<3> SHVector3;
+	typedef TSHVector<2> SHVector2;
+
 	typedef TSHVectorRGB<3> SHVectorRGB3;
 	typedef TSHVectorRGB<2> SHVectorRGB2;
 }

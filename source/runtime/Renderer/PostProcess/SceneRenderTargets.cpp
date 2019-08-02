@@ -15,6 +15,7 @@
 namespace Air
 {
 	static TGlobalResource<SceneRenderTargets> mSceneRenderTargetSingleton;
+	extern int32 GDiffuseIrradianceCubemapSize;
 
 	IMPLEMENT_CONSTANT_BUFFER_STRUCT(GBufferResourceStruct, TEXT("GBuffers"));
 
@@ -770,6 +771,45 @@ namespace Air
 			if (mGBufferRefCount == 0)
 			{
 				releaseGBufferTargets();
+			}
+		}
+	}
+
+	void SceneRenderTargets::allocateReflectionTargets(RHICommandList& RHICmdList, int32 targetSize)
+	{
+		if (GSupportsRenderTargetFormat_PF_FloatRGBA)
+		{
+			const int32 numReflectionCaptureMips = Math::ceilLogTwo(targetSize) + 1;
+
+			if (mReflectionColorScratchCubemap[0] && mReflectionColorScratchCubemap[0]->getRenderTargetItem().mTargetableTexture->getNumMips() != numReflectionCaptureMips)
+			{
+				mReflectionColorScratchCubemap[0].safeRelease();
+				mReflectionColorScratchCubemap[1].safeRelease();
+			}
+
+			bool bSharedReflectionTargetsAllocated = mReflectionColorScratchCubemap[0] != nullptr;
+
+			if (!bSharedReflectionTargetsAllocated)
+			{
+				uint32 cubeTexFlags = TexCreate_TargetArraySlicesIndependently;
+				{
+					PooledRenderTargetDesc desc2(PooledRenderTargetDesc::createCubemapDesc(targetSize, PF_FloatRGBA, ClearValueBinding::None, cubeTexFlags, TexCreate_RenderTargetable, false, 1, numReflectionCaptureMips));
+					GRenderTargetPool.findFreeElement(RHICmdList, desc2, mReflectionColorScratchCubemap[0], TEXT("ReflectionColorScratchCubemap0"));
+					GRenderTargetPool.findFreeElement(RHICmdList, desc2, mReflectionColorScratchCubemap[1], TEXT("ReflectionColorScratchCubemap1"));
+				}
+
+				const int32 numDiffuseIrradianceMips = Math::ceilLogTwo(GDiffuseIrradianceCubemapSize) + 1;
+
+				{
+					PooledRenderTargetDesc desc2(PooledRenderTargetDesc::createCubemapDesc(GDiffuseIrradianceCubemapSize, PF_FloatRGBA, ClearValueBinding::None, cubeTexFlags, TexCreate_RenderTargetable, false, 1, numDiffuseIrradianceMips));
+					GRenderTargetPool.findFreeElement(RHICmdList, desc2, mDiffuseIrradianceScratchCubemap[0], TEXT("DiffuseIrradianceScratchCubemap0"));
+					GRenderTargetPool.findFreeElement(RHICmdList, desc2, mDiffuseIrradianceScratchCubemap[1], TEXT("DiffuseIrradianceScratchCubemap1"));
+				}
+				{
+					PooledRenderTargetDesc desc(PooledRenderTargetDesc::create2DDesc(int2(SHVector3::MaxSHBasis, 1), PF_FloatRGBA, ClearValueBinding::None, TexCreate_None, TexCreate_RenderTargetable, false));
+					GRenderTargetPool.findFreeElement(RHICmdList, desc, mSkySHIrradianceMap, TEXT("SkySHIrradianceMap"));
+				}
+
 			}
 		}
 	}

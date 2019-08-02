@@ -122,6 +122,7 @@ namespace Air
 
 		void allocGBufferTargets(RHICommandList& RHICmdList);
 
+		void allocateReflectionTargets(RHICommandList& RHICmdList, int32 targetSize);
 
 		ConstantBufferRHIParamRef getGBufferResourcesConstantBuffer() const
 		{
@@ -205,6 +206,12 @@ namespace Air
 		TRefCountPtr<IPooledRenderTarget> mGBufferD;
 		TRefCountPtr<IPooledRenderTarget> mGBufferE;
 		TRefCountPtr<IPooledRenderTarget> mGBufferVelocity;
+
+		TRefCountPtr<IPooledRenderTarget> mReflectionColorScratchCubemap[2];
+
+		TRefCountPtr<IPooledRenderTarget> mDiffuseIrradianceScratchCubemap[2];
+
+		TRefCountPtr<IPooledRenderTarget> mSkySHIrradianceMap;
 
 		ConstantBufferRHIRef mGBufferResourcesConstantBuffer;
 

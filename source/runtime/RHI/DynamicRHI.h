@@ -300,7 +300,11 @@ namespace Air
 
 		virtual void RHIBindDebugLabelName(TextureRHIParamRef texture, const TCHAR* name) = 0;
 
+		virtual void RHIReadSurfaceFloatData(TextureRHIParamRef texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex) = 0;
+
 		virtual void RHIBindDebugLabelName(UnorderedAccessViewRHIParamRef unorderedAccessViewRHI, const TCHAR* name) {}
+
+
 	};
 
 

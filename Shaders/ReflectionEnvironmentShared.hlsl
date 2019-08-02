@@ -17,3 +17,12 @@ float3 getSkySHDiffuse(float3 normal)
 
 	return max(0, intermediate0 + intermediate1 + intermediate2);
 }
+
+#define REFLECTION_CAPTURE_ROUGHEST_MIP 1
+#define REFLECTION_CAPTURE_ROUGHNESS_MIP_SCALE 1.2
+
+float computeReflectionCaptureRoughnessFromMip(float mip, half cubemapMaxMip)
+{
+	float levelFrom1x1 = cubemapMaxMip - 1 - mip;
+	return exp2((REFLECTION_CAPTURE_ROUGHEST_MIP - levelFrom1x1) / REFLECTION_CAPTURE_ROUGHNESS_MIP_SCALE);
+}

@@ -26,12 +26,12 @@ namespace Air
 
 		bool equal(const TViewTarget& otherTarget) const;
 
-		void setNewTarget(std::shared_ptr<AActor> newTarget);
+		void setNewTarget(AActor* newTarget);
 
 		class APawn* getTargetPawn() const;
 
 
-		std::shared_ptr<class AActor> mTarget;
+		class AActor* mTarget;
 
 		struct MinimalViewInfo mPOV;
 
@@ -49,7 +49,7 @@ namespace Air
 	public:
 		AActor* getViewTarget() const;
 		void setViewTarget(class AActor* newTarget);
-		void assignViewTarget(AActor* newTarget, TViewTarget vt);
+		void assignViewTarget(AActor* newTarget, TViewTarget& vt);
 		virtual void initializeFor(class APlayerController* pc);
 
 		virtual void updateCamera(float deltaTime);

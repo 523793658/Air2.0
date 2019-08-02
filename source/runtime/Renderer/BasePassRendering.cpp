@@ -245,7 +245,7 @@ namespace Air
 			const typename LightMapPolicyType::ElementDataType& lightMapElementDatat)
 		{
 			const Scene* scene = parameters.mPrimitiveSceneProxy ? parameters.mPrimitiveSceneProxy->getPrimitiveSceneInfo()->mScene : nullptr;
-			const bool bRenderSkylight = false;
+			const bool bRenderSkylight = scene && scene->shouldRenderSkyLight(parameters.mBlendMode) && parameters.mShadingModel != MSM_Unlit;
 			const bool bRenderAtmosphericFog = false;
 			bool bEnableReceiveDecalOutput = false;
 			TBasePassDrawingPolicy<LightMapPolicyType> drawingPolicy(
@@ -328,7 +328,7 @@ namespace Air
 			if (mScene)
 			{
 				TStaticMeshDrawList<TBasePassDrawingPolicy<LightMapPolicyType>>& drawList = mScene->getBasePassDrawList<LightMapPolicyType>(drawType);
-				const bool bRenderSkylight = false;
+				const bool bRenderSkylight = mScene->shouldRenderSkyLight(parameters.mBlendMode) && parameters.mShadingModel != MSM_Unlit;
 				const bool bRenderAtmosphericFog = false;
 				drawList.addMesh(mStaticMesh, typename TBasePassDrawingPolicy<LightMapPolicyType>::ElementDataType(lightMapElementData), TBasePassDrawingPolicy<LightMapPolicyType>(mStaticMesh->mVertexFactory, mStaticMesh->mMaterialRenderProxy, *parameters.mMaterial, parameters.mFeatureLevel, lightMapPolicy, parameters.mBlendMode, parameters.mTextureMode, bRenderSkylight, bRenderAtmosphericFog, computeMeshOverrideSettings(*mStaticMesh), DVSM_None, false, false), mScene->getFeatureLevel());
 			}

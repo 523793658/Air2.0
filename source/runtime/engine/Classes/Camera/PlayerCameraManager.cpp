@@ -11,7 +11,7 @@ namespace Air
 		return (mTarget == otherTarget.mTarget) && (mPlayerState == otherTarget.mPlayerState) && mPOV.equals(otherTarget.mPOV);
 	}
 
-	void TViewTarget::setNewTarget(std::shared_ptr<AActor> newTarget)
+	void TViewTarget::setNewTarget(AActor* newTarget)
 	{
 		mTarget = newTarget;
 	}
@@ -40,7 +40,7 @@ namespace Air
 	AActor* PlayerCameraManager::getViewTarget() const
 	{
 		PlayerCameraManager* const nonConstThis = const_cast<PlayerCameraManager*>(this);
-		return mViewTarget.mTarget.get();
+		return mViewTarget.mTarget;
 	}
 
 	void PlayerCameraManager::setViewTarget(class AActor* newTarget)
@@ -51,22 +51,22 @@ namespace Air
 		}
 		mViewTarget.checkViewTarget(mPCOwner.get());
 
-		if (newTarget != mViewTarget.mTarget.get())
+		if (newTarget != mViewTarget.mTarget)
 		{
 			assignViewTarget(newTarget, mViewTarget);
 			mViewTarget.checkViewTarget(mPCOwner.get());
 		}
 	}
 
-	void PlayerCameraManager::assignViewTarget(AActor* newTarget, TViewTarget vt)
+	void PlayerCameraManager::assignViewTarget(AActor* newTarget, TViewTarget& vt)
 	{
-		if (!newTarget || (newTarget == vt.mTarget.get()))
+		if (!newTarget || (newTarget == vt.mTarget))
 		{
 			return;
 		}
 
-		std::shared_ptr<AActor> oldViewTarget = vt.mTarget;
-		vt.mTarget = std::dynamic_pointer_cast<AActor>(newTarget->shared_from_this());
+		AActor* oldViewTarget = vt.mTarget;
+		vt.mTarget = newTarget;
 		vt.mPOV.mAspectRatio = mDefaultAspectRatio;
 		vt.mPOV.mFOV = mDefaultFOV;
 
@@ -95,7 +95,7 @@ namespace Air
 		outVT.mPOV.bUseFieldOfViewForLOD = true;
 		outVT.mPOV.mProjectonMode = bIsOrthographic ? ECameraProjectionMode::Orthographic : ECameraProjectionMode::Perspective;
 		bool bDoNotApplyModifiers = false;
-		if (std::shared_ptr<ACameraActor> camActor = std::dynamic_pointer_cast<ACameraActor>(outVT.mTarget))
+		if (ACameraActor* cameraActor = dynamic_cast<ACameraActor*>( outVT.mTarget))
 		{
 
 		}
@@ -190,10 +190,10 @@ namespace Air
 		BOOST_ASSERT(owningController);
 		if (mTarget == nullptr)
 		{
-			mTarget = std::dynamic_pointer_cast<APlayerController>(owningController->shared_from_this());
+			mTarget = owningController;
 		}
 
-		if (mTarget.get() == owningController)
+		if (mTarget == owningController)
 		{
 			mPlayerState = nullptr;
 		}
@@ -212,11 +212,11 @@ namespace Air
 
 	APawn* TViewTarget::getTargetPawn() const
 	{
-		if (APawn* pawn = dynamic_cast<APawn*>( mTarget.get()))
+		if (APawn* pawn = dynamic_cast<APawn*>( mTarget))
 		{
 			return pawn;
 		}
-		else if (std::shared_ptr<AController> controller = std::dynamic_pointer_cast<AController>(mTarget))
+		else if (AController* controller = dynamic_cast<AController*>(mTarget))
 		{
 			return controller->getPawn();
 		}

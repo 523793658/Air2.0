@@ -224,6 +224,8 @@ namespace Air
 
 		virtual void RHIUnlockIndexBuffer(IndexBufferRHIParamRef indexBuffer) final override;
 
+		virtual void RHIReadSurfaceFloatData(TextureRHIParamRef texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex) final override;
+
 		uint32 getMaxMSAAQuality(uint32 sampleCount);
 		IDXGIFactory1* getFactory() const
 		{

@@ -6,6 +6,7 @@
 #include "Template/AlignOf.h"
 #include "Misc/MemStack.h"
 #include "DynamicRHI.h"
+#include "Math/Float16Color.h"
 #include "Containers/StaticArray.h"
 namespace Air
 {
@@ -1555,6 +1556,12 @@ namespace Air
 		FORCEINLINE TextureReferenceRHIRef createTextureReference(LastRenderTimeContainer* lastRenderTime)
 		{
 			return GDynamicRHI->RHICreateTextureReference(lastRenderTime);
+		}
+
+		FORCEINLINE void readSurfaceFloatData(TextureRHIParamRef texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex)
+		{
+			immediateFlush(EImmediateFlushType::FlushRHIThread);
+			GDynamicRHI->RHIReadSurfaceFloatData(texture, rect, outData, cubeface, arrayIndex, mipIndex);
 		}
 
 		void updateTextureReference(TextureReferenceRHIParamRef textureRef, TextureRHIParamRef newTexture);

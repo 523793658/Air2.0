@@ -83,11 +83,13 @@ namespace Air
 	public:
 		class SkyLightSceneProxy* createSceneProxy() const;
 
+		virtual void postInitProperties() override;
+
 		void setCubemap(std::shared_ptr<RTextureCube> cube);
 
 		static void updateSkyCaptureContents(World* worldToUpdate);
 
-		static void updateSkyCaptureContentsArray(World* worldToUpdate, TArray<std::shared_ptr<SkyLightComponent>>& componentArray, bool bBlendSources);
+		static void updateSkyCaptureContentsArray(World* worldToUpdate, TArray<SkyLightComponent*>& componentArray, bool bBlendSources);
 
 	protected:
 		virtual void createRenderState_Concurrent() override;
@@ -104,6 +106,9 @@ namespace Air
 
 		float mSkyDistanceThreshold;
 
+		bool bLowerHemisphereIsBlack{ false };
+
+		LinearColor lowerHemisphereColor;
 
 	protected:
 		TRefCountPtr<SkyTextureCubeResource> mProcessedSkyTexture;
@@ -118,7 +123,7 @@ namespace Air
 
 		SHVectorRGB3 mBlendDestinationIrradianceEnvironmentMap;
 
-		static TArray<std::shared_ptr<SkyLightComponent>> mSkyCapturesToUpdates;
+		static TArray<SkyLightComponent*> mSkyCapturesToUpdates;
 		static CriticalSection skyCaptureToUpdateLock;
 
 		friend class SkyLightSceneProxy;

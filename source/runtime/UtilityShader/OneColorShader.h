@@ -52,5 +52,17 @@ namespace Air
 		{
 
 		}
+
+		virtual void setColors(RHICommandList& RHICmdList, const LinearColor* colors, int32 numColors);
+
+		virtual bool serialize(Archive& ar) override
+		{
+			return GlobalShader::serialize(ar);
+		}
+
+		static bool shouldCache(EShaderPlatform platform)
+		{
+			return true;
+		}
 	};
 }

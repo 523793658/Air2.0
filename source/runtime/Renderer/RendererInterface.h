@@ -76,6 +76,37 @@ namespace Air
 			return newDesc;
 		}
 
+		static PooledRenderTargetDesc createCubemapDesc(
+			uint32 inExtent,
+			EPixelFormat inFormat,
+			const ClearValueBinding& inClearValue,
+			uint32 inFlags,
+			uint32 inTargetableFlags,
+			bool bInForceSeparateTargetAndShaderResource,
+			uint32 inArraySize = 1,
+			uint16 inNumMips = 1,
+			bool inAutowritable = true)
+		{
+			BOOST_ASSERT(inExtent);
+			PooledRenderTargetDesc newDesc;
+			newDesc.mClearValue = inClearValue;
+			newDesc.mExtent = int2(inExtent, inExtent);
+			newDesc.mDepth = 0;
+			newDesc.mArraySize = inArraySize;
+			newDesc.bIsArray = inArraySize > 1;
+			newDesc.bIsCubemap = true;
+			newDesc.mNumMips = inNumMips;
+			newDesc.mNumSamples = 1;
+			newDesc.mFormat = inFormat;
+			newDesc.mFlags = inFlags;
+			newDesc.mTargetableFlags = inTargetableFlags;
+			newDesc.bForceSeparateTargetAndShaderResource = bInForceSeparateTargetAndShaderResource;
+			newDesc.mDebugName = TEXT("UnknownTextureCube");
+			newDesc.bAutoWritable = inAutowritable;
+			BOOST_ASSERT(newDesc.isCubemap());
+			return newDesc;
+		}
+
 		bool is2DTexture() const
 		{
 			return mExtent.x != 0 && mExtent.y != 0 && mDepth == 0 && !bIsCubemap;
@@ -127,6 +158,13 @@ namespace Air
 				&& bForceSeparateTargetAndShaderResource == rhs.bForceSeparateTargetAndShaderResource
 				&& mClearValue == rhs.mClearValue
 				&& bAutoWritable == rhs.bAutoWritable;
+		}
+
+		
+
+		bool isCubemap() const
+		{
+			return bIsCubemap;
 		}
 
 		void reset()
@@ -225,4 +263,6 @@ namespace Air
 			mVertexDeclarationRHI.safeRelease();
 		}
 	};
+
+	
 }

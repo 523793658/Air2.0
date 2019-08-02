@@ -52,7 +52,7 @@ namespace Air
 			mGameThreadParent = parentMaterialInterface;
 			BOOST_ASSERT(parentMaterialInterface != nullptr);
 			ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-				InitMaterialInstanceResource, MaterialInstanceResource*, resource, this, std::shared_ptr<MaterialInterface>&, parent, parentMaterialInterface,
+				InitMaterialInstanceResource, MaterialInstanceResource*, resource, this, std::shared_ptr<MaterialInterface>, parent, parentMaterialInterface,
 				{
 					resource->mParent = parent;
 					resource->invalidateConstantExpressionCache();

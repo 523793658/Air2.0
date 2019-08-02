@@ -60,6 +60,16 @@ half getMaterialOpacityClipValue()
 	%s;
 }
 
+half getMaterialAmbientOcclusionRaw(PixelMaterialInputs pixelMaterialInputs)
+{
+	return pixelMaterialInputs.AmbientOcclusion;
+}
+
+half getMaterialAmbientOcclusion(PixelMaterialInputs pixelMaterialInputs)
+{
+	return saturate(getMaterialAmbientOcclusionRaw(pixelMaterialInputs));
+}
+
 MaterialFloat3 reflectionAboutCustomWorldNormal(MaterialPixelParameters parameters, MaterialFloat3 worldNormal, bool bNormalizeInputNormal)
 {
 	if(bNormalizeInputNormal)

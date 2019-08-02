@@ -31,6 +31,11 @@ SET(SOURCE_FILE
     ${AIR_ROOT_DIR}/Shaders/PostProcessBloom.hlsl
     ${AIR_ROOT_DIR}/Shaders/SkyLighting.hlsl
     ${AIR_ROOT_DIR}/Shaders/ReflectionEnvironmentShared.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ReflectionEnvironmentComputeShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ReflectionEnvironmentShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ScreenVertexShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/SHCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/MonteCarlo.hlsl
 )
 add_custom_target(ALLShaders  
     SOURCES ${SOURCE_FILE}

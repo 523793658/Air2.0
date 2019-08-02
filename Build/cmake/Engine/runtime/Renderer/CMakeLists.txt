@@ -55,6 +55,9 @@ SET(SOURCE_FILE
     ${Renderer_SOURCE_DIR}/HdrCustomResolveShaders.h 
     ${Renderer_SOURCE_DIR}/HdrCustomResolveShaders.cpp 
     ${Renderer_SOURCE_DIR}/SkyBoxRendering.cpp 
+    ${Renderer_SOURCE_DIR}/ReflectionEnvironmentCapture.h 
+    ${Renderer_SOURCE_DIR}/ReflectionEnvironmentCapture.cpp 
+    ${Renderer_SOURCE_DIR}/ReflectionEnvironmentDiffuseIrradiance.cpp 
     )
     
 
@@ -99,6 +102,7 @@ target_link_libraries(${LIB_NAME}
     RenderCore
     RHI
     ShaderCore
+	UtilityShader
 )
 
 

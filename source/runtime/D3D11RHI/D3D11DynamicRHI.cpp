@@ -1885,8 +1885,71 @@ namespace Air
 		return new D3D11ShaderResourceView(shaderResourceView, vertexBuffer);
 	}
 
-	
+	void D3D11DynamicRHI::RHIReadSurfaceFloatData(TextureRHIParamRef textureRHI, IntRect inRect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex)
+	{
+		D3D11TextureBase* texture = getD3D11TextureFromRHITexture(textureRHI);
+		uint32 width = inRect.width();
+		uint32 height = inRect.height();
 
+		D3D11_TEXTURE2D_DESC textureDesc;
+		((ID3D11Texture2D*)texture->getResource())->GetDesc(&textureDesc);
+		BOOST_ASSERT(textureDesc.Format == GPixelFormats[PF_FloatRGBA].PlatformFormat);
+
+		outData.empty(width * height);
+
+		D3D11_BOX rect;
+		rect.left = inRect.min.x;
+		rect.top = inRect.min.y;
+		rect.right = inRect.max.x;
+		rect.bottom = inRect.max.y;
+		rect.back = 1;
+		rect.front = 0;
+
+		D3D11_TEXTURE2D_DESC desc;
+		ZeroMemory(&desc, sizeof(D3D11_TEXTURE2D_DESC));
+		desc.Width = width;
+		desc.Height = height;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = textureDesc.Format;
+		desc.SampleDesc.Count = 1;
+		desc.SampleDesc.Quality = 0;
+		desc.Usage = D3D11_USAGE_STAGING;
+		desc.BindFlags = 0;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		desc.MiscFlags = 0;
+		TRefCountPtr<ID3D11Texture2D> tempTexture2D;
+		VERIFYD3D11RESULT_EX(mD3D11Device->CreateTexture2D(&desc, NULL, tempTexture2D.getInitReference()), mD3D11Device);
+
+		uint32 subresource = 0;
+		if (textureDesc.MiscFlags == D3D11_RESOURCE_MISC_TEXTURECUBE)
+		{
+			uint32 d3dFace = getD3D11CubeFace(cubeface);
+			subresource = D3D11CalcSubresource(mipIndex, arrayIndex * 6 + d3dFace, textureDesc.MipLevels);
+		}
+		mD3D11Context->CopySubresourceRegion(tempTexture2D, 0, 0, 0, 0, texture->getResource(), subresource, &rect);
+
+		D3D11_MAPPED_SUBRESOURCE lockedRect;
+		VERIFYD3D11RESULT_EX(mD3D11Context->Map(tempTexture2D, 0, D3D11_MAP_READ, 0, &lockedRect), mD3D11Device);
+
+		int32 totalCount = width * height;
+
+		if (totalCount >= outData.size())
+		{
+			outData.addZeroed(totalCount);
+		}
+		for (int32 y = inRect.min.y; y < inRect.max.y; y++)
+		{
+			Float16Color* srcPtr = (Float16Color*)((uint8*)lockedRect.pData + (y - inRect.min.y) * lockedRect.RowPitch);
+			int32 index = (y - inRect.min.y) * width;
+			BOOST_ASSERT(index + ((int32)width - 1) < outData.size());
+			Float16Color* destColor = &outData[index];
+			float16* destPtr = (float16*)(destColor);
+			Memory::memcpy(destPtr, srcPtr, width * sizeof(float16) * 4);
+		}
+		mD3D11Context->Unmap(tempTexture2D, 0);
+	}
+	
 
 
 	ShaderResourceViewRHIRef D3D11DynamicRHI::RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint32 mipLevel)

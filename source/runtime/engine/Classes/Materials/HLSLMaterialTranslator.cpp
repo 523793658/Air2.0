@@ -66,11 +66,20 @@ namespace Air
 			chunk[MP_Normal] = mMaterial->compilePropertyAndSetMaterialProperty(MP_Normal, this);
 			normalCodeChunkEnd = mSharedPropertyCodeChunks[normalShaderFrequency].size();
 		}
+
+		chunk[MP_EmissiveColor] = mMaterial->compilePropertyAndSetMaterialProperty(MP_EmissiveColor, this);
 		chunk[MP_BaseColor] = mMaterial->compilePropertyAndSetMaterialProperty(MP_BaseColor, this);
 		chunk[MP_Metallic] = mMaterial->compilePropertyAndSetMaterialProperty(MP_Metallic, this);
 		chunk[MP_Specular] = mMaterial->compilePropertyAndSetMaterialProperty(MP_Specular, this);
 		chunk[MP_Roughness] = mMaterial->compilePropertyAndSetMaterialProperty(MP_Roughness, this);
 		EMaterialShadingModel materialShadingModel = mMaterial->getShadingModel();
+
+		chunk[MP_AmbientOcclusion] = mMaterial->compilePropertyAndSetMaterialProperty(MP_AmbientOcclusion, this);
+
+
+
+
+
 		const EMaterialDomain domain = (const EMaterialDomain)mMaterial->getMaterialDomain();
 
 		const uint32 saveNumUserTexCoords = mNumUserTexCoords;

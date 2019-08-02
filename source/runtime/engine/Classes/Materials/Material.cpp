@@ -340,6 +340,8 @@ namespace Air
 		{
 			mMaterialPropertyTable[MP_CustomizedUVs0 + index] = &mCustomizedUVs[index];
 		}
+		mMaterialPropertyTable[MP_AmbientOcclusion] = &mAmbientOcclusion;
+		mMaterialPropertyTable[MP_EmissiveColor] = &mEmissiveColor;
 	}
 
 	MaterialRenderProxy* RMaterial::getRenderProxy(bool selected, bool bHovered /* = false */) const
@@ -894,6 +896,8 @@ namespace Air
 		case MP_Roughness: return mRoughness.compileWithDefault(compiler, prop);
 		case MP_BaseColor: return mBaseColor.compileWithDefault(compiler, prop);
 		case MP_Normal: return mNormal.compileWithDefault(compiler, prop);
+		case MP_AmbientOcclusion: return mAmbientOcclusion.compileWithDefault(compiler, prop);
+		case MP_EmissiveColor: return mEmissiveColor.compileWithDefault(compiler, prop);
 		default:
 			if (prop >= MP_CustomizedUVs0 && prop <= MP_CustomizedUVs7)
 			{

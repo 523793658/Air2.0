@@ -8,7 +8,7 @@
 namespace Air
 {
 
-	TArray<std::shared_ptr<SkyLightComponent>> SkyLightComponent::mSkyCapturesToUpdates;
+	TArray<SkyLightComponent*> SkyLightComponent::mSkyCapturesToUpdates;
 	WindowsCriticalSection SkyLightComponent::skyCaptureToUpdateLock;
 	
 	void SkyTextureCubeResource::initRHI()
@@ -81,6 +81,16 @@ namespace Air
 		mOcclusionTint = Color::Black;
 		mAverageBrightness = 1.0f;
 		mBlendDestinationAverageBrightness = 1.0f;
+	}
+
+	void SkyLightComponent::postInitProperties()
+	{
+		if (!hasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+		{
+			ScopeLock lock(&skyCaptureToUpdateLock);
+			mSkyCapturesToUpdates.addUnique(this);
+		}
+		ParentType::postInitProperties();
 	}
 
 	SkyLightSceneProxy* SkyLightComponent::createSceneProxy() const
@@ -178,12 +188,12 @@ namespace Air
 		}
 	}
 
-	void SkyLightComponent::updateSkyCaptureContentsArray(World* worldToUpdate, TArray<std::shared_ptr<SkyLightComponent>>& componentArray, bool bBlendSources)
+	void SkyLightComponent::updateSkyCaptureContentsArray(World* worldToUpdate, TArray<SkyLightComponent*>& componentArray, bool bBlendSources)
 	{
 		const bool bIsCompilingShaders = GShaderCompilingManager != nullptr && GShaderCompilingManager->isCompiling();
 		for (int32 captureIndex = componentArray.size() - 1; captureIndex >= 0; captureIndex--)
 		{
-			std::shared_ptr<SkyLightComponent> captureComponent = componentArray[captureIndex];
+			SkyLightComponent* captureComponent = componentArray[captureIndex];
 			AActor* owner = captureComponent->getOwner();
 			if ((!owner || !owner->getLevel() || (worldToUpdate->containsActor(owner) && owner->getLevel()->bIsVisible)) && (!bIsCompilingShaders || captureComponent->mSourceType == SLS_SpecifiedCubmap))
 			{

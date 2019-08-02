@@ -143,9 +143,13 @@ namespace Air
 		
 		ColorMaterialInput mBaseColor;
 
+		ColorMaterialInput mEmissiveColor;
+
 		VectorMaterialInput mNormal;
 
 		Vector2MaterialInput mCustomizedUVs[8];
+
+		ScalarMaterialInput mAmbientOcclusion;
 
 		ExpressionInput* mMaterialPropertyTable[MP_Max];
 	private:

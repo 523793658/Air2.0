@@ -8,7 +8,7 @@
 namespace Air
 {
 	struct Color;
-
+	class Float16Color;
 	struct CORE_API LinearColor
 	{
 		float R, G, B, A;
@@ -27,7 +27,7 @@ namespace Air
 
 		LinearColor(const Color& Color);
 
-
+		explicit LinearColor(const Float16Color& c);
 
 		FORCEINLINE LinearColor()
 		{}

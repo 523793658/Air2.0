@@ -1841,6 +1841,8 @@ namespace Air
 		add(Guid::newGuid(), TEXT("CustomizedUV5"), MP_CustomizedUVs5, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 5);
 		add(Guid::newGuid(), TEXT("CustomizedUV6"), MP_CustomizedUVs6, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 6);
 		add(Guid::newGuid(), TEXT("CustomizedUV7"), MP_CustomizedUVs7, MCT_Float2, float4(0, 0, 0, 0), SF_Vertex, 7);
+		add(Guid::newGuid(), TEXT("AmbientOcclusion"), MP_AmbientOcclusion, MCT_Float1, float4(1, 0, 0, 0), SF_Pixel);
+		add(Guid::newGuid(), TEXT("EmissiveColor"), MP_EmissiveColor, MCT_Float3, float4(0, 0, 0, 0), SF_Pixel);
 		add(Guid::newGuid(), TEXT("Missing"), MP_Max, MCT_Float1, float4(0, 0, 0, 0), SF_Pixel, INDEX_NONE, bHideAttribute);
 
 	}

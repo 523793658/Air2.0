@@ -2,6 +2,8 @@
 #include "EngineMininal.h"
 #include "RenderResource.h"
 #include "RHICommandList.h"
+#include "GlobalShader.h"
+#include "ShaderParameterUtils.h"
 namespace Air
 {
 	struct ScreenVertex
@@ -32,4 +34,67 @@ namespace Air
 	};
 
 	extern ENGINE_API TGlobalResource<ScreenVertexDeclaration> GScreenVertexDeclaration;
+
+	class ScreenVS : public GlobalShader
+	{
+		DECLARE_EXPORTED_SHADER_TYPE(ScreenVS, Global, ENGINE_API);
+	public:
+		static bool shouldCache(EShaderPlatform platform) { return true; }
+
+		ScreenVS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+			:GlobalShader(initializer)
+		{
+
+		}
+
+		ScreenVS() {}
+
+		void setParameters(RHICommandList& RHICmdList, const SceneView& view)
+		{
+			GlobalShader::setParameters(RHICmdList, getVertexShader(), view);
+		}
+
+		virtual bool serialize(Archive& ar) override
+		{
+			return GlobalShader::serialize(ar);
+		}
+	};
+
+	class ScreenPS : public GlobalShader
+	{
+		DECLARE_EXPORTED_SHADER_TYPE(ScreenPS, Global, ENGINE_API);
+	public:	
+		static bool shouldCache(EShaderPlatform platform) { return true; }
+
+		ScreenPS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+			:GlobalShader(initializer)
+		{
+			inTexture.bind(initializer.mParameterMap, TEXT("inTexture"), SPF_Mandatory);
+			inTextureSampler.bind(initializer.mParameterMap, TEXT("inTextureSampler"));
+		}
+
+		ScreenPS() {}
+
+		void setParameters(RHICommandList& RHICmdList, const Texture* texture)
+		{
+			setTextureParameter(RHICmdList, getPixelShader(), inTexture, inTextureSampler, texture);
+		}
+
+		void setParameters(RHICommandList& RHICmdList, SamplerStateRHIParamRef samplerStateRHI, TextureRHIParamRef textureRHI)
+		{
+			setTextureParameter(RHICmdList, getPixelShader(), inTexture, inTextureSampler, samplerStateRHI, textureRHI);
+		}
+
+		virtual bool serialize(Archive& ar) override
+		{
+			bool bShaderHasOutdateParameters = GlobalShader::serialize(ar);
+			ar << inTexture;
+			ar << inTextureSampler;
+			return bShaderHasOutdateParameters;
+		}
+
+	private:
+		ShaderResourceParameter inTexture;
+		ShaderResourceParameter inTextureSampler;
+	};
 }

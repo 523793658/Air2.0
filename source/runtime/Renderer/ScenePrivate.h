@@ -73,6 +73,26 @@ namespace Air
 
 		virtual void disableSkyLight(SkyLightSceneProxy* light) override;
 
+		virtual void updateSkyCaptureContents(const SkyLightComponent* captureComponent, bool bCaptureEmissiveOnly, std::shared_ptr<RTextureCube> sourceCubemap, Texture* outProcessedTexture, float& outAverageBrightness, SHVectorRGB3& outIrradianceEnvironmentMap) override;
+
+		bool shouldRenderSkyLight(EBlendMode blendMode) const
+		{
+			return shouldRenderSkyLight_Internal(blendMode);
+		}
+
+		bool shouldRenderSkyLight_Internal(EBlendMode blendMode) const
+		{
+			if (isTranslucentBlendMode(blendMode))
+			{
+				return mSkyLight && !mSkyLight->bHasStaticLighting;
+			}
+			else
+			{
+				const bool bRenderSkyLight = mSkyLight && !mSkyLight->bHasStaticLighting && (mSkyLight->bWantsStaticShadowing || isAnyForwardShadingEnabled(getShaderPlatform()));
+				return bRenderSkyLight;
+			}
+		}
+
 		template<typename LightMapPolicyType>
 		TStaticMeshDrawList<TBasePassDrawingPolicy<LightMapPolicyType>>& getBasePassDrawList(EBasePassDrawListType drawType);
 
