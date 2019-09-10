@@ -253,6 +253,11 @@ namespace Air
 		return GRHICommandList.mCommandListImmediate;
 	}
 
+	RHICommandListExecutor::RHICommandListExecutor()
+		:bLatchedBypass(true)
+	{
+	}
+
 	RHIAsyncComputeCommandListImmediate& RHICommandListExecutor::getImmediateAsyncComputeCommandList()
 	{
 		return GRHICommandList.mAsyncComputeCmdListImmediate;

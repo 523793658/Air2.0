@@ -266,7 +266,26 @@ namespace Air
 
 	class RHI_API RHITexture3D : public RHITexture
 	{
+		RHITexture3D(uint32 width, uint32 height, uint32 depth, uint32 inNumMips, EPixelFormat inFormat, uint32 inFlags, const ClearValueBinding& inClearValue)
+			:RHITexture(inNumMips, 1, inFormat, inFlags, nullptr, inClearValue)
+			, mWidth(width)
+			, mHeight(height)
+			, mDepth(depth)
+		{
 
+		}
+
+		virtual RHITexture3D* getTexture3D() { return this; }
+
+		uint32 getWidth() const { return mWidth; }
+		
+		uint32 getHeight() const { return mHeight; }
+
+		uint32 getDepth() const { return mDepth; }
+	private:
+		uint32 mWidth;
+		uint32 mHeight;
+		uint32 mDepth;
 	};
 
 	class RHI_API RHITextureCube : public RHITexture

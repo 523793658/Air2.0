@@ -40,13 +40,13 @@ namespace Demo
 		std::shared_ptr<AStaticMeshActor> actor = mWorld->spawnActor<AStaticMeshActor>(spawnInfo);
 		std::shared_ptr<ADirectionalLight> light = mWorld->spawnActor<ADirectionalLight>(spawnInfo);
 		std::shared_ptr<ASkyLight> skyLight = mWorld->spawnActor<ASkyLight>(spawnInfo);
-
+		skyLight->getLightComponent()->setLightColor(LinearColor::White);
 		light->setLightColor(LinearColor(1.0f, 1.0f, 1.0f, 1.0f));
 		
 		auto tex = loadObjectAsync<RTexture>(TEXT("assets/textures/uffizi_cross.dds"));
 		mWorld->setSkyTexture(tex);
 		skyLight->getLightComponent()->setCubemap(std::dynamic_pointer_cast<RTextureCube>(tex));
-		
+		skyLight->getLightComponent()->mSourceType = SLS_SpecifiedCubmap;
 
 
 		std::shared_ptr<MaterialInterface>& material = std::dynamic_pointer_cast

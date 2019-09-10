@@ -391,4 +391,6 @@ struct ScreenVertexOutput
 	float4 Position : SV_POSITION;
 };
 
+#define RETURN_COLOR(color) (color)
+
 #include "Random.hlsl"

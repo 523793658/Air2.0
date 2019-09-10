@@ -205,3 +205,17 @@ void FilterPS(
 	outColor = SampleCubemap(cubeCoordinates);
 #endif
 }
+
+void AccumulateCubeFacesPS(
+	ScreenVertexOutput input,
+	out float4 outColor : SV_Target0
+)
+{
+	float4 accumulateValue = TextureCubeSampleLevel(SourceTexture, SourceTextureSampler, float3(1, 0, 0), SourceMipIndex);
+	accumulateValue += TextureCubeSampleLevel(SourceTexture, SourceTextureSampler, float3(-1, 0, 0), SourceMipIndex);
+	accumulateValue += TextureCubeSampleLevel(SourceTexture, SourceTextureSampler, float3(0, 1, 0), SourceMipIndex);
+	accumulateValue += TextureCubeSampleLevel(SourceTexture, SourceTextureSampler, float3(0, -1, 0), SourceMipIndex);
+	accumulateValue += TextureCubeSampleLevel(SourceTexture, SourceTextureSampler, float3(0, 0, 1), SourceMipIndex);
+	accumulateValue += TextureCubeSampleLevel(SourceTexture, SourceTextureSampler, float3(0, 0, -1), SourceMipIndex);
+	outColor = float4(4 * PI * accumulateValue.rgb / (max(accumulateValue.a, 0.00001f)), 0);
+}

@@ -148,6 +148,7 @@ namespace Air
 			mSharedPixelProperties[MP_Specular] = true;
 			mSharedPixelProperties[MP_Roughness] = true;
 			mSharedPixelProperties[MP_AmbientOcclusion] = true;
+			mSharedPixelProperties[MP_EmissiveColor] = true;
 			{
 				for (int32 frequency = 0; frequency < SF_NumFrequencies; ++frequency)
 				{

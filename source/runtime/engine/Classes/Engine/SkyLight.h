@@ -8,9 +8,12 @@ namespace Air
 	{
 		GENERATED_RCLASS_BODY(ASkyLight, AInfo)
 	public:
-		std::shared_ptr<class SkyLightComponent> mLightComponent;
+		~ASkyLight();
 
 	public:
+		std::shared_ptr<class SkyLightComponent> mLightComponent;
+
+
 		uint32 bEnabled;
 
 		class SkyLightComponent* getLightComponent() const;

@@ -2,7 +2,11 @@
 #include "Material.hlsl"
 #include "BasePassCommon.hlsl"
 #include "VertexFactory.hlsl"
+#include "ReflectionEnvironmentShared.hlsl"
 #include "DeferredShadingCommon.hlsl"
+#include "InstancedStereo.hlsl"
+
+#define getEffectiveSkySHDiffuse getSkySHDiffuse
 
 
 void getSkyLighting(float3 worldNormal, float2 lightmapUV, out float3 outDiffuseLighting, out float3 outSubsurfaceLighting)
@@ -15,12 +19,12 @@ void getSkyLighting(float3 worldNormal, float2 lightmapUV, out float3 outDiffuse
 	float geometryTerm = 1;
 	float3 skyLightingNormal = worldNormal;
 
-	float3 diffuseLookup = getEffecitiveSkySHDiffuse(skyLightingNormal) * resolvedView.SkyLightColor.rgb;
+	float3 diffuseLookup = getEffectiveSkySHDiffuse(skyLightingNormal) * ResolvedView.SkyLightColor.rgb;
 
-	outDiffuseLighting += diffuseLookup * (skyVisiblity * geometryTerm);
+	outDiffuseLighting += diffuseLookup * (skyVisibility * geometryTerm);
 
 #if MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
-	float3 backfaceDiffuseLookup = getEffecitiveSkySHDiffuse(-worldNormal) * resolvedView.SkyLightColor.rgb;
+	float3 backfaceDiffuseLookup = getEffectiveSkySHDiffuse(-worldNormal) * resolvedView.SkyLightColor.rgb;
 	outSubsurfaceLighting += backfaceDiffuseLookup * skyVisiblity;
 #endif // MATERIAL_SHADINGMODEL_TWOSIDED_FOLIAGE
 
@@ -59,6 +63,10 @@ void PixelShaderInOut_MainPS(
 	in PixelShaderIn In,
 	inout PixelShaderOut Out)
 {
+#if INSTANCED_STEREO
+#else
+	ResolvedView = ResolveView();
+#endif
 	float4 OutGBufferD = 0;
 	float4 OutGBufferE = 0;
 	MaterialPixelParameters materialParameters = getMaterialPixelParameters(interpolants, In.SvPosition);

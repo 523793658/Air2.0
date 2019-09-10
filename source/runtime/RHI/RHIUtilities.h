@@ -152,6 +152,38 @@ namespace Air
 	//	Texture2DRHIRef
 	//)
 
+	inline void RHICreateTargetableShaderResourceCube(
+		uint32 linearSize,
+		uint8 format,
+		uint32 numMips,
+		uint32 flags,
+		uint32 targetableTextureFlags,
+		bool bForceSeparateTargetAndShaderResource,
+		RHIResourceCreateInfo& createInfo,
+		TextureCubeRHIRef& outTargetableTexture,
+		TextureCubeRHIRef& outShaderResourceTexture
+	)
+	{
+		BOOST_ASSERT(!(flags & TexCreate_RenderTargetable));
+		BOOST_ASSERT(!(flags & TexCreate_ResolveTargetable));
+		BOOST_ASSERT(!(flags & TexCreate_ShaderResource));
+
+		BOOST_ASSERT(!(flags & targetableTextureFlags));
+
+		BOOST_ASSERT(targetableTextureFlags & (TexCreate_RenderTargetable | TexCreate_DepthStencilTargetable));
+
+		bForceSeparateTargetAndShaderResource &= (GMaxRHIFeatureLevel > ERHIFeatureLevel::ES2);
+		if (!bForceSeparateTargetAndShaderResource)
+		{
+			outTargetableTexture = outShaderResourceTexture = RHICreateTextureCube(linearSize, format, numMips, flags | targetableTextureFlags | TexCreate_ShaderResource, createInfo);
+		}
+		else
+		{
+			outTargetableTexture = RHICreateTextureCube(linearSize, format, numMips, flags | targetableTextureFlags, createInfo);
+			outShaderResourceTexture = RHICreateTextureCube(linearSize, format, numMips, flags | TexCreate_ShaderResource | TexCreate_ShaderResource, createInfo);
+		}
+	}
+
 	inline uint32 getVertexCountForPrimitiveCount(uint32 numPrimitives, uint32 primitiveType)
 	{
 		uint32 vertexCount = 0;

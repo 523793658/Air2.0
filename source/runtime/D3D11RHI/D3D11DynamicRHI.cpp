@@ -565,6 +565,13 @@ namespace Air
 				{
 					resource = sourceTexture2DArray;
 				}
+
+				D3D11TextureCube* sourceTextureCube = static_cast<D3D11TextureCube*>(renderTarget->getTextureCube());
+				if (sourceTextureCube)
+				{
+					resource = sourceTextureCube;
+				}
+
 				resource->setCurrentGPUAccess(transitionType);
 			}
 		}
@@ -2076,6 +2083,15 @@ namespace Air
 			if (RHITexture2D* texture2D = texture->getTexture2D())
 			{
 				verifyHandle(mCurrentRenderTargets[index], ResourceCast(texture2D)->getResource());
+			}
+			else if (RHITextureCube * textureCube = texture->getTextureCube())
+			{
+				verifyHandle(mCurrentRenderTargets[index], ResourceCast(textureCube)->getResource());
+			}
+			else if (RHITexture3D * texture3D = texture->getTexture3D())
+			{
+				/*verifyHandle(mCurrentRenderTargets[index], ResourceCast(texture3D)->getResource());*/
+				BOOST_ASSERT(false);
 			}
 			else
 			{

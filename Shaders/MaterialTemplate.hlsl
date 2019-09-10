@@ -185,6 +185,16 @@ half getMaterialRoughness(PixelMaterialInputs pixelMaterialInputs)
 	return saturate(getMaterialRoughnessRaw(pixelMaterialInputs));
 }
 
+half3 getMaterialEmissiveRaw(PixelMaterialInputs pixelMaterialInputs)
+{
+	return pixelMaterialInputs.EmissiveColor;
+}
+
+half3 getMaterialEmissive(PixelMaterialInputs pixelMaterialInputs)
+{
+	return getMaterialEmissiveRaw(pixelMaterialInputs);
+}
+
 MaterialPixelParameters makeInitializedMaterialPixelParameters()
 {
 	MaterialPixelParameters MPP;

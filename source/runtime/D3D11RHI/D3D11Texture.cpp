@@ -99,7 +99,7 @@ namespace Air
 
 		bool bPooledTexture = true;
 
-		if(GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1);
+		if(GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1)
 		{
 			flags &= ~TexCreate_SRGB;
 		}

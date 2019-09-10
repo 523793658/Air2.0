@@ -20,7 +20,7 @@ namespace Air
 
 	void OneColorPS::setColors(RHICommandList& RHICmdList, const LinearColor* colors, int32 numColors)
 	{
-		BOOST_ASSERT(NUMCOLORS <= MaxSimultaneousRenderTargets);
+		BOOST_ASSERT(numColors <= MaxSimultaneousRenderTargets);
 
 		const ShaderConstantBufferParameter& clearUBParam = getConstantBufferParameter<ClearShaderUB>();
 		if (clearUBParam.isBound())

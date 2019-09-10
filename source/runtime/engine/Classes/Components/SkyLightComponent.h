@@ -91,10 +91,20 @@ namespace Air
 
 		static void updateSkyCaptureContentsArray(World* worldToUpdate, TArray<SkyLightComponent*>& componentArray, bool bBlendSources);
 
+		void setLightColor(LinearColor color);
+
+		~SkyLightComponent();
+
 	protected:
 		virtual void createRenderState_Concurrent() override;
 
 		virtual void destroyRenderState_Concurrent() override;
+
+	private:
+		void sanitizeCubemapSize();
+
+		void updateLimitedRenderingStateFast();
+
 	public:
 		TEnumAsByte<enum ESkyLightSourceType> mSourceType;
 

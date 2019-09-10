@@ -237,32 +237,32 @@ namespace Air
 				{
 					setRenderTarget(RHICmdList, effectiveRT.mTargetableTexture, 0, cubeface, nullptr, true);
 
-RHICmdList.clearColorTexture(effectiveRT.mTargetableTexture, LinearColor(0, 0, 0, 0), IntRect());
+					RHICmdList.clearColorTexture(effectiveRT.mTargetableTexture, LinearColor(0, 0, 0, 0), IntRect());
 
-const IntRect viewRect(0, 0, mipSize, mipSize);
-RHICmdList.setViewport(0, 0, 0.0f, mipSize, mipSize, 1.0f);
-RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
-RHICmdList.setBlendState(TStaticBlendState<>::getRHI());
+					const IntRect viewRect(0, 0, mipSize, mipSize);
+					RHICmdList.setViewport(0, 0, 0.0f, mipSize, mipSize, 1.0f);
+					RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
+					RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
+					RHICmdList.setBlendState(TStaticBlendState<>::getRHI());
 
-TShaderMapRef<CopyDiffuseIrradiancePS> pixelShader(shaderMap);
+					TShaderMapRef<CopyDiffuseIrradiancePS> pixelShader(shaderMap);
 
-TShaderMapRef<ScreenVS> vertexShader(getGlobalShaderMap(featureLevel));
+					TShaderMapRef<ScreenVS> vertexShader(getGlobalShaderMap(featureLevel));
 
-setGlobalBoundShaderState(RHICmdList, featureLevel, s_CopyDiffuseIrradianceShaderState, GFilterVertexDeclaration.mVertexDeclarationRHI, *vertexShader, *pixelShader);
+					setGlobalBoundShaderState(RHICmdList, featureLevel, s_CopyDiffuseIrradianceShaderState, GFilterVertexDeclaration.mVertexDeclarationRHI, *vertexShader, *pixelShader);
 
-pixelShader->setParameters(RHICmdList, cubeface, lightingSourceMipIndex, coefficientIndex, mipSize, lightingSource);
+					pixelShader->setParameters(RHICmdList, cubeface, lightingSourceMipIndex, coefficientIndex, mipSize, lightingSource);
 
-drawRectangle(RHICmdList,
-	viewRect.min.x, viewRect.min.y,
-	viewRect.width(), viewRect.height(),
-	viewRect.min.x, viewRect.min.y,
-	viewRect.width(), viewRect.height(),
-	int2(viewRect.width(), viewRect.height()),
-	int2(mipSize, mipSize),
-	*vertexShader);
+					drawRectangle(RHICmdList,
+						viewRect.min.x, viewRect.min.y,
+						viewRect.width(), viewRect.height(),
+						viewRect.min.x, viewRect.min.y,
+						viewRect.width(), viewRect.height(),
+						int2(viewRect.width(), viewRect.height()),
+						int2(mipSize, mipSize),
+						*vertexShader);
 
-RHICmdList.copyToResolveTarget(effectiveRT.mTargetableTexture, effectiveRT.mShaderResourceTexture, true, ResolveParams(ResolveRect(), (ECubeFace)cubeface));
+					RHICmdList.copyToResolveTarget(effectiveRT.mTargetableTexture, effectiveRT.mShaderResourceTexture, true, ResolveParams(ResolveRect(), (ECubeFace)cubeface));
 				}
 			}
 			const int32 numMips = Math::ceilLogTwo(GDiffuseIrradianceCubemapSize) + 1;

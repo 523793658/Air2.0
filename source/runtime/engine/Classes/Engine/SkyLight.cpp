@@ -3,6 +3,12 @@
 #include "SimpleReflection.h"
 namespace Air
 {
+	ASkyLight::~ASkyLight()
+	{
+		AIR_LOG(ASkyLight, Log, TEXT("dnff"));
+	}
+
+
 	ASkyLight::ASkyLight(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
 	{

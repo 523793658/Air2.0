@@ -407,7 +407,7 @@ namespace Air
 			}
 			{
 				const EPixelFormat DiffuseGBufferFormat = bHighPrecisionGBuffers ? PF_FloatRGBA : PF_B8G8R8A8;
-				PooledRenderTargetDesc desc(PooledRenderTargetDesc::create2DDesc(mBufferSize, DiffuseGBufferFormat, ClearValueBinding::Transparent, TexCreate_None, TexCreate_RenderTargetable, false));
+				PooledRenderTargetDesc desc(PooledRenderTargetDesc::create2DDesc(mBufferSize, DiffuseGBufferFormat, ClearValueBinding::Transparent, TexCreate_SRGB, TexCreate_RenderTargetable, false));
 				GRenderTargetPool.findFreeElement(RHICmdList, desc, mGBufferC, TEXT("GBufferC"));
 			}
 

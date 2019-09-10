@@ -200,6 +200,88 @@ namespace Air
 				viewConstantShaderParameters.DirectionalLightColor = LinearColor::Black;
 				viewConstantShaderParameters.DirectionalLightDirection = float3::Zero;
 			}
+
+			if (scene->mSkyLight)
+			{
+				SkyLightSceneProxy* skyLight = scene->mSkyLight;
+				viewConstantShaderParameters.SkyLightColor = skyLight->mLightColor;
+				bool bApplyPrecomputedBentNormalShadowing = skyLight->bCastShadows && skyLight->bWantsStaticShadowing;
+
+				viewConstantShaderParameters.SkyLightParameters = bApplyPrecomputedBentNormalShadowing ? 1 : 0;
+			}
+			else
+			{
+				viewConstantShaderParameters.SkyLightParameters = 0;
+				viewConstantShaderParameters.SkyLightColor = LinearColor::Black;
+			}
+		}
+
+		BOOST_ASSERT(sizeof(viewConstantShaderParameters.SkyIrradianceEnvironmentMap) == sizeof(float4) * 7);
+		setupSkyIrradianceEnvironmentMapConstants((float4*)& viewConstantShaderParameters.SkyIrradianceEnvironmentMap);
+	}
+
+	void ViewInfo::setupSkyIrradianceEnvironmentMapConstants(float4* outSkyIrradianceEnvironmentMap) const
+	{
+		Scene* scene = nullptr;
+		if (mFamily->mScene)
+		{
+			scene = mFamily->mScene->getRenderScene();
+		}
+
+		if (scene && scene->mSkyLight && !scene->mSkyLight->bHasStaticLighting
+			&& mFamily->mEngineShowFlags.SkyLighting)
+		{
+			const SHVectorRGB3& skyIrradiance = scene->mSkyLight->mIrradianceEnvironmentMap;
+			const float sqrtPI = Math::sqrt(PI);
+			const float coefficient0 = 1.0f / (2 * sqrtPI);
+			const float coefficient1 = Math::sqrt(3) / (3 * sqrtPI);
+			const float coefficient2 = Math::sqrt(15) / (8 * sqrtPI);
+			const float coefficient3 = Math::sqrt(5) / (16 * sqrtPI);
+			const float coefficient4 = 0.5f * coefficient2;
+
+			outSkyIrradianceEnvironmentMap[0].x = -coefficient1 * skyIrradiance.r.V[3];
+			outSkyIrradianceEnvironmentMap[0].y = -coefficient1 * skyIrradiance.r.V[1];
+			outSkyIrradianceEnvironmentMap[0].z = coefficient1 * skyIrradiance.r.V[2];
+			outSkyIrradianceEnvironmentMap[0].w = coefficient0 * skyIrradiance.r.V[0] -coefficient3 * skyIrradiance.r.V[6];
+
+
+			outSkyIrradianceEnvironmentMap[1].x = -coefficient1 * skyIrradiance.g.V[3];
+			outSkyIrradianceEnvironmentMap[1].y = -coefficient1 * skyIrradiance.g.V[1];
+			outSkyIrradianceEnvironmentMap[1].z = coefficient1 * skyIrradiance.g.V[2];
+			outSkyIrradianceEnvironmentMap[1].w = coefficient0 * skyIrradiance.g.V[0] - coefficient3 * skyIrradiance.b.V[6];
+
+
+			outSkyIrradianceEnvironmentMap[2].x = -coefficient1 * skyIrradiance.b.V[3];
+			outSkyIrradianceEnvironmentMap[2].y = -coefficient1 * skyIrradiance.b.V[1];
+			outSkyIrradianceEnvironmentMap[2].z = coefficient1 * skyIrradiance.b.V[2];
+			outSkyIrradianceEnvironmentMap[2].w = coefficient0 * skyIrradiance.b.V[0] - coefficient3 * skyIrradiance.b.V[6];
+
+
+			outSkyIrradianceEnvironmentMap[3].x = coefficient2 * skyIrradiance.r.V[4];
+			outSkyIrradianceEnvironmentMap[3].y = -coefficient2 * skyIrradiance.r.V[5];
+			outSkyIrradianceEnvironmentMap[3].z = 3 * coefficient3 * skyIrradiance.r.V[6];
+			outSkyIrradianceEnvironmentMap[3].w = -coefficient2 * skyIrradiance.r.V[7];
+
+
+			outSkyIrradianceEnvironmentMap[4].x = coefficient2 * skyIrradiance.g.V[4];
+			outSkyIrradianceEnvironmentMap[4].y = -coefficient2 * skyIrradiance.g.V[5];
+			outSkyIrradianceEnvironmentMap[4].z = 3 * coefficient3 * skyIrradiance.g.V[6];
+			outSkyIrradianceEnvironmentMap[4].w = -coefficient2 * skyIrradiance.g.V[7];
+
+
+			outSkyIrradianceEnvironmentMap[5].x = coefficient2 * skyIrradiance.b.V[4];
+			outSkyIrradianceEnvironmentMap[5].y = -coefficient2 * skyIrradiance.b.V[5];
+			outSkyIrradianceEnvironmentMap[5].z = 3 * coefficient3 * skyIrradiance.b.V[6];
+			outSkyIrradianceEnvironmentMap[5].w = -coefficient2 * skyIrradiance.b.V[7];
+
+			outSkyIrradianceEnvironmentMap[6].x = coefficient4 * skyIrradiance.r.V[8];
+			outSkyIrradianceEnvironmentMap[6].y = coefficient4 * skyIrradiance.g.V[8];
+			outSkyIrradianceEnvironmentMap[6].z = coefficient4 * skyIrradiance.b.V[8];
+			outSkyIrradianceEnvironmentMap[6].w = 1;
+		}
+		else
+		{
+			Memory::memzero(outSkyIrradianceEnvironmentMap, sizeof(float4) * 7);
 		}
 	}
 

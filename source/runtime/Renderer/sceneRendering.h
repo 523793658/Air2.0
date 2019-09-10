@@ -75,6 +75,8 @@ namespace Air
 			}
 		}
 		ERHIFeatureLevel::Type getFeatureLevel() const { return mFeatureLevel; }
+
+		void setupSkyIrradianceEnvironmentMapConstants(float4* outSkyIrradianceEnvironmentMap) const;
 	public:
 		ICustomVisibilityQuery* mCustomVisibilityQuery{ nullptr };
 		std::unique_ptr<ViewConstantShaderParameters> mCachedViewConstantShaderParameters;

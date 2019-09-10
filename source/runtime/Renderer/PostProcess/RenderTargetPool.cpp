@@ -152,7 +152,25 @@ namespace Air
 				}
 				else
 				{
+					BOOST_ASSERT(desc.isCubemap());
+					if (desc.isArray())
+					{
 
+					}
+					else
+					{
+						RHICreateTargetableShaderResourceCube(
+							desc.mExtent.x,
+							desc.mFormat,
+							desc.mNumMips,
+							desc.mFlags,
+							desc.mTargetableFlags,
+							false,
+							createInfo,
+							(TextureCubeRHIRef&)found->mRenderTargetItem.mTargetableTexture,
+							(TextureCubeRHIRef&)found->mRenderTargetItem.mShaderResourceTexture
+						);
+					}
 				}
 				RHIBindDebugLabelName(found->mRenderTargetItem.mTargetableTexture, inDebugName);
 			}

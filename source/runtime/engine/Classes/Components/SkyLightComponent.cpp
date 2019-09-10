@@ -41,7 +41,7 @@ namespace Air
 	}
 
 	SkyLightSceneProxy::SkyLightSceneProxy(const class SkyLightComponent* inLightComponent)
-		: mLightComponent(inLightComponent)
+		: mLightComponent(std::dynamic_pointer_cast<const SkyLightComponent>(inLightComponent->shared_from_this()))
 		, mProcessedTexture(inLightComponent->mProcessedSkyTexture)
 		, mBlendDestinationProcessedTexture(inLightComponent->mBlendDestinationProcessedSkyTexture)
 		,mSkyDistanceThreshold(inLightComponent->mSkyDistanceThreshold)
@@ -79,8 +79,35 @@ namespace Air
 		mOcclusionMaxDistance = 1000;
 		mMinOcclusion = 0;
 		mOcclusionTint = Color::Black;
+		mCubemapResolution = 128;
 		mAverageBrightness = 1.0f;
 		mBlendDestinationAverageBrightness = 1.0f;
+	}
+
+	void SkyLightComponent::setLightColor(LinearColor color)
+	{
+		Color newColor(color.toColor(true));
+		if (areDynamicDataChangeAllowed() && mLightColor != newColor)
+		{
+			mLightColor = newColor;
+			updateLimitedRenderingStateFast();
+		}
+	}
+
+	void SkyLightComponent::updateLimitedRenderingStateFast()
+	{
+		if (mSceneProxy)
+		{
+			ENQUEUE_UNIQUE_RENDER_COMMAND_THREEPARAMETER(
+				FastUpdateSkyLightCommand,
+				SkyLightSceneProxy*, lightSceneProxy, mSceneProxy,
+				LinearColor, lightColor, LinearColor(mLightColor) * mIntensity,
+				float, indirectLightIntensity, mIndirectLightingIntensity,
+				{
+					lightSceneProxy->mLightColor = lightColor;
+					lightSceneProxy->mIndirectLightingIntensity = indirectLightIntensity;
+				});
+		}
 	}
 
 	void SkyLightComponent::postInitProperties()
@@ -91,6 +118,13 @@ namespace Air
 			mSkyCapturesToUpdates.addUnique(this);
 		}
 		ParentType::postInitProperties();
+	}
+
+	void SkyLightComponent::sanitizeCubemapSize()
+	{
+		static const int32 s_MaxCubemapResolution = 1024;
+		static const int32 s_MinCubemapResolution = 64;
+		mCubemapResolution = Math::clamp(int32(Math::roundUpToPowerOfTwo(mCubemapResolution)), s_MinCubemapResolution, s_MaxCubemapResolution);
 	}
 
 	SkyLightSceneProxy* SkyLightComponent::createSceneProxy() const
@@ -163,6 +197,10 @@ namespace Air
 			mAverageBrightness = *inAverageBrightness;
 			mBlendFraction = 0;
 		}
+	}
+
+	SkyLightComponent::~SkyLightComponent()
+	{
 	}
 
 	void SkyLightComponent::setCubemap(std::shared_ptr<RTextureCube> cube)

@@ -55,6 +55,7 @@ namespace Air
 	VIEW_CONSTANT_BUFFER_MEMBER(float4, BufferSizeAndInvSize)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float4, SceneTextureMinMax)\
 	VIEW_CONSTANT_BUFFER_MEMBER(LinearColor, SkyLightColor)\
+	VIEW_CONSTANT_BUFFER_MEMBER(float, SkyLightParameters) \
 	VIEW_CONSTANT_BUFFER_MEMBER_ARRAY(float4, SkyIrradianceEnvironmentMap, [7])\
 	VIEW_CONSTANT_BUFFER_MEMBER(uint32, Random)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float, RealTime)\

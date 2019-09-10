@@ -22,6 +22,9 @@ struct VertexFactoryInput
 #elif NUM_MATERIAL_TEXCOORDS_VERTEX == 7
 	float2 PackedTexCoords2 : ATTRIBUTE7;
 #endif
+#elif USE_PARTICLE_SUBUVS
+	float2 TexCoords[1] : ATTRIBUTE4;
+#endif
 };
 
 struct VertexFactoryIntermediates

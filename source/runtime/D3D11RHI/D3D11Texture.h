@@ -28,6 +28,7 @@ namespace Air
 			:mD3DRHI(inD3DRHI)
 			,IHVResourceHandle(nullptr)
 			,mMemorySize(0)
+			,mRTVArraySize(inRTVArraySize)
 			,mBaseShaderResource(this)
 			,mResource(inResource)
 			,mShaderResourceView(inShaderResourceView)
@@ -282,6 +283,7 @@ namespace Air
 	{
 		typedef D3D11Texture2D TConcreteType;
 	};
+
 
 	DECL_D3D11_RESOURCE_TRAITS(D3D11TextureCube, RHITextureCube);
 

@@ -1629,6 +1629,8 @@ namespace Air
 			//DefaultBypass = PLAT
 		};
 
+		RHICommandListExecutor();
+
 		static inline RHICommandListImmediate& getImmediateCommandList();
 
 		static inline RHIAsyncComputeCommandListImmediate& getImmediateAsyncComputeCommandList();

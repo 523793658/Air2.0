@@ -284,11 +284,18 @@ namespace Air
 			static const auto supportAllShaderPremutations = false;
 
 			const bool bForceAllPermutations = supportAllShaderPremutations;
-			const bool bProjectSupportsStationarySkyLight = false;
+			const bool bProjectSupportsStationarySkyLight = true;
 
 			const bool bCachedShaders = !bEnableSkyLight || (bProjectSupportsStationarySkyLight && (material->getShadingModel() != MSM_Unlit));
 
 			return bCachedShaders && (isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4)) && TBasePassPixelShaderBaseType<LightMapPolicyType>::shouldCache(platform, material, vertexFactoryType);
+		}
+
+		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		{
+			outEnvironment.setDefine(TEXT("SCENE_TEXTURES_DISABLED"), material->getMaterialDomain() == MD_DeferredDecal);
+			outEnvironment.setDefine(TEXT("ENABLE_SKY_LIGHT"), bEnableSkyLight);
+			TBasePassPixelShaderBaseType<LightMapPolicyType>::modifyCompilationEnvironment(platform, material, outEnvironment);
 		}
 
 		TBasePassPS(const ShaderMetaType::CompiledShaderInitializerType& initializer):
