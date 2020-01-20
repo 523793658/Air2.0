@@ -4,11 +4,12 @@
 #include "StaticBoundShaderState.h"
 #include "PostProcess/SceneFilterRendering.h"
 #include "TextureResource.h"
+#include "RHIStaticStates.h"
 namespace Air
 {
 	class SkyBoxVS : public GlobalShader
 	{
-		DECLARE_SHADER_TYPE(SkyBoxVS, Global);
+		DECLARE_GLOBAL_SHADER(SkyBoxVS);
 	public:
 		SkyBoxVS()
 		{
@@ -18,7 +19,7 @@ namespace Air
 			:GlobalShader(initializer)
 		{
 		}
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
@@ -26,7 +27,7 @@ namespace Air
 
 	class SkyBoxPS : public GlobalShader
 	{
-		DECLARE_SHADER_TYPE(SkyBoxPS, Global);
+		DECLARE_GLOBAL_SHADER(SkyBoxPS);
 	public:
 		SkyBoxPS()
 		{
@@ -36,7 +37,7 @@ namespace Air
 			:GlobalShader(initializer)
 		{
 		}
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
@@ -48,27 +49,28 @@ namespace Air
 		}
 	};
 
-	IMPLEMENT_SHADER_TYPE(, SkyBoxVS, TEXT("SkyBox"), TEXT("MainVS"), SF_Vertex);
-	IMPLEMENT_SHADER_TYPE(, SkyBoxPS, TEXT("SkyBox"), TEXT("MainPS"),
-		SF_Pixel);
+	IMPLEMENT_GLOBAL_SHADER(SkyBoxVS, "SkyBox", "MainVS", SF_Vertex);
+
+	IMPLEMENT_GLOBAL_SHADER(SkyBoxPS, "SkyBox", "MainPS", SF_Pixel);
 
 	void DeferredShadingSceneRenderer::renderSky(RHICommandList& RHICmdList)
 	{
-		RHICmdList.setBlendState(TStaticBlendState<CW_RGB, BO_Add, BF_One, BF_Zero, BO_Add, BF_Zero, BF_Zero>::getRHI());
-
+		GraphicsPipelineStateInitializer graphicsPSOInit;
+		graphicsPSOInit.mBlendState = TStaticBlendState<CW_RGB, BO_Add, BF_One, BF_Zero, BO_Add, BF_Zero, BF_Zero>::getRHI();
+		graphicsPSOInit.mRasterizerState = TStaticRasterizerState<FM_Solid, CM_None>::getRHI();
+		graphicsPSOInit.mDepthStencilState = TStaticDepthStencilState<true
+			, CF_LessEqual>::getRHI();
 		bool bStencilDirty = false;
 		for (int32 viewIndex = 0; viewIndex < mViews.size(); viewIndex++)
 		{
 			ViewInfo& view = mViews[viewIndex];
 			TShaderMapRef<SkyBoxVS> vertexShader(view.mShaderMap);
 			RHICmdList.setViewport(view.mViewRect.min.x, view.mViewRect.min.y, 0.0f, view.mViewRect.max.x, view.mViewRect.max.y, 1.0f);
-			RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-			RHICmdList.setDepthStencilState(TStaticDepthStencilState<true
-				, CF_LessEqual>::getRHI());
+			setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
 			TShaderMapRef<SkyBoxPS> pixelShader(view.mShaderMap);
-			setGlobalBoundShaderState(RHICmdList, view.getFeatureLevel(), pixelShader->getBoundShaderState(), getVertexDeclarationVector4(), *vertexShader, *pixelShader);
-			pixelShader->setParameters(RHICmdList, pixelShader->getPixelShader(), view);
-			drawRectangle(RHICmdList, 0, 0, view.mViewRect.width(), view.mViewRect.height(), view.mViewRect.min.x, view.mViewRect.min.y, view.mViewRect.width(), view.mViewRect.height(), view.mViewRect.size(), SceneRenderTargets::get(RHICmdList).getBufferSizeXY(), *vertexShader, EDRF_UseTriangleOptimization);
+			
+			//pixelShader->setParameters(RHICmdList, pixelShader->getPixelShader(), view);
+			//drawRectangle(RHICmdList, 0, 0, view.mViewRect.width(), view.mViewRect.height(), view.mViewRect.min.x, view.mViewRect.min.y, view.mViewRect.width(), view.mViewRect.height(), view.mViewRect.size(), SceneRenderTargets::get(RHICmdList).getBufferSizeXY(), *vertexShader, EDRF_UseTriangleOptimization);
 		}
 
 	}

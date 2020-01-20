@@ -134,7 +134,7 @@ namespace Air
 				const int32 numStaticMeshes = primitiveSceneInfo->mStaticMeshes.size();
 				for (int32 meshIndex = 0; meshIndex < numStaticMeshes; meshIndex++)
 				{
-					const StaticMesh& staticMesh = primitiveSceneInfo->mStaticMeshes[meshIndex];
+					const StaticMeshBatch& staticMesh = primitiveSceneInfo->mStaticMeshes[meshIndex];
 					if (true)
 					{
 						uint8 markMask = 0;
@@ -211,7 +211,7 @@ namespace Air
 				{
 
 				}
-				if (primitiveSceneInfo->needsLazyUpdateForRendering())
+				if (primitiveSceneInfo->needsConstantBufferUpdate())
 				{
 					mLazyUpdatePrimitives.addPrim(primitiveSceneInfo);
 				}
@@ -345,7 +345,7 @@ namespace Air
 		}
 	}
 
-	bool DeferredShadingSceneRenderer::initViews(RHICommandListImmediate& RHICmdList, struct FILCUpdatePrimTaskData& ILCTaskData, GraphEventArray& sortEvents)
+	bool DeferredShadingSceneRenderer::initViews(RHICommandListImmediate& RHICmdList, FExclusiveDepthStencil::Type basePassDepthStencilAccess, struct FILCUpdatePrimTaskData& ILCTaskData, GraphEventArray& sortEvents)
 	{
 		for (int32 viewIndex = 0; viewIndex < mViews.size(); viewIndex++)
 		{

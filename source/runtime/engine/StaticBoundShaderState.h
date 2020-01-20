@@ -15,9 +15,9 @@ namespace Air
 
 		ENGINE_API virtual ~GlobalBoundShaderStateResource();
 
-		BoundShaderStateRHIParamRef getInitializedRHI(VertexDeclarationRHIParamRef vertexDeclaration, VertexShaderRHIParamRef vertexShader, PixelShaderRHIParamRef pixelShader, GeometryShaderRHIParamRef geometryShader);
+		RHIBoundShaderState* getInitializedRHI(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShader, RHIPixelShader* pixelShader, RHIGeometryShader* geometryShader);
 
-		BoundShaderStateRHIParamRef getPreinitializedRHI();
+		RHIBoundShaderState* getPreinitializedRHI();
 
 	private:
 		BoundShaderStateRHIRef mBoundShaderState;
@@ -26,16 +26,16 @@ namespace Air
 
 		ENGINE_API virtual void releaseRHI();
 
-		VertexDeclarationRHIParamRef mBoundVertexDeclaration;
-		VertexShaderRHIParamRef mBoundVertexShader;
-		PixelShaderRHIParamRef mBoundPixelShader;
-		GeometryShaderRHIParamRef mBoundGeometryShader;
+		RHIVertexDeclaration* mBoundVertexDeclaration;
+		RHIVertexShader* mBoundVertexShader;
+		RHIPixelShader* mBoundPixelShader;
+		RHIGeometryShader* mBoundGeometryShader;
 	};
 	typedef TGlobalResource<GlobalBoundShaderStateResource> GlobalBoundShaderState_Internal;
 
 	struct GlobalBoundShaderStateArgs
 	{
-		VertexDeclarationRHIParamRef mVertexDeclarationRHI;
+		RHIVertexDeclaration* mVertexDeclarationRHI;
 		Shader* mVertexShader;
 		Shader* mPixelShader;
 		Shader* mGeometryShader;
@@ -63,7 +63,7 @@ namespace Air
 	};
 
 	ENGINE_API void setGlobalBoundShaderState(RHICommandList& RHICmdList, ERHIFeatureLevel::Type featureLevel, GlobalBoundShaderState& boundShaderState,
-		VertexDeclarationRHIParamRef vertexDeclaration,
+		RHIVertexDeclaration* vertexDeclaration,
 		Shader* vertexShader,
 		Shader* pixelShader,
 		Shader* geometryShader = nullptr);

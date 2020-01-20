@@ -71,11 +71,17 @@ namespace Air
 
 		virtual void setInput(EPassInputId inPassInputId, const RenderingCompositeOutputRef& inOutputRef) = 0;
 
+		virtual RHIComputeFence* getComputePassEndFence() const { return nullptr; }
+
 	protected:
 
 		bool bComputeOutputDescWasCalled{ false };
 
 		bool bProcessWasCalled{ false };
+
+		bool bIsComputePass{ false };
+
+		bool bPreferAsyncCompute{ false };
 
 		friend class RenderingCompositionGraph;
 	};
@@ -288,6 +294,7 @@ namespace Air
 		RenderingCompositePass* mPass;
 		RenderingCompositionGraph mGraph;
 		RHICommandListImmediate& mRHICmdList;
+		IntRect mSceneColorViewRect;
 
 	private:
 		IntRect mViewportRect;

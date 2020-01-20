@@ -34,6 +34,22 @@ namespace Air
 		return false;
 	}
 
+	void SceneRenderer::renderShadowDepthMapAtlases(RHICommandListImmediate& RHICmdList)
+	{
 
+	}
+
+	void SceneRenderer::renderShadowDepthMaps(RHICommandListImmediate& RHICmdList)
+	{
+		BOOST_ASSERT(RHICmdList.isOutsideRenderPass());
+
+		SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+
+		SceneRenderer::renderShadowDepthMapAtlases(RHICmdList);
+
+		BOOST_ASSERT(RHICmdList.isOutsideRenderPass());
+
+		//for(int32 cubemapIndex = 0;)
+	}
 
 }

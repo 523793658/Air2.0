@@ -25,7 +25,7 @@ namespace Air
 			PooledRenderTarget* pooledRT = mPooledRenderTargets[i];
 			if (pooledRT && pooledRT->getDesc().bAutoWritable)
 			{
-				TextureRHIParamRef renderTarget = pooledRT->getRenderTargetItem().mTargetableTexture;
+				RHITexture* renderTarget = pooledRT->getRenderTargetItem().mTargetableTexture;
 				if (renderTarget)
 				{
 					mTransitionTargets.push_back(renderTarget);

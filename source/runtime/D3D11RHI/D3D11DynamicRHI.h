@@ -10,6 +10,7 @@
 #include "D3D11ConstantBuffer.h"
 #include "D3D11Util.h"
 #include "D3D11Buffer.h"
+#include "RHIContext.h"
 #include "RHICommandList.h"
 namespace Air
 {
@@ -18,7 +19,7 @@ namespace Air
 
 	class D3D11ComputeShader;
 
-	class D3D11RHI_API D3D11DynamicRHI : public DynamicRHI, public IRHICommandContext
+	class D3D11RHI_API D3D11DynamicRHI : public DynamicRHI, public IRHICommandContextPSOFallback
 	{
 	public:
 		friend class D3D11Viewport;
@@ -49,11 +50,11 @@ namespace Air
 
 		virtual void updateMSAASettings() override;
 
-		virtual Texture2DRHIRef RHIGetViewportBackBuffer(ViewportRHIParamRef viewport)override;
+		virtual Texture2DRHIRef RHIGetViewportBackBuffer(RHIViewport* viewport)override;
 
-		virtual void RHIBeginDrawingViewport(ViewportRHIParamRef viewport, TextureRHIParamRef renderTargetRHI) override;
+		virtual void RHIBeginDrawingViewport(RHIViewport* viewport, RHITexture* renderTargetRHI) override;
 
-		virtual void RHIEndDrawingViewport(ViewportRHIParamRef viewport, bool bPresent, bool bLockToVsync) override;
+		virtual void RHIEndDrawingViewport(RHIViewport* viewport, bool bPresent, bool bLockToVsync) override;
 
 		virtual void RHIBeginScene() override;
 
@@ -63,19 +64,21 @@ namespace Air
 
 		virtual void RHIEndFrame() override;
 
-		virtual void RHISetRenderTargets(uint32 NumSimultaneousRenderTargets, const RHIRenderTargetView* newRenderTargets, const RHIDepthRenderTargetView* newDepthStencilTarget, uint32 numUAVs, const UnorderedAccessViewRHIParamRef* UAVs) final override;
+		virtual void RHISetRenderTargets(uint32 NumSimultaneousRenderTargets, const RHIRenderTargetView* newRenderTargets, const RHIDepthRenderTargetView* newDepthStencilTarget, uint32 numUAVs, RHIUnorderedAccessView* const* UAVs) final override;
 
-		virtual void RHISetBlendState(BlendStateRHIParamRef newState, const LinearColor& blendFactory) final override;
+		virtual void RHISetBlendState(RHIBlendState* newState, const LinearColor& blendFactory) final override;
 
-		virtual void RHISetDepthStencilState(DepthStencilStateRHIParamRef newState, uint32 inStencilRef) final override;
+		virtual void RHISetDepthStencilState(RHIDepthStencilState* newState, uint32 inStencilRef) final override;
 
-		virtual void RHISetRasterizerState(RasterizerStateRHIParamRef newState) final override;
+		virtual void RHISetRasterizerState(RHIRasterizerState* newState) final override;
 
-		virtual void RHICopyToResolveTarget(TextureRHIParamRef sourceTexture, TextureRHIParamRef destTexture, bool keepOriginalSurface, const ResolveParams& resolveParams) final override;
+		virtual void RHIResizeViewport(RHIViewport* viewport, uint32 sizeX, uint32 sizeY, bool isFullscreen, EPixelFormat preferredPixelFormat) override;
 
-		virtual void RHIResizeViewport(ViewportRHIParamRef viewport, uint32 sizeX, uint32 sizeY, bool isFullscreen, EPixelFormat preferredPixelFormat) override;
+		virtual void RHIResizeViewport(RHIViewport* viewport, uint32 sizeX, uint32 sizeY, bool isFullscreen) override;
 
-		virtual ViewportRHIParamRef RHICreateViewport(void* windowHandle, uint32 sizeX, uint32 sizeY, bool isFullscree, EPixelFormat preferredPixelFormat) final override;
+
+
+		virtual ViewportRHIRef RHICreateViewport(void* windowHandle, uint32 sizeX, uint32 sizeY, bool isFullscree, EPixelFormat preferredPixelFormat) final override;
 
 		SamplerStateRHIRef RHICreateSamplerState(const SamplerStateInitializerRHI &inInitializerRHI) final override;
 
@@ -93,7 +96,7 @@ namespace Air
 
 		virtual void RHISetMultipleViewports(uint32 count, const ViewportBounds* data) override;
 
-		void RHITransitionResources(EResourceTransitionAccess transitionType, TextureRHIParamRef* inTexture, int32 numTextures) override;
+		void RHITransitionResources(EResourceTransitionAccess transitionType, RHITexture** inTexture, int32 numTextures) override;
 
 		virtual void RHIAdvanceFrameForGetViewportBackBuffer() override;
 
@@ -103,23 +106,23 @@ namespace Air
 
 		virtual TextureReferenceRHIRef RHICreateTextureReference(LastRenderTimeContainer* lastRenderTime) override;
 
-		virtual void* RHILockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail) override;
+		virtual void* RHILockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail) override;
 
-		virtual void RHIUnlockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail) override;
+		virtual void RHIUnlockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail) override;
 
-		virtual void RHIUpdateTextureReference(TextureReferenceRHIParamRef textureRHI, TextureRHIParamRef newTexture) override;
+		virtual void RHIUpdateTextureReference(RHITextureReference* textureRHI, RHITexture* newTexture) override;
 
-		virtual uint32 RHIComputeMemorySize(TextureRHIParamRef textureRHI) final override;
+		virtual uint32 RHIComputeMemorySize(RHITexture* textureRHI) final override;
 
-		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint32 mipLevel) final override;
+		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(RHITexture* textureRHI, const RHITextureSRVCreateInfo& createInfo) final override;
 
-		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint32 mipLevel, uint8 numMipLevel, uint8 format) final override;
-
-		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint8 format) final override;
+		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(RHIVertexBuffer* vertexBuffer, uint32 stride, uint8 format) final override;
 
 		virtual VertexDeclarationRHIRef RHICreateVertexDeclaration(const VertexDeclarationElementList& elements) final override;
 
-		virtual ConstantBufferRHIRef RHICreateConstantBuffer(const void* contents, const RHIConstantBufferLayout& layout, EConstantBufferUsage usage) final override;
+		virtual ConstantBufferRHIRef RHICreateConstantBuffer(const void* contents, const RHIConstantBufferLayout& layout, EConstantBufferUsage usage, EConstantBufferValidation validation) final override;
+
+		virtual void RHIUpdateConstantBuffer(RHIConstantBuffer* constantBufferRHI, const void* contents) final override;
 
 		virtual VertexShaderRHIRef RHICreateVertexShader(const TArray<uint8>& code) final override;
 
@@ -133,98 +136,86 @@ namespace Air
 
 		virtual ComputeShaderRHIRef RHICreateComputeShader(const TArray<uint8>& code) final override;
 
-		virtual void RHIClearColorTextures(int32 numTextures, TextureRHIParamRef* textures, const LinearColor* colorArray, IntRect excludeRect) final override;
-
-		virtual void RHIClearDepthStencilTexture(TextureRHIParamRef texture, EClearDepthStencil clearDepthStencil, float depth, uint32 stencil, IntRect& excludeRect) final override;
-
 		virtual void RHIBindClearMRTValues(bool bClearColor, bool bClearDepth, bool bClearStencil) final override;
 
 		virtual GeometryShaderRHIRef RHICreateGeometryShaderWithStreamOutput(const TArray<uint8>& code, const StreamOutElementList& elementList, uint32 numStrides, const uint32* strides, int32 rasterizedStream) final override;
 
-		virtual void* RHILockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail) final override;
+		virtual void* RHILockTexture2D(RHITexture2D* texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail) final override;
 
-		virtual void RHIUnlockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, bool bLockWithinMiptail) final override;
+		virtual void RHIUnlockTexture2D(RHITexture2D* texture, uint32 mipIndex, bool bLockWithinMiptail) final override;
 
-		virtual BoundShaderStateRHIRef RHICreateBoundShaderState(VertexDeclarationRHIParamRef vertexDeclaration, VertexShaderRHIParamRef vertexShaderRHI, HullShaderRHIParamRef hullShaderRHI, DomainShaderRHIParamRef domainShaderRHI, GeometryShaderRHIParamRef geometryShaderRHI, PixelShaderRHIParamRef pixelShaderRHI) final override;
+		virtual BoundShaderStateRHIRef RHICreateBoundShaderState(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShaderRHI, RHIHullShader* hullShaderRHI, RHIDomainShader* domainShaderRHI, RHIGeometryShader* geometryShaderRHI, RHIPixelShader* pixelShaderRHI) final override;
 
-		virtual void RHISetBoundShaderState(BoundShaderStateRHIParamRef boundShaderState) final override;
+		virtual void RHISetBoundShaderState(RHIBoundShaderState* boundShaderState) final override;
 
-		virtual void RHISetShaderConstantBuffer(VertexShaderRHIParamRef vertexShader, uint32 bufferIndex, ConstantBufferRHIParamRef buffer) final override;
+		virtual void RHISetShaderConstantBuffer(RHIVertexShader* vertexShader, uint32 bufferIndex, RHIConstantBuffer* buffer) final override;
 
-		virtual void RHISetShaderConstantBuffer(HullShaderRHIParamRef hullShader, uint32 bufferIndex, ConstantBufferRHIParamRef buffer) final override;
+		virtual void RHISetShaderConstantBuffer(RHIHullShader* hullShader, uint32 bufferIndex, RHIConstantBuffer* buffer) final override;
 
-		virtual void RHISetShaderConstantBuffer(DomainShaderRHIParamRef domainShader, uint32 bufferIndex, ConstantBufferRHIParamRef buffer) final override;
+		virtual void RHISetShaderConstantBuffer(RHIDomainShader* domainShader, uint32 bufferIndex, RHIConstantBuffer* buffer) final override;
 
-		virtual void RHISetShaderConstantBuffer(GeometryShaderRHIParamRef geometryShader, uint32 bufferindex, ConstantBufferRHIParamRef buffer) final override;
+		virtual void RHISetShaderConstantBuffer(RHIGeometryShader* geometryShader, uint32 bufferindex, RHIConstantBuffer* buffer) final override;
 
-		virtual void RHISetShaderConstantBuffer(PixelShaderRHIParamRef pixelShader, uint32 bufferIndex, ConstantBufferRHIParamRef buffer) final override;
+		virtual void RHISetShaderConstantBuffer(RHIPixelShader* pixelShader, uint32 bufferIndex, RHIConstantBuffer* buffer) final override;
 
-		virtual void RHISetShaderConstantBuffer(ComputeShaderRHIParamRef computeShader, uint32 bufferIndex, ConstantBufferRHIParamRef buffer) final override;
+		virtual void RHISetShaderConstantBuffer(RHIComputeShader* computeShader, uint32 bufferIndex, RHIConstantBuffer* buffer) final override;
 
-		virtual void RHISetShaderParameter(VertexShaderRHIParamRef vertexShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
+		virtual void RHISetShaderParameter(RHIVertexShader* vertexShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
 
-		virtual void RHISetShaderParameter(HullShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
+		virtual void RHISetShaderParameter(RHIHullShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
 
-		virtual void RHISetShaderParameter(DomainShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
+		virtual void RHISetShaderParameter(RHIDomainShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
 
-		virtual void RHISetShaderParameter(GeometryShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
+		virtual void RHISetShaderParameter(RHIGeometryShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
 
-		virtual void RHISetShaderParameter(PixelShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
+		virtual void RHISetShaderParameter(RHIPixelShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
 		static DXGI_FORMAT getPlatformTextureResourceFormat(DXGI_FORMAT inFormat, uint32 inFlags);
 
-		virtual void RHISetShaderParameter(ComputeShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
+		virtual void RHISetShaderParameter(RHIComputeShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue) final override;
 
-		virtual void RHISetShaderTexture(VertexShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTexture) final override;
+		virtual void RHISetShaderTexture(RHIVertexShader* vertexShader, uint32 textureIndex, RHITexture* newTexture) final override;
 
-		virtual void RHISetShaderTexture(HullShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTexture) final override;
+		virtual void RHISetShaderTexture(RHIHullShader* vertexShader, uint32 textureIndex, RHITexture* newTexture) final override;
 
-		virtual void RHISetShaderTexture(DomainShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTexture) final override;
+		virtual void RHISetShaderTexture(RHIDomainShader* vertexShader, uint32 textureIndex, RHITexture* newTexture) final override;
 
-		virtual void RHISetShaderTexture(GeometryShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTexture) final override;
+		virtual void RHISetShaderTexture(RHIGeometryShader* vertexShader, uint32 textureIndex, RHITexture* newTexture) final override;
 
-		virtual void RHISetShaderTexture(PixelShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTexture) final override;
+		virtual void RHISetShaderTexture(RHIPixelShader* vertexShader, uint32 textureIndex, RHITexture* newTexture) final override;
 
-		virtual void RHISetShaderTexture(ComputeShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTexture) final override;
+		virtual void RHISetShaderTexture(RHIComputeShader* vertexShader, uint32 textureIndex, RHITexture* newTexture) final override;
 
-		virtual void RHISetShaderSampler(VertexShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler) final override;
+		virtual void RHISetShaderSampler(RHIVertexShader* vertexShader, uint32 samplerIndex, RHISamplerState* newSampler) final override;
 
-		virtual void RHISetShaderSampler(HullShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler) final override;
+		virtual void RHISetShaderSampler(RHIHullShader* vertexShader, uint32 samplerIndex, RHISamplerState* newSampler) final override;
 
-		virtual void RHISetShaderSampler(DomainShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler) final override;
+		virtual void RHISetShaderSampler(RHIDomainShader* vertexShader, uint32 samplerIndex, RHISamplerState* newSampler) final override;
 
-		virtual void RHISetShaderSampler(GeometryShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler) final override;
+		virtual void RHISetShaderSampler(RHIGeometryShader* vertexShader, uint32 samplerIndex, RHISamplerState* newSampler) final override;
 
-		virtual void RHISetShaderSampler(PixelShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler) final override;
+		virtual void RHISetShaderSampler(RHIPixelShader* vertexShader, uint32 samplerIndex, RHISamplerState* newSampler) final override;
 
-		virtual void RHISetShaderSampler(ComputeShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler) final override;
+		virtual void RHISetShaderSampler(RHIComputeShader* vertexShader, uint32 samplerIndex, RHISamplerState* newSampler) final override;
 
-		virtual void RHISetStreamSource(uint32 streamIndex, VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint32 offset) final override;
+		virtual void RHISetStreamSource(uint32 streamIndex, RHIVertexBuffer* vertexBuffer, uint32 offset) final override;
 
-		virtual void RHIDrawPrimitive(uint32 primitiveType, int32 baseVertexIndex, uint32 numPrimitives, uint32 numInstances) final override;
+		virtual void RHIDrawPrimitive(int32 baseVertexIndex, uint32 numPrimitives, uint32 numInstances) final override;
 
-		virtual void RHIDrawIndexedPrimitive(IndexBufferRHIParamRef indexBuffer, uint32 primitiveType, int32 baseVertexIndex, uint32 firstInstance, uint32 numVertex, uint32 startIndex, uint32 numPrimitives, uint32 numInstances)final override;
-
-		virtual void RHIEndDrawPrimitiveUP() final override;
-
-		virtual void RHIBeginDrawPrimitiveUP(uint32 primitiveType, uint32 numPrimitives, uint32 numVertices, uint32 vertexDataStride, void*& outVertexData) final override;
-
-		virtual void RHIBeginDrawIndexedPrimitiveUP(uint32 primitiveType, uint32 numPrimitives, uint32 numVertices, uint32 vertexDataStride, void*& outVertexData, uint32 minVertexIndex, uint32 numIndices, uint32 indexDataStride, void*& outIndexData) final override;
-
-		virtual void RHIEndDrawIndexedPrimitiveUP() final override;
+		virtual void RHIDrawIndexedPrimitive(RHIIndexBuffer* indexBuffer, uint32 primitiveType, int32 baseVertexIndex, uint32 firstInstance, uint32 numVertex, uint32 startIndex, uint32 numPrimitives, uint32 numInstances)final override;
 
 		virtual VertexBufferRHIRef RHICreateVertexBuffer(uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo) final override;
 
-		virtual void* RHILockVertexBuffer(VertexBufferRHIParamRef vertexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode) final override;
+		virtual void* RHILockVertexBuffer(RHIVertexBuffer* vertexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode) final override;
 
-		virtual void RHIUnlockVertexBuffer(VertexBufferRHIParamRef vertexBuffer) final override;
+		virtual void RHIUnlockVertexBuffer(RHIVertexBuffer* vertexBuffer) final override;
 
 		virtual IndexBufferRHIRef RHICreateIndexBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo) final override;
 
-		virtual void* RHILockIndexBuffer(IndexBufferRHIParamRef indexBuffer, uint32 Offset, uint32 size, EResourceLockMode lockMode) final override;
+		virtual void* RHILockIndexBuffer(RHIIndexBuffer* indexBuffer, uint32 Offset, uint32 size, EResourceLockMode lockMode) final override;
 
-		virtual void RHIUnlockIndexBuffer(IndexBufferRHIParamRef indexBuffer) final override;
+		virtual void RHIUnlockIndexBuffer(RHIIndexBuffer* indexBuffer) final override;
 
-		virtual void RHIReadSurfaceFloatData(TextureRHIParamRef texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex) final override;
+		virtual void RHIReadSurfaceFloatData(RHITexture* texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex) final override;
 
 		uint32 getMaxMSAAQuality(uint32 sampleCount);
 		IDXGIFactory1* getFactory() const
@@ -241,7 +232,71 @@ namespace Air
 			internalSetShaderResourceView<ShaderFrequency>(resource, srv, resourceIndex, name, srvType);
 		}
 
-		void RHIBindDebugLabelName(TextureRHIParamRef texture, const TCHAR* name) override final;
+		void RHIBindDebugLabelName(RHITexture* texture, const TCHAR* name) override final;
+
+		virtual void RHISetGraphicsPipelineState(RHIGraphicsPipelineState* graphicsState) final override
+		{
+			RHIGraphicsPipelineStateFallBack* fallbackGraphicsState = static_cast<RHIGraphicsPipelineStateFallBack*>(graphicsState);
+			IRHICommandContextPSOFallback::RHISetGraphicsPipelineState(graphicsState);
+			mPrimitiveType = fallbackGraphicsState->mInitializer.mPrimitiveType;
+		}
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIIndexBuffer* indexBuffer, uint8 format) final override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIStructuredBuffer* structuredBuffer, bool bUseUAVCounter, bool bAppendBuffer) final override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHITexture* texture, uint32 mipLevel) final override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIVertexBuffer* vertexBuffer, uint8 format) final override;
+
+		virtual void RHISetShaderResourceViewParameter(RHIVertexShader* vertexShader, uint32 samplerIndex, RHIShaderResourceView* srv) final override;
+
+		virtual void RHISetShaderResourceViewParameter(RHIDomainShader* domainShader, uint32 samplerIndex, RHIShaderResourceView* srv) final override;
+
+
+		virtual void RHISetShaderResourceViewParameter(RHIHullShader* hullShader, uint32 samplerIndex, RHIShaderResourceView* srv) final override;
+
+		virtual void RHISetShaderResourceViewParameter(RHIGeometryShader* geometryShader, uint32 samplerIndex, RHIShaderResourceView* srv) final override;
+
+		virtual void RHISetShaderResourceViewParameter(RHIPixelShader* pixelShader, uint32 samplerIndex, RHIShaderResourceView* srv) final override;
+
+		virtual void RHISetShaderResourceViewParameter(RHIComputeShader* computeShader, uint32 samplerIndex, RHIShaderResourceView* srv) final override;
+
+		virtual StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo) final override;
+
+		virtual void RHICopyToResolveTarget(RHITexture* sourceTexture, RHITexture* destTexture, const ResolveParams& resolveParams) final override;
+
+		virtual void RHISetUAVParameter(RHIComputeShader* computeShader, uint32 uavIndex, RHIUnorderedAccessView* uav, uint32 initialCount)final override;
+
+		virtual void RHISetUAVParameter(RHIComputeShader* computeShader, uint32 uavIndex, RHIUnorderedAccessView* uav) final override;
+
+		virtual void RHISetComputeShader(RHIComputeShader* computeShader) final override;
+
+		virtual void RHIDispatchComputeShader(uint32 threadGroupCountX, uint32 threadGroupCountY, uint32 threadGroupCountZ) final override;
+
+		virtual void RHIFlushComputeShaderCache() final override;
+
+		virtual void RHIAutomaticCacheFlushAfterComputeShader(bool bEnable) final override;
+
+		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(RHIStructuredBuffer*) final override;
+
+		virtual void RHISubmitCommandsHint() final override;
+
+		virtual void RHIEnableDepthBoundsTest(bool bEnable) final override
+		{
+			if (GSupportsDepthBoundsTest && mStateCache.bDepthBoundsEnabled != bEnable)
+			{
+				enableDepthBoundsTest(bEnable, 0.0f, 1.0f);
+			}
+		}
+		virtual void RHISetDepthBounds(float minDepth, float maxDepth) final override
+		{
+			if (GSupportsDepthBoundsTest && (mStateCache.mDepthBoundsMin != minDepth || mStateCache.mDepthBoundsMax != maxDepth))
+			{
+				enableDepthBoundsTest(true, minDepth, maxDepth);
+			}
+		}
+
 	public:
 		void clearState();
 
@@ -259,7 +314,7 @@ namespace Air
 
 		void setupAfterDeviceCreation();
 
-		void conditionalClearShaderResource(D3D11BaseShaderResource* resource);
+		void conditionalClearShaderResource(D3D11BaseShaderResource* resource, bool bCheckBoundInputAssember);
 
 		template<EShaderFrequency ShaderFrequency>
 		void clearShaderResourceViews(D3D11BaseShaderResource* resource);
@@ -277,19 +332,32 @@ namespace Air
 		template <EShaderFrequency ShaderFrequency>
 		void internalSetShaderResourceView(D3D11BaseShaderResource* resource, ID3D11ShaderResourceView* srv, int32 resourceIndex, wstring name, D3D11StateCacheBase::ESRV_Type srvType = D3D11StateCacheBase::ESRV_Type::SRV_Unknown);
 
-		template<typename ShaderType, EShaderFrequency Frequency>
-		void _RHISetShaderTexture(ShaderType* ShaderRHI, uint32 textureIndex, TextureRHIParamRef newTextureRHI);
 
+		template<EShaderFrequency ShaderFrequency>
+		void RHISetShaderResourceViewParameter_Internal(RHIShaderResourceView* srvRHI, uint32 textureIndex, wstring name);
+	
 
-		enum class EForceFullScreenClear
-		{
-			EDoNotForce,
-			EForce
-		};
-
-		virtual void RHIClearMRTImpl(bool bClearColor, int32 numClearColor, const LinearColor* colorArray, bool bClearDepth, float depth, bool bClearStencil, uint32 stencil, IntRect excludeRect, bool bForceShaderClear, EForceFullScreenClear bForceFullScreen);
+		virtual void RHIClearMRTImpl(bool bClearColor, int32 numClearColor, const LinearColor* colorArray, bool bClearDepth, float depth, bool bClearStencil, uint32 stencil);
 
 		void validateExclusiveDepthStencilAccess(FExclusiveDepthStencil src) const;
+
+		void trackResourceBoundAsVB(D3D11BaseShaderResource* resource, int32 streamIndex);
+		void trackResourceBoundAsIB(D3D11BaseShaderResource* resource);
+
+		void setCurrentComputeShader(RHIComputeShader* computeShader)
+		{
+			mCurrentComputeShader = computeShader;
+		}
+
+		const ComputeShaderRHIRef getCurrentComputeShader() const
+		{
+			return mCurrentComputeShader;
+		}
+
+		void beginUAVOverlap();
+		void endUAVOverlap();
+
+		void enableDepthBoundsTest(bool bEnable, float minDepth, float maxDepth);
 	protected:
 		IDXGIFactory1Ptr mDXGIFactory1;
 		D3D_FEATURE_LEVEL	mFeatureLevel;
@@ -306,11 +374,15 @@ namespace Air
 
 		D3D11StateCache mStateCache;
 
+		EPrimitiveType mPrimitiveType;
+
 		uint32 mAvailableMSAAQualities[DX_MAX_MSAA_COUNT + 1];
 
 		D3D11BaseShaderResource* mCurrentResourceBoundAsSRVs[SF_NumFrequencies][D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT];
-
+		D3D11BaseShaderResource* mCurrentResourceBoundAsVBs[D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT];
+		D3D11BaseShaderResource* mCurrentResourceBoundAsIB;
 		int32 mMaxBoundShaderResourceIndex[SF_NumFrequencies];
+		int32 mMaxBoundVertexBufferIndex;
 		uint16 mDirtyConstantBuffers[SF_NumFrequencies];
 
 		ConstantBufferRHIRef mBoundConstantBuffers[SF_NumFrequencies][MAX_CONSTANT_BUFFERS_PER_SHADER_STAGE];
@@ -333,6 +405,8 @@ namespace Air
 		TArray<TRefCountPtr<D3D11UniformBuffer>> mGSUnifomBuffers;
 		TArray<TRefCountPtr<D3D11UniformBuffer>> mPSUnifomBuffers;
 		TArray<TRefCountPtr<D3D11UniformBuffer>> mCSUnifomBuffers;
+
+		bool bRenderDoc = false;
 
 
 		uint32 mNumUAVs{ 0 };
@@ -357,6 +431,8 @@ namespace Air
 
 		TRefCountPtr<D3D11DynamicBuffer> mDynamicVB;
 		TRefCountPtr<D3D11DynamicBuffer> mDynamicIB;
+
+		ComputeShaderRHIRef mCurrentComputeShader;
 	public:
 		TMap<D3D11LockedKey, D3D11LockedData> mOutstandingLocks;
 

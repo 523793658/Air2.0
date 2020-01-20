@@ -2,6 +2,7 @@
 #include "ShaderCore.h"
 #include "D3D11Resource.h"
 #include "D3D11Typedefs.h"
+#include "ShaderParameterMap.h"
 namespace Air
 {
 	struct D3D11ShaderResourceTable : public BaseShaderResourceTable
@@ -128,12 +129,12 @@ namespace Air
 
 		bool bShaderNeedsGlobalUniformBuffer[SF_NumFrequencies];
 		D3D11BoundShaderState(
-			VertexDeclarationRHIParamRef inVertexDeclarationRHI,
-			VertexShaderRHIParamRef inVertexShaderRHI,
-			PixelShaderRHIParamRef inPixelShaderRHI,
-			HullShaderRHIParamRef inHullShaderRHI,
-			DomainShaderRHIParamRef inDomainShaderRHI,
-			GeometryShaderRHIParamRef inGeometryShaderRHI,
+			RHIVertexDeclaration* inVertexDeclarationRHI,
+			RHIVertexShader* inVertexShaderRHI,
+			RHIPixelShader* inPixelShaderRHI,
+			RHIHullShader* inHullShaderRHI,
+			RHIDomainShader* inDomainShaderRHI,
+			RHIGeometryShader* inGeometryShaderRHI,
 			ID3D11Device* direct3DDevice
 		);
 

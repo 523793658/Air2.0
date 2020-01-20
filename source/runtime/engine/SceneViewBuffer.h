@@ -16,13 +16,13 @@
 namespace Air
 {
 #define VIEW_CONSTANT_BUFFER_MEMBER(type, identifier)	\
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(type, identifier)
+	SHADER_PARAMETER(type, identifier)
 
 #define VIEW_CONSTANT_BUFFER_MEMBER_EX(type, identifier, precision)	\
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(type, identifier, precision)
+	SHADER_PARAMETER_EX(type, identifier, precision)
 
 #define VIEW_CONSTANT_BUFFER_MEMBER_ARRAY(type, identifier, dimension) \
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_ARRAY(type, identifier, dimension)
+	SHADER_PARAMETER_ARRAY(type, identifier, dimension)
 
 #define VIEW_CONSTANT_BUFFER_MEMBER_TABLE	\
 	VIEW_CONSTANT_BUFFER_MEMBER(Matrix, TranslatedWorldToClip)\
@@ -62,13 +62,9 @@ namespace Air
 	VIEW_CONSTANT_BUFFER_MEMBER(float, GameTime)\
 	VIEW_CONSTANT_BUFFER_MEMBER(float, MotionBlurNormalizedToPixel)
 
-	BEGIN_CONSTANT_BUFFER_STRUCT_WITH_CONSTRUCTOR(InstancedViewConstantShaderParameters, ENGINE_API)
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT_WITH_CONSTRUCTOR(InstancedViewConstantShaderParameters, ENGINE_API)
 		VIEW_CONSTANT_BUFFER_MEMBER_TABLE
-	END_CONSTANT_BUFFER_STRUCT(InstancedViewConstantShaderParameters)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT()
 
-	BEGIN_CONSTANT_BUFFER_STRUCT_WITH_CONSTRUCTOR(ViewConstantShaderParameters, ENGINE_API)
-		VIEW_CONSTANT_BUFFER_MEMBER_TABLE
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(TextureCube, SkyBoxTexture)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, SkyBoxTextureSampler)
-	END_CONSTANT_BUFFER_STRUCT(ViewConstantShaderParameters)
+
 }

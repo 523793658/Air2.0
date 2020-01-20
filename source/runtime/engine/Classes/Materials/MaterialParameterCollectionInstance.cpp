@@ -5,6 +5,9 @@
 #include "SimpleReflection.h"
 namespace Air
 {
+
+	int32 GDeferUpdateRenderStates = 1;
+
 	RMaterialParameterCollectionInstance::RMaterialParameterCollectionInstance(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
 		:ParentType(objectInitializer)
 	{
@@ -15,15 +18,35 @@ namespace Air
 	{
 		mCollection = collection;
 		mWorld = inWorld;
-		updateRenderState();
 	}
 
-	void RMaterialParameterCollectionInstance::updateRenderState()
+	void RMaterialParameterCollectionInstance::updateRenderState(bool bRecreateConstantBuffer)
 	{
-		TArray<float4> parameterData;
-		getParameterData(parameterData);
-		mResource->GameThread_UpdateContents(mCollection ? mCollection->mStateId : Guid(), parameterData);
-		mWorld->updateParameterCollectionInstances(false);
+		if (!mWorld)
+		{
+			return;
+		}
+
+		bNeedsRenderStateUpdate = true;
+
+		mWorld->setMaterialParameterCollectionInstanceNeedsUpdate();
+
+		if (!GDeferUpdateRenderStates || bRecreateConstantBuffer)
+		{
+			deferredUpdateRenderState(bRecreateConstantBuffer);
+		}
+	}
+
+	void RMaterialParameterCollectionInstance::deferredUpdateRenderState(bool bRecreateConstantBuffer)
+	{
+		BOOST_ASSERT(bNeedsRenderStateUpdate || !bRecreateConstantBuffer);
+		if (bNeedsRenderStateUpdate && mWorld)
+		{
+			TArray<float4> parameterData;
+			getParameterData(parameterData);
+			mResource->GameThread_UpdateContents(mCollection ? mCollection->mStateId : Guid(), parameterData, getName(), bRecreateConstantBuffer);
+		}
+		bNeedsRenderStateUpdate = false;
 	}
 
 	void RMaterialParameterCollectionInstance::getParameterData(TArray<float4>& parameterData) const

@@ -12,11 +12,13 @@
 #undef FUNC_INCLUDING_INLINE_IMPL
 
 
+
+
 namespace Air
 {
-#define FUNC_DECLARE_DELEGATE(DelegateName, ...)\
-	typedef 
 
+#define FUNC_DECLARE_DELEGATE(DelegateName, ...) \
+	typedef TBaseDelegate<__VA_ARGS__> DelegateName;
 
 
 }

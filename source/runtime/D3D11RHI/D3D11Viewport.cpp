@@ -167,7 +167,7 @@ namespace Air
 	}
 
 
-	Texture2DRHIRef D3D11DynamicRHI::RHIGetViewportBackBuffer(ViewportRHIParamRef viewportRHI)
+	Texture2DRHIRef D3D11DynamicRHI::RHIGetViewportBackBuffer(RHIViewport* viewportRHI)
 	{
 		D3D11Viewport* viewport = ResourceCast(viewportRHI);
 		return viewport->getBackBuffer();

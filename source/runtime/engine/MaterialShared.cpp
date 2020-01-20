@@ -18,6 +18,8 @@
 #include "Classes/Materials/XMLMaterialTranslator.h"
 #include "Misc/App.h"
 #include "shader.h"
+#include "Misc/CoreMisc.h"
+#include "DerivedDataCache/DerivedDataCacheInterface.h"
 namespace Air
 {
 	int32 GCreateShadersOnLoad = 0;
@@ -29,6 +31,242 @@ namespace Air
 		TEXT("Medium"),
 		TEXT("Num")
 	};
+
+	static wstring getMaterialShaderMapKeyString(const MaterialShaderMapId& shaderMapId, EShaderPlatform platform)
+	{
+		wstring format = legacyShaderPlatformToShaderFormat(platform);
+		wstring shaderMapKeyString = format + TEXT("_") + boost::lexical_cast<wstring>(getTargetPlatformManagerRef().shaderFormatVersion(format)) + TEXT("_");
+		shaderMapAppendKeyString(platform, shaderMapKeyString);
+		shaderMapId.appendKeyString(shaderMapKeyString);
+		return shaderMapKeyString;
+	}
+
+	void MaterialShaderMap::initOrderedMeshShaderMaps()
+	{
+		mOrderredMeshShaderMaps.empty(VertexFactoryType::getNumVertexFactoryTypes());
+		mOrderredMeshShaderMaps.addZeroed(VertexFactoryType::getNumVertexFactoryTypes());
+		for (int32 index = 0; index < mMeshShaderMaps.size(); index++)
+		{
+			BOOST_ASSERT(mMeshShaderMaps[index].getVertexFactoryType());
+			const int32 vfIndex = mMeshShaderMaps[index].getVertexFactoryType()->getId();
+			mOrderredMeshShaderMaps[vfIndex] = &mMeshShaderMaps[index];
+		}
+	}
+
+	void MaterialShaderMap::saveToDerivedDataCache()
+	{
+		TArray<uint8> saveData;
+		MemoryWriter ar(saveData, true);
+		serialize(ar);
+		getDerivedDataCacheRef().put(getMaterialShaderMapKeyString(mShaderMapId, mPlatform).c_str(), saveData);
+	}
+
+	void MaterialShaderMap::loadFromDerivedDataCache(const FMaterial* material, const MaterialShaderMapId& shaderMapId, EShaderPlatform platform, TRefCountPtr<MaterialShaderMap>& inOutShaderMap)
+	{
+		if (inOutShaderMap != nullptr)
+		{
+
+
+		}
+		else
+		{
+			{
+				TArray<uint8> cachedData;
+				const wstring dataKey = getMaterialShaderMapKeyString(shaderMapId, platform);
+				//if(getDerivedDataCacheRef().gets)
+			}
+		}
+	}
+
+	
+	void MaterialShaderMapId::appendKeyString(wstring& keyString) const
+	{
+		keyString += mBaseMaterialId.toString();
+		keyString += TEXT("_");
+		wstring qualityLevelName;
+		getMaterialQualityLevelName(mQualityLevel, qualityLevelName);
+		keyString += qualityLevelName + TEXT("_");
+		wstring featureLevelString;
+		getFeatureLevelName(mFeatureLevel, featureLevelString);
+		keyString += featureLevelString + TEXT("_");
+		mParameterSet.appendKeyString(keyString);
+
+		keyString += TEXT("_");
+		keyString += boost::lexical_cast<wstring>(mUsage);
+		keyString += TEXT("_");
+		for (int32 functionIndex = 0; functionIndex < mReferencedFunctions.size(); functionIndex++)
+		{
+			keyString += mReferencedFunctions[functionIndex].toString();
+		}
+		keyString += TEXT("_");
+		for (int32 collectionIndex = 0; collectionIndex < mReferencedParameterCollections.size(); collectionIndex++)
+		{
+			keyString += mReferencedParameterCollections[collectionIndex].toString();
+		}
+		TMap<const TCHAR*, CachedConstantBufferDeclaration> referencedConstantBuffers;
+		for (int32 shaderIndex = 0; shaderIndex < mShaderTypeDependencies.size(); shaderIndex++)
+		{
+			const ShaderTypeDependency& shaderTypeDependency = mShaderTypeDependencies[shaderIndex];
+			keyString += TEXT("_");
+			keyString += shaderTypeDependency.mShaderType->getName();
+			keyString += shaderTypeDependency.mSourceHash.toString();
+			shaderTypeDependency.mShaderType->getSerializationHistory().appendKeyString(keyString);
+			const TMap<const TCHAR*, CachedConstantBufferDeclaration>& referencedShaderParametersMetadatasCache = shaderTypeDependency.mShaderType->getReferencedShaderParametersMetadatasCache();
+			for (auto& it : referencedShaderParametersMetadatasCache)
+			{
+				referencedConstantBuffers.emplace(it.first, it.second);
+			}
+		}
+		for (int32 typeIndex = 0; typeIndex < mShaderPipelineTypeDependencies.size(); typeIndex++)
+		{
+			const ShaderPipelineTypeDependency& dependency = mShaderPipelineTypeDependencies[typeIndex];
+			keyString += TEXT("_");
+			keyString += dependency.mShaderPipelineType->getName();
+			keyString += dependency.mStagesSourceHash.toString();
+			for (const ShaderType* shaderType : dependency.mShaderPipelineType->getStages())
+			{
+				const TMap<const TCHAR*, CachedConstantBufferDeclaration>& refrencedConstantStructsCache = shaderType->getReferencedShaderParametersMetadatasCache();
+				for (auto& it : refrencedConstantStructsCache)
+				{
+					referencedConstantBuffers.emplace(it.first, it.second);
+				}
+			}
+		}
+		for (int32 VFIndex = 0; VFIndex < mVertexFactoryTypeDependencies.size(); VFIndex++)
+		{
+			keyString += TEXT("_");
+			const VertexFactoryTypeDependency& vfDependency = mVertexFactoryTypeDependencies[VFIndex];
+			keyString += vfDependency.mVertexFactoryType->getName();
+			keyString += vfDependency.mVFSourceHash.toString();
+
+			for (int32 frequency = 0; frequency < SF_NumFrequencies; frequency++)
+			{
+				vfDependency.mVertexFactoryType->getSerializationHistory((EShaderFrequency)frequency);
+			}
+			const TMap<const TCHAR*, CachedConstantBufferDeclaration>& referenceCosntntBufferStructCache = vfDependency.mVertexFactoryType->getReferencedShaderParametersMetadatasCache();
+			for (auto& it : referenceCosntntBufferStructCache)
+			{
+				referencedConstantBuffers.emplace(it.first, it.second);
+			}
+		}
+		{
+			TArray<uint8> tempData;
+			SerializationHistory serializationHistory;
+			MemoryWriter ar(tempData, true);
+			ShaderSaveArchive saveArchive(ar, serializationHistory);
+			serializeConstantBufferInfo(saveArchive, referencedConstantBuffers);
+			serializationHistory.appendKeyString(keyString);
+		}
+		keyString += bytesToHex(&mTextureReferencesHash.mHash[0], sizeof(mTextureReferencesHash.mHash));
+		keyString += bytesToHex(&mBasePropertyOverridesHash.mHash[0], sizeof(mBasePropertyOverridesHash.mHash));
+	}
+
+	struct CompareMeshShaderMaps
+	{
+		FORCEINLINE bool operator ()(const MeshMaterialShaderMap& A, const MeshMaterialShaderMap& B) const
+		{
+			return CString::strncmp(A.getVertexFactoryType()->getName(), B.getVertexFactoryType()->getName(), Math::min(CString::strlen(A.getVertexFactoryType()->getName()), CString::strlen(B.getVertexFactoryType()->getName()))) > 0;
+		}
+	};
+
+
+	void MaterialShaderMap::serialize(Archive& ar, bool bInlineShaderResources /* = true */, bool bLoadedByCookedMaterial)
+	{
+		mShaderMapId.serialize(ar, bLoadedByCookedMaterial);
+		int32 tempPlatform = (int32)mPlatform;
+		ar << tempPlatform;
+		mPlatform = (EShaderPlatform)tempPlatform;
+		ar << mFriendlyName;
+
+		mMaterialCompilationOutput.serialize(ar);
+
+		if (ar.isSaving())
+		{
+			TShaderMap<MaterialShaderType>::serializeInline(ar, bInlineShaderResources, false, false);
+			registerSerializedShaders();
+			int32 numMeshShaderMaps = 0;
+			for (int32 vfindex = 0; vfindex < mOrderredMeshShaderMaps.size(); vfindex++)
+			{
+				MeshMaterialShaderMap* meshShaderMap = mOrderredMeshShaderMaps[vfindex];
+				if (meshShaderMap)
+				{
+					numMeshShaderMaps++;
+				}
+			}
+			ar << numMeshShaderMaps;
+			TArray<MeshMaterialShaderMap*> sortedMeshShaderMaps;
+			sortedMeshShaderMaps.empty(mMeshShaderMaps.size());
+			for (int32 mapIndex = 0; mapIndex < mMeshShaderMaps.size(); mapIndex++)
+			{
+				sortedMeshShaderMaps.add(&mMeshShaderMaps[mapIndex]);
+			}
+
+			sortedMeshShaderMaps.sort(CompareMeshShaderMaps());
+			for (int32 mapindex = 0; mapindex < sortedMeshShaderMaps.size(); mapindex)
+			{
+				MeshMaterialShaderMap* meshShaderMap = sortedMeshShaderMaps[mapindex];
+				if (meshShaderMap)
+				{
+					VertexFactoryType* vfType = meshShaderMap->getVertexFactoryType();
+					BOOST_ASSERT(vfType);
+					ar << vfType;
+					meshShaderMap->serializeInline(ar, bInlineShaderResources, false, false);
+					meshShaderMap->registerSerializedShaders();
+				}
+			}
+		}
+		if (ar.isLoading())
+		{
+			mMeshShaderMaps.empty();
+			for (TLinkedList<VertexFactoryType*>::TIterator vertexFactoryTypeIt(VertexFactoryType::getTypeList()); vertexFactoryTypeIt; vertexFactoryTypeIt.next())
+			{
+				VertexFactoryType* vertexFactoryType = *vertexFactoryTypeIt;
+				BOOST_ASSERT(vertexFactoryType);
+				if (vertexFactoryType->isUsedWithMaterial())
+				{
+					new(mMeshShaderMaps)MeshMaterialShaderMap(getShaderPlatform(), vertexFactoryType);
+				}
+			}
+			initOrderedMeshShaderMaps();
+
+			TShaderMap<MaterialShaderType>::serializeInline(ar, bInlineShaderResources, false, bLoadedByCookedMaterial);
+			int32 numMeshShaderMaps = 0;
+			ar << numMeshShaderMaps;
+			for (int32 vfIndex = 0; vfIndex < numMeshShaderMaps; vfIndex++)
+			{
+				VertexFactoryType* vfType = nullptr;
+				ar << vfType;
+				BOOST_ASSERT(vfType);
+				MeshMaterialShaderMap* meshShaderMap = mOrderredMeshShaderMaps[vfType->getId()];
+				BOOST_ASSERT(meshShaderMap);
+				meshShaderMap->serializeInline(ar, bInlineShaderResources, false, bLoadedByCookedMaterial);
+			}
+		}
+	}
+
+	void MaterialShaderMapId::serialize(Archive& ar, bool bLoadedByCookedMaterial)
+	{
+		uint32 usageInt = mUsage;
+		ar << usageInt;
+		mUsage = (EMaterialShaderMapUsage::Type)usageInt;
+		ar << mBaseMaterialId;
+		ar << (int32&)mQualityLevel;
+		ar << (int32&)mFeatureLevel;
+		mParameterSet.serialize(ar);
+		ar << mReferencedFunctions;
+
+		ar << mReferencedParameterCollections;
+
+		ar << mShaderTypeDependencies;
+
+		ar << mShaderPipelineTypeDependencies;
+
+		ar << mVertexFactoryTypeDependencies;
+
+		ar << mTextureReferencesHash;
+
+		ar << mBasePropertyOverridesHash;
+	}
 
 
 	void getMaterialQualityLevelName(EMaterialQualityLevel::Type inQualityLevel, wstring & outName)
@@ -123,7 +361,7 @@ namespace Air
 			outShaderMapId.mBaseMaterialId = getMaterialId();
 			outShaderMapId.mQualityLevel = getQualityLevelForShaderMapId();
 			outShaderMapId.mFeatureLevel = getFeatureLevel();
-			outShaderMapId.setShaderDependencies(shaderTypes, shaderPipelineTypes, VFTypes);
+			outShaderMapId.setShaderDependencies(shaderTypes, shaderPipelineTypes, VFTypes, platform);
 			getReferencedTexturesHash(platform, outShaderMapId.mTextureReferencesHash);
 		}
 	}
@@ -192,9 +430,9 @@ namespace Air
 		}
 	}
 
-	static inline bool shouldCacheMaterialShader(const MaterialShaderType* shaderType, EShaderPlatform platform, const FMaterial* material)
+	static inline bool shouldCacheMaterialShader(const MaterialShaderType* shaderType, EShaderPlatform platform, const FMaterial* material, int32 permutationId)
 	{
-		return shaderType->shouldCache(platform, material) && material->shouldCache(platform, shaderType, nullptr);
+		return shaderType->shouldCompilePermutation(platform, material, permutationId) && material->shouldCache(platform, shaderType, nullptr);
 	}
 
 
@@ -229,9 +467,13 @@ namespace Air
 		for (TLinkedList<ShaderType*>::TIterator shaderTypeIt(ShaderType::getTypeList()); shaderTypeIt; shaderTypeIt.next())
 		{
 			MaterialShaderType* shaderType = shaderTypeIt->getMaterialShaderType();
-			if (shaderType && !isMaterialShaderComplete(material, shaderType, nullptr, bSilent))
+			const int32 permutationCount = shaderType ? shaderType->getPermutationCount() : 0;
+			for (int32 permutationId = 0; permutationId < permutationCount; ++permutationId)
 			{
-				return false;
+				if (!isMaterialShaderComplete(material, shaderType, nullptr, permutationId, bSilent))
+				{
+					return false;
+				}
 			}
 		}
 		const bool bHasTessellation = material->getTessellationMode() != MTM_NOTessellation;
@@ -245,7 +487,7 @@ namespace Air
 				for (int32 index = 0; index < stageTypes.size(); ++index)
 				{
 					auto* shaderType = stageTypes[index]->getMaterialShaderType();
-					if (shouldCacheMaterialShader(shaderType, mPlatform, material))
+					if (shouldCacheMaterialShader(shaderType, mPlatform, material, kUniquePermutationId))
 					{
 						++numShouldCache;
 					}
@@ -259,7 +501,7 @@ namespace Air
 					for (int32 index = 0; index < stageTypes.size(); ++index)
 					{
 						auto* shaderType = stageTypes[index]->getMaterialShaderType();
-						if (!isMaterialShaderComplete(material, shaderType, pipeline, bSilent))
+						if (!isMaterialShaderComplete(material, shaderType, pipeline, kUniquePermutationId, bSilent))
 						{
 							return false;
 						}
@@ -377,8 +619,8 @@ namespace Air
 			BOOST_ASSERT(shader);
 			if (!shaderPipelineType)
 			{
-				BOOST_ASSERT(!meshShaderMap->hasShader(meshMaterialShaderType));
-				meshShaderMap->addShader(meshMaterialShaderType, shader);
+				BOOST_ASSERT(!meshShaderMap->hasShader(meshMaterialShaderType, currentJob.mPermutationId));
+				meshShaderMap->addShader(meshMaterialShaderType, currentJob.mPermutationId, shader);
 			}
 		}
 		else
@@ -389,8 +631,8 @@ namespace Air
 			BOOST_ASSERT(shader);
 			if (!shaderPipelineType)
 			{
-				BOOST_ASSERT(!hasShader(materialShaderType));
-				addShader(materialShaderType, shader);
+				BOOST_ASSERT(!hasShader(materialShaderType, currentJob.mPermutationId));
+				addShader(materialShaderType, currentJob.mPermutationId, shader);
 			}
 		}
 		return shader;
@@ -425,7 +667,7 @@ namespace Air
 		hashState.getHash(&outHash.mHash[0]);
 	}
 
-	void MaterialShaderMapId::setShaderDependencies(const TArray<ShaderType*>& shaderTypes, const TArray<const ShaderPipelineType*>& shaderPipelineTypes, const TArray<VertexFactoryType*>& VFType)
+	void MaterialShaderMapId::setShaderDependencies(const TArray<ShaderType*>& shaderTypes, const TArray<const ShaderPipelineType*>& shaderPipelineTypes, const TArray<VertexFactoryType*>& VFType, EShaderPlatform shaderPlatform)
 	{
 		if (!PlatformProperties::requiresCookedData())
 		{
@@ -433,14 +675,14 @@ namespace Air
 			{
 				ShaderTypeDependency dependency;
 				dependency.mShaderType = shaderTypes[shaderTypeIndex];
-				dependency.mSourceHash = shaderTypes[shaderTypeIndex]->getSourceHash();
+				dependency.mSourceHash = shaderTypes[shaderTypeIndex]->getSourceHash(shaderPlatform);
 				mShaderTypeDependencies.add(dependency);
 			}
 			for (int32 VFTypeIndex = 0; VFTypeIndex < VFType.size(); VFTypeIndex++)
 			{
 				VertexFactoryTypeDependency dependency;
 				dependency.mVertexFactoryType = VFType[VFTypeIndex];
-				dependency.mVFSourceHash = VFType[VFTypeIndex]->getSourceHash();
+				dependency.mVFSourceHash = VFType[VFTypeIndex]->getSourceHash(shaderPlatform);
 				mVertexFactoryTypeDependencies.add(dependency);
 			}
 
@@ -460,8 +702,9 @@ namespace Air
 
 	TArray<MaterialShaderMap*> MaterialShaderMap::mAllMaterialShaderMaps;
 
-	MaterialShaderMap::MaterialShaderMap()
-		:mPlatform(SP_NumPlatforms),
+	MaterialShaderMap::MaterialShaderMap(EShaderPlatform inPlatform)
+		:
+		TShaderMap<MaterialShaderType>(inPlatform),
 		mCompilingId(1),
 		mNumRef(0),
 		bDeletedThroughDeferredCleanup(false),
@@ -549,17 +792,17 @@ namespace Air
 
 	void ConstantExpressionSet::createBufferStruct()
 	{
-		TArray<ConstantBufferStruct::Member> members;
+		TArray<ShaderParametersMetadata::Member> members;
 		uint32 nextMemberOffset = 0;
 		if (mConstantVectorExpressions.size())
 		{
-			new (members)ConstantBufferStruct::Member(TEXT("VectorExpressions"), TEXT(""), nextMemberOffset, CBMT_FLOAT32, EShaderPrecisionModifier::Half, 1, 4, mConstantVectorExpressions.size(), nullptr);
+			new (members)ShaderParametersMetadata::Member(TEXT("VectorExpressions"), TEXT(""), nextMemberOffset, CBMT_FLOAT32, EShaderPrecisionModifier::Half, 1, 4, mConstantVectorExpressions.size(), nullptr);
 			const uint32 vectorArraySize = mConstantVectorExpressions.size() * sizeof(float4);
 			nextMemberOffset += vectorArraySize;
 		}
 		if (mConstantScalarExpressions.size())
 		{
-			new(members)ConstantBufferStruct::Member(TEXT("ScalarExpressions"), TEXT(""), nextMemberOffset, CBMT_FLOAT32, EShaderPrecisionModifier::Half, 1, 4, (mConstantScalarExpressions.size() + 3) / 4, nullptr);
+			new(members)ShaderParametersMetadata::Member(TEXT("ScalarExpressions"), TEXT(""), nextMemberOffset, CBMT_FLOAT32, EShaderPrecisionModifier::Half, 1, 4, (mConstantScalarExpressions.size() + 3) / 4, nullptr);
 			const uint32 scalarArraySize = (mConstantScalarExpressions.size() + 3) / 4 * sizeof(float4);
 			nextMemberOffset += scalarArraySize;
 		}
@@ -585,26 +828,27 @@ namespace Air
 		for (int32 i = 0; i < mConstant2DTextureExpression.size(); i++)
 		{
 			BOOST_ASSERT((nextMemberOffset & 0x7) == 0);
-			new(members)ConstantBufferStruct::Member(texture2DNames[i].c_str(), TEXT("Texture2D"), nextMemberOffset, CBMT_TEXTURE, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
+			new(members)ShaderParametersMetadata::Member(texture2DNames[i].c_str(), TEXT("Texture2D"), nextMemberOffset, CBMT_TEXTURE, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 			nextMemberOffset += 8;
-			new (members)ConstantBufferStruct::Member(texture2DSamplerNames[i].c_str(), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
+			new (members)ShaderParametersMetadata::Member(texture2DSamplerNames[i].c_str(), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 			nextMemberOffset += 8;
 		}
 
 		for (int32 i = 0; i < mConstantCubeTextureExpressions.size(); ++i)
 		{
 			BOOST_ASSERT((nextMemberOffset & 0x7) == 0);
-			new(members)ConstantBufferStruct::Member(textureCubeNames[i].c_str(), TEXT("TextureCube"), nextMemberOffset, CBMT_TEXTURE, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
+			new(members)ShaderParametersMetadata::Member(textureCubeNames[i].c_str(), TEXT("TextureCube"), nextMemberOffset, CBMT_TEXTURE, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 			nextMemberOffset += 8;
-			new (members)ConstantBufferStruct::Member(textureCubeSamplerNames[i].c_str(), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
+			new (members)ShaderParametersMetadata::Member(textureCubeSamplerNames[i].c_str(), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 			nextMemberOffset += 8;
 		}
-		new (members)ConstantBufferStruct::Member(TEXT("Wrap_WorldGroupSettings"), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
+		new (members)ShaderParametersMetadata::Member(TEXT("Wrap_WorldGroupSettings"), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 		nextMemberOffset += 8;
-		new (members)ConstantBufferStruct::Member(TEXT("Clamp_WorldGroupSettings"), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
+		new (members)ShaderParametersMetadata::Member(TEXT("Clamp_WorldGroupSettings"), TEXT("SamplerState"), nextMemberOffset, CBMT_SAMPLER, EShaderPrecisionModifier::Float, 1, 1, 1, nullptr);
 		nextMemberOffset += 8;
 		const uint32 structSize = align(nextMemberOffset, CONSTANT_BUFFER_STRUCT_ALIGNMENT);
-		mConstantBufferStruct.emplace(MaterialLayout.c_str(), TEXT("MaterialConstants"), TEXT("Material"), constructMaterialCosntantBufferParameter, structSize, members, false);
+		mConstantBufferStruct.emplace(ShaderParametersMetadata::EUseCase::DataDrivenShaderParameterStruct,
+			MaterialLayout, TEXT("MaterialConstants"), TEXT("Material"), structSize, members);
 	}
 
 	bool ConstantExpressionSet::isEmpty() const
@@ -712,10 +956,9 @@ namespace Air
 
 	
 
-	void MaterialConstantExpressionTexture::getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<const RTexture>& outValue, ESamplerSourceMode& outSamplerSource) const
+	void MaterialConstantExpressionTexture::getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<RTexture>& outValue) const
 	{
 		BOOST_ASSERT(isInParallelRenderingThread());
-		outSamplerSource = mSamplerSource;
 		if (mTransientOverrideValue_RenderThread)
 		{
 			outValue = mTransientOverrideValue_RenderThread;
@@ -737,105 +980,12 @@ namespace Air
 			mPerFrameConstantVectorExpressions.size(),
 			mParameterCollections.size());
 	}
-	const ConstantBufferStruct& ConstantExpressionSet::getConstantBufferStruct() const
+	const ShaderParametersMetadata& ConstantExpressionSet::getShaderParametersMetadata() const
 	{
 		return mConstantBufferStruct.getValue();
 	}
 
-	ConstantBufferRHIRef ConstantExpressionSet::createConstantBuffer(const MaterialRenderContext& materialRenderContext, RHICommandList* commandListIfLocalMode, struct LocalConstantBuffer* outLocalConstantBuffer) const
-	{
-		BOOST_ASSERT(mConstantBufferStruct);
-		BOOST_ASSERT(isInParallelRenderingThread());
-		ConstantBufferRHIRef constantBuffer;
-		if (mConstantBufferStruct->getSize() > 0)
-		{
-			MemMark mark(MemStack::get());
-			void* const tempBuffer = MemStack::get().pushBytes(mConstantBufferStruct->getSize(), CONSTANT_BUFFER_STRUCT_ALIGNMENT);
-			LinearColor* tempVectorBuffer = (LinearColor*)tempBuffer;
-			for (int32 vectorIndex = 0; vectorIndex < mConstantVectorExpressions.size(); ++vectorIndex)
-			{
-				tempVectorBuffer[vectorIndex] = LinearColor(0, 0, 0, 0);
-				mConstantVectorExpressions[vectorIndex]->getNumberValue(materialRenderContext, tempVectorBuffer[vectorIndex]);
-			}
-			float* temScalarBuffer = (float*)(tempVectorBuffer + mConstantVectorExpressions.size());
-			for (int32 scalarIndex = 0; scalarIndex < mConstantScalarExpressions.size(); ++scalarIndex)
-			{
-				LinearColor vectorValue(0, 0, 0, 0);
-				mConstantScalarExpressions[scalarIndex]->getNumberValue(materialRenderContext, vectorValue);
-				temScalarBuffer[scalarIndex] = vectorValue.R;
-			}
-
-			void** resourceTable = (void**)((uint8*)tempBuffer + mConstantBufferStruct->getLayout().mResourceOffset);
-			BOOST_ASSERT(((UPTRINT)resourceTable & 0x7) == 0);
-			BOOST_ASSERT(mConstantBufferStruct->getLayout().mResource.size() == mConstant2DTextureExpression.size() * 2 + mConstantCubeTextureExpressions.size() * 2 + 2);
-
-			for (int32 expressionIndex = 0; expressionIndex < mConstant2DTextureExpression.size(); expressionIndex++)
-			{
-				std::shared_ptr<const RTexture> value;
-				ESamplerSourceMode sourceMode;
-				mConstant2DTextureExpression[expressionIndex]->getTextureValue(materialRenderContext, materialRenderContext.mMaterial, value, sourceMode);
-				if (value && value->mResource)
-				{
-					*resourceTable++ = value->mTextureReference.mTextureReferenceRHI;
-					SamplerStateRHIRef* samplerSource = &value->mResource->mSamplerStateRHI;
-					if (sourceMode == SSM_Wrap_WorldGroupSettings)
-					{
-						samplerSource = &Wrap_WorldGroupSettings->mSamplerStateRHI;
-					}
-					else if(sourceMode == SSM_Clamp_WorldGroupSettings)
-					{
-						samplerSource = &Clamp_WorldGroupSettings->mSamplerStateRHI;
-					}
-					*resourceTable++ = *samplerSource;
-				}
-				else
-				{
-					*resourceTable++ = GWhiteTexture->mTextureRHI;
-					*resourceTable++ = GWhiteTexture->mSamplerStateRHI;
-				}
-			}
-			for (int32 expressionIndex = 0; expressionIndex < mConstantCubeTextureExpressions.size(); expressionIndex++)
-			{
-				std::shared_ptr<const RTexture> value;
-				ESamplerSourceMode sourceMode;
-				mConstantCubeTextureExpressions[expressionIndex]->getTextureValue(materialRenderContext, materialRenderContext.mMaterial, value, sourceMode);
-				if (value && value->mResource)
-				{
-					BOOST_ASSERT(value->mTextureReference.mTextureReferenceRHI);
-					*resourceTable++ = value->mTextureReference.mTextureReferenceRHI;
-					SamplerStateRHIRef* samplerSource = &value->mResource->mSamplerStateRHI;
-					if (sourceMode == SSM_Wrap_WorldGroupSettings)
-					{
-						samplerSource = &Wrap_WorldGroupSettings->mSamplerStateRHI;
-					}
-					else if (sourceMode == SSM_Clamp_WorldGroupSettings)
-					{
-						samplerSource = &Clamp_WorldGroupSettings->mSamplerStateRHI;
-					}
-					*resourceTable++ = *samplerSource;
-				}
-				else
-				{
-					*resourceTable++ = GWhiteTexture->mTextureRHI;
-					*resourceTable++ = GWhiteTexture->mSamplerStateRHI;
-				}
-			}
-			*resourceTable++ = Wrap_WorldGroupSettings->mSamplerStateRHI;
-			*resourceTable++ = Clamp_WorldGroupSettings->mSamplerStateRHI;
-			if (commandListIfLocalMode)
-			{
-				BOOST_ASSERT(outLocalConstantBuffer);
-				*outLocalConstantBuffer = commandListIfLocalMode->buildLocalConstantBuffer(tempBuffer, mConstantBufferStruct->getSize(), mConstantBufferStruct->getLayout());
-				BOOST_ASSERT(outLocalConstantBuffer->isValid());
-			}
-			else
-			{
-				constantBuffer = RHICreateConstantBuffer(tempBuffer, mConstantBufferStruct->getLayout(), ConstantBuffer_MultiFrame);
-				BOOST_ASSERT(!outLocalConstantBuffer->isValid());
-			}
-		}
-		return constantBuffer;
-	}
+	
 
 	void MaterialConstantExpressionTexture::serialize(Archive& ar)
 	{
@@ -867,13 +1017,11 @@ namespace Air
 		if (mGameThreadShaderMap)
 		{
 			mGameThreadShaderMap = nullptr;
-			ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-				releaseShaderMap,
-				FMaterial*, material, this,
+			ENQUEUE_RENDER_COMMAND(
+				releaseShaderMap)([this](RHICommandListImmediate& RHICmdList)
 				{
-					material->setRenderingThreadShaderMap(nullptr);
-				}
-			);
+					this->setRenderingThreadShaderMap(nullptr);
+				});
 		}
 	}
 
@@ -896,7 +1044,7 @@ namespace Air
 				for (TLinkedList<ShaderType*>::TIterator shaderTypeIt(ShaderType::getTypeList()); shaderTypeIt; shaderTypeIt.next())
 				{
 					MeshMaterialShaderType* shaderType = shaderTypeIt->getMeshMaterialShaderType();
-					if (shaderType&& shaderType->shouldCache(platform, this, vertexFactoryType) && shouldCache(platform, shaderType, vertexFactoryType) && vertexFactoryType->shouldCache(platform, this, shaderType))
+					if (shaderType&& shaderType->shouldCompilePermutation(platform, this, vertexFactoryType, kUniquePermutationId) && shouldCache(platform, shaderType, vertexFactoryType) && vertexFactoryType->shouldCache(platform, this, shaderType))
 					{
 						bAddedTypeFromThisVF = true;
 						outShaderType.addUnique(shaderType);
@@ -912,7 +1060,7 @@ namespace Air
 						for (const ShaderType* type : shaderStages)
 						{
 							const MeshMaterialShaderType* shaderType = type->getMeshMaterialShaderType();
-							if (shaderType->shouldCache(platform, this, vertexFactoryType) && shouldCache(platform, shaderType, vertexFactoryType) && vertexFactoryType->shouldCache(platform, this, shaderType))
+							if (shaderType->shouldCompilePermutation(platform, this, vertexFactoryType, kUniquePermutationId) && shouldCache(platform, shaderType, vertexFactoryType) && vertexFactoryType->shouldCache(platform, this, shaderType))
 							{
 								++numShouldCache;
 							}
@@ -937,9 +1085,13 @@ namespace Air
 		for (TLinkedList<ShaderType*>::TIterator shaderTypeIt(ShaderType::getTypeList()); shaderTypeIt; shaderTypeIt.next())
 		{
 			MaterialShaderType* shaderType = shaderTypeIt->getMaterialShaderType();
-			if (shaderType && shaderType->shouldCache(platform, this) && shouldCache(platform, shaderType, nullptr))
+			const int32 permutationCount = shaderType ? shaderType->getPermutationCount() : 0;
+			for (int32 permutationId = 0; permutationId < permutationCount; permutationId++)
 			{
-				outShaderType.add(shaderType);
+				if (shaderType->shouldCompilePermutation(platform, this, permutationId) && shouldCache(platform, shaderType, nullptr))
+				{
+					outShaderType.add(shaderType);
+				}
 			}
 		}
 
@@ -953,7 +1105,7 @@ namespace Air
 				for (const ShaderType* type : shaderStages)
 				{
 					const MaterialShaderType* shaderType = type->getMaterialShaderType();
-					if (shaderType && shaderType->shouldCache(platform, this) && shouldCache(platform, shaderType, nullptr))
+					if (shaderType && shaderType->shouldCompilePermutation(platform, this, kUniquePermutationId) && shouldCache(platform, shaderType, nullptr))
 					{
 						++numShouldCache;
 					}
@@ -992,7 +1144,7 @@ namespace Air
 
 			const wstring materialShaderCode =  materialTranslator.getMaterialShaderCode();
 			const bool bSynchronousCompile = requiresSynchronousCompilation() || !GShaderCompilingManager->allowAsynchronousShaderCompiling() || isDefaultMaterial();
-			materialEnvironment->mIncludeFileNameToContentsMap.emplace(TEXT("Material.hlsl"), stringToArray<ANSICHAR>(materialShaderCode.c_str(), materialShaderCode.length() + 1));
+			materialEnvironment->mIncludeVirtualPathToContentsMap.emplace(TEXT("Material.hlsl"), materialShaderCode);
 			newShaderMap->compile(this, shaderMapId, materialEnvironment, newComilationOutput, platform, bSynchronousCompile, bApplyCompletedShaderMapForRendering);
 			if (bSynchronousCompile)
 			{
@@ -1084,16 +1236,16 @@ namespace Air
 		return bSucceeded;
 	}
 
-	Shader* FMaterial::getShader(MeshMaterialShaderType* shaderType, VertexFactoryType* vertexFactoryType) const
+	Shader* FMaterial::getShader(MeshMaterialShaderType* shaderType, VertexFactoryType* vertexFactoryType, int32 permutationId, bool bFatalIfMissing) const
 	{
 		const MeshMaterialShaderMap* meshShaderMap = mRenderingThreadShaderMap->getMeshShaderMap(vertexFactoryType);
-		Shader* shader = meshShaderMap ? meshShaderMap->getShader(shaderType) : nullptr;
+		Shader* shader = meshShaderMap ? meshShaderMap->getShader(shaderType, permutationId) : nullptr;
 		if (!shader)
 		{
 			auto shaderPlatform = GShaderPlatformForFeatureLevel[getFeatureLevel()];
 			bool bMaterialShouldCache = shouldCache(shaderPlatform, shaderType, vertexFactoryType);
 			bool bVFShouldCache = vertexFactoryType->shouldCache(shaderPlatform, this, shaderType);
-			bool bShaderShouldCache = shaderType->shouldCache(shaderPlatform, this, vertexFactoryType);
+			bool bShaderShouldCache = shaderType->shouldCompilePermutation(shaderPlatform, this, vertexFactoryType, permutationId);
 		}
 		return shader;
 	}
@@ -1113,7 +1265,40 @@ namespace Air
 		BOOST_ASSERT(isInParallelRenderingThread());
 		const ConstantExpressionSet& constantExpressionSet = context.mMaterial.getRenderingThreadShaderMap()->getConstantExpressionSet();
 		outConstantExpressionCache.mCachedConstantExpressionShaderMap = context.mMaterial.getRenderingThreadShaderMap();
-		outConstantExpressionCache.mConstantBuffer = constantExpressionSet.createConstantBuffer(context, commandListIfLocalMode, &outConstantExpressionCache.mLocalConstantBuffer);
+		
+		const ShaderParametersMetadata& constantBufferStruct = constantExpressionSet.getConstantBufferStruct();
+
+		MemMark mark(MemStack::get());
+
+		uint8* tempBuffer = MemStack::get().pushBytes(constantBufferStruct.getSize(), SHADER_PARAMETER_STRUCT_ALIGNMENT);
+
+		BOOST_ASSERT(tempBuffer != nullptr);
+
+		constantExpressionSet.fillConstantBuffer(context, outConstantExpressionCache, tempBuffer, constantBufferStruct.getSize());
+
+		if (commandListIfLocalMode)
+		{
+			outConstantExpressionCache.mLocalConstantBuffer = commandListIfLocalMode->buildLocalConstantBuffer(tempBuffer, constantBufferStruct.getSize(), constantBufferStruct.getLayout());
+			BOOST_ASSERT(outConstantExpressionCache.mLocalConstantBuffer.isValid());
+		}
+		else
+		{
+			if (isValidRef(outConstantExpressionCache.mConstantBuffer) && !outConstantExpressionCache.mConstantBuffer->isValid())
+			{
+				AIR_LOG(LogMatrial, Fatal, TEXT("The ConstantBuffer needs to be valid if it has been set"));
+			}
+
+			if (isValidRef(outConstantExpressionCache.mConstantBuffer))
+			{
+				BOOST_ASSERT(outConstantExpressionCache.mConstantBuffer->getLayout() == constantBufferStruct.getLayout());
+				RHIUpdateConstantBuffer(outConstantExpressionCache.mConstantBuffer, tempBuffer);
+			}
+			else
+			{
+				outConstantExpressionCache.mConstantBuffer = RHICreateConstantBuffer(tempBuffer, constantBufferStruct.getLayout(), ConstantBuffer_MultiFrame);
+			}
+		}
+
 		outConstantExpressionCache.mParameterCollections = constantExpressionSet.mParameterCollections;
 		outConstantExpressionCache.bUpToData = true;
 	}
@@ -1171,86 +1356,22 @@ namespace Air
 		return mMaterialInstance ? mMaterialInstance->isMasked() : mMaterial->isMasked();
 	}
 
-	static inline bool shouldCacheMeshShader(const MeshMaterialShaderType* shaderType, EShaderPlatform platform, const FMaterial* material, VertexFactoryType* inVertexFactoryType)
+	static inline bool shouldCacheMeshShader(const MeshMaterialShaderType* shaderType, EShaderPlatform platform, const FMaterial* material, VertexFactoryType* inVertexFactoryType, int32 permutationId)
 	{
-		return shaderType->shouldCache(platform, material, inVertexFactoryType) && material->shouldCache(platform, shaderType, inVertexFactoryType) && inVertexFactoryType->shouldCache(platform, material, shaderType);
+		return shaderType->shouldCompilePermutation(platform, material, inVertexFactoryType, permutationId) && material->shouldCache(platform, shaderType, inVertexFactoryType) && inVertexFactoryType->shouldCache(platform, material, shaderType);
 	}
 
-	bool MeshMaterialShaderMap::isComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* material, VertexFactoryType* inVertexFactoryType, bool bSilent)
-	{
-		for (TLinkedList<ShaderType*>::TIterator shaderTypeIt(ShaderType::getTypeList()); shaderTypeIt; shaderTypeIt.next())
-		{
-			MeshMaterialShaderType* shaderType = shaderTypeIt->getMeshMaterialShaderType();
-			if (shaderType && !isMeshShaderComplete(meshShaderMap, platform, material, shaderType, nullptr, inVertexFactoryType, bSilent))
-			{
-				return false;
-			}
-		}
-
-		const bool bHasTessellation = material->getTessellationMode() != MTM_NOTessellation;
-		for (TLinkedList<ShaderPipelineType*>::TIterator shaderPipelineIt(ShaderPipelineType::getTypeList()); shaderPipelineIt; shaderPipelineIt.next())
-		{
-			const ShaderPipelineType* shaderPipelineType = *shaderPipelineIt;
-			if (shaderPipelineType->isMeshMaterialTypePipeline() && shaderPipelineType->hasTessellation() == bHasTessellation)
-			{
-				auto& stages = shaderPipelineType->getStages();
-				int32 numShouldCache = 0;
-				for (int32 index = 0; index < stages.size(); ++index)
-				{
-					auto* shaderType = stages[index]->getMeshMaterialShaderType();
-					if (shouldCacheMeshShader(shaderType, platform, material, inVertexFactoryType))
-					{
-						++numShouldCache;
-					}
-					else
-					{
-						break;
-					}
-				}
-				if (numShouldCache == stages.size())
-				{
-					for (int32 index = 0; index < stages.size(); ++index)
-					{
-						auto* shaderType = stages[index]->getMeshMaterialShaderType();
-						if (shaderType && !isMeshShaderComplete(meshShaderMap, platform, material, shaderType, shaderPipelineType, inVertexFactoryType, bSilent))
-						{
-							return false;
-						}
-					}
-				}
-			}
-		}
-		return false;
-	}
-
-	inline bool MeshMaterialShaderMap::isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* material, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, bool bSilent)
-	{
-		if (shouldCacheMeshShader(shaderType, platform, material, inVertexFactoryType) && (!meshShaderMap || (pipeline && !meshShaderMap->hasShaderPipeline(pipeline)) || (!pipeline && !meshShaderMap->hasShader((ShaderType*)shaderType))))
-		{
-			if (!bSilent)
-			{
-				if (pipeline)
-				{
-
-				}
-				else
-				{
-
-				}
-			}
-			return false;
-		}
-		return true;
-	}
+	
+	
 
 	bool MaterialResource::isLightFunction() const
 	{
 		return mMaterial->mMaterialDomain == MD_LightFunction;
 	}
 
-	bool MaterialShaderMap::isMaterialShaderComplete(const FMaterial* material, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, bool bSilent)
+	bool MaterialShaderMap::isMaterialShaderComplete(const FMaterial* material, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, int32 permutationId, bool bSilent)
 	{
-		if (shouldCacheMaterialShader(shaderType, mPlatform, material) && ((pipelineType && !hasShaderPipeline(pipelineType)) || (!pipelineType && !hasShader((ShaderType*)shaderType))))
+		if (shouldCacheMaterialShader(shaderType, mPlatform, material, permutationId) && ((pipelineType && !hasShaderPipeline(pipelineType)) || (!pipelineType && !hasShader((ShaderType*)shaderType, permutationId))))
 		{
 			if (!bSilent)
 			{
@@ -1346,7 +1467,7 @@ namespace Air
 						if (meshShaderMap == nullptr)
 						{
 							meshShaderMapIndex = mMeshShaderMaps.size();
-							meshShaderMap = new(mMeshShaderMaps) MeshMaterialShaderMap(vertexFactoryType);
+							meshShaderMap = new(mMeshShaderMaps) MeshMaterialShaderMap(platform, vertexFactoryType);
 
 						}
 						const uint32 meshShaders = meshShaderMap->beginCompile(mCompilingId, shaderMapId, material, materialEnvironment, platform, newJobs);
@@ -1361,22 +1482,29 @@ namespace Air
 				for (TLinkedList<ShaderType*>::TIterator shaderTypeIt(ShaderType::getTypeList()); shaderTypeIt; shaderTypeIt.next())
 				{
 					MaterialShaderType* shaderType = shaderTypeIt->getMaterialShaderType();
-					if (shaderType && shouldCacheMaterialShader(shaderType, platform, material))
+					const int32 permutationCount = shaderType ? shaderType->getPermutationCount() : 0;
+
+					for (int32 permutationId = 0; permutationId < permutationCount; ++permutationId)
 					{
-						BOOST_ASSERT(shaderMapId.containsShaderType(shaderType));
-						TArray<wstring> shaderErrors;
-						if (!hasShader(shaderType))
+
+						if (shouldCacheMaterialShader(shaderType, platform, material, permutationId))
 						{
-							auto* job = shaderType->beginCompileShader(mCompilingId,
-								material,
-								materialEnvironment,
-								nullptr,
-								platform,
-								newJobs);
-							BOOST_ASSERT(sharedShaderJobs.find(shaderType) == sharedShaderJobs.end());
-							sharedShaderJobs.emplace(shaderType, job);
+							BOOST_ASSERT(shaderMapId.containsShaderType(shaderType, permutationId));
+							TArray<wstring> shaderErrors;
+							if (!hasShader(shaderType, permutationId))
+							{
+								auto* job = shaderType->beginCompileShader(mCompilingId,
+									permutationId,
+									material,
+									materialEnvironment,
+									nullptr,
+									platform,
+									newJobs);
+								BOOST_ASSERT(sharedShaderJobs.find(shaderType) == sharedShaderJobs.end());
+								sharedShaderJobs.emplace(shaderType, job);
+							}
+							numShaders++;
 						}
-						numShaders++;
 					}
 				}
 				const bool bHasTessellation = material->getTessellationMode() != MTM_NOTessellation;
@@ -1390,9 +1518,9 @@ namespace Air
 						for (int32 index = 0; index < stageTypes.size(); ++index)
 						{
 							MaterialShaderType* shaderType = (MaterialShaderType*)(stageTypes[index]->getMaterialShaderType());
-							if (shaderType && shouldCacheMaterialShader(shaderType, platform, material))
+							if (shaderType && shouldCacheMaterialShader(shaderType, platform, material, kUniquePermutationId))
 							{
-								BOOST_ASSERT(shaderMapId.containsShaderType(shaderType));
+								BOOST_ASSERT(shaderMapId.containsShaderType(shaderType, kUniquePermutationId));
 								shaderStagesToCompile.add(shaderType);
 							}
 							else
@@ -1403,7 +1531,7 @@ namespace Air
 						if (shaderStagesToCompile.size() == stageTypes.size())
 						{
 							BOOST_ASSERT(shaderMapId.containsShaderPipelineType(pipeline));
-							if (pipeline->shoudlOptimizeUnusedOutputs())
+							if (pipeline->shoudlOptimizeUnusedOutputs(platform))
 							{
 								numShaders += shaderStagesToCompile.size();
 								MaterialShaderType::beginCompileShaderPipeline(mCompilingId, platform, material, materialEnvironment, pipeline, shaderStagesToCompile, newJobs);
@@ -1444,11 +1572,11 @@ namespace Air
 		}
 	}
 
-	bool MaterialShaderMapId::containsShaderType(const ShaderType* shaderType) const
+	bool MaterialShaderMapId::containsShaderType(const ShaderType* shaderType, int32 permutationId) const
 	{
 		for (int32 typeIndex = 0; typeIndex < mShaderTypeDependencies.size(); ++typeIndex)
 		{
-			if (mShaderTypeDependencies[typeIndex].mShaderType == shaderType)
+			if (mShaderTypeDependencies[typeIndex].mShaderType == shaderType && mShaderTypeDependencies[typeIndex].mPermutationId == permutationId) 
 			{
 				return true;
 			}
@@ -1501,7 +1629,7 @@ namespace Air
 
 	void FMaterial::setupMaterialEnvironment(EShaderPlatform platform, const ConstantExpressionSet& inConstantExpressionSet, ShaderCompilerEnvironment& outEnvironment) const
 	{
-		ShaderConstantBufferParameter::modifyCompilationEnvironment(TEXT("Material"), inConstantExpressionSet.getConstantBufferStruct(), platform, outEnvironment);
+		ShaderConstantBufferParameter::modifyCompilationEnvironment(TEXT("Material"), inConstantExpressionSet.getShaderParametersMetadata(), platform, outEnvironment);
 
 		switch (getShadingModel())
 		{
@@ -1705,7 +1833,7 @@ namespace Air
 								for (int32 index = 0; index < stageTypes.size(); ++index)
 								{
 									MeshMaterialShaderType* shaderType = ((MeshMaterialShaderType*)(stageTypes[index]))->getMeshMaterialShaderType();
-									Shader* shader = meshShaderMap->getShader(shaderType);
+									Shader* shader = meshShaderMap->getShader(shaderType,kUniquePermutationId);
 									BOOST_ASSERT(shader);
 									shaderStages.add(shader);
 								}
@@ -1728,7 +1856,7 @@ namespace Air
 							for (int32 index = 0; index < stageTypes.size(); ++index)
 							{
 								MaterialShaderType* shaderType = ((MaterialShaderType*)(stageTypes[index]))->getMaterialShaderType();
-								Shader* shader = getShader(shaderType);
+								Shader* shader = getShader(shaderType, kUniquePermutationId);
 								BOOST_ASSERT(shader);
 								shaderStages.add(shader);
 							}
@@ -1880,7 +2008,7 @@ namespace Air
 		if (App::canEverRender())
 		{
 			MaterialRenderProxy* renderProxy = this;
-			ENQUEUE_UNIQUE_RENDER_COMMAND(CacheConstantExpresionsCommand)([renderProxy](RHICommandListImmediate& RHICmdList) {
+			ENQUEUE_RENDER_COMMAND(CacheConstantExpresionsCommand)([renderProxy](RHICommandListImmediate& RHICmdList) {
 				renderProxy->cacheConstantExpressions();
 			});
 		}

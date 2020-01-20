@@ -84,7 +84,7 @@ namespace Air
 			if (taskToSpawn && maybeTasksLeft > 0)
 			{
 				taskToSpawn = Math::min<int32>(taskToSpawn, maybeTasksLeft);
-				GraphTask<ParallelForTask>::createTask().constructAndDispatchWhenReady(data, taskToSpawn - 1);
+				TGraphTask<ParallelForTask>::createTask().constructAndDispatchWhenReady(data, taskToSpawn - 1);
 			}
 			int32 localBlockSize = mBlockSize;
 			int32 lockNum = mNum;
@@ -160,7 +160,7 @@ namespace Air
 		}
 
 		std::shared_ptr<ParallelForData> data = MakeSharedPtr<ParallelForData>(num, anyThreadTasks + 1, num > anyThreadTasks + 1, body);
-		GraphTask<ParallelForTask>::createTask().constructAndDispatchWhenReady(data, anyThreadTasks - 1);
+		TGraphTask<ParallelForTask>::createTask().constructAndDispatchWhenReady(data, anyThreadTasks - 1);
 		if (!data->process(0, data, true))
 		{
 			data->mEvent->wait();

@@ -94,7 +94,7 @@ namespace Air
 	private:
 		TArray<TRefCountPtr<PooledRenderTarget>> mPooledRenderTargets;
 		TArray<TRefCountPtr<PooledRenderTarget>> mDeferredDeleteArray;
-		TArray<TextureRHIParamRef> mTransitionTargets;
+		TArray<RHITexture*> mTransitionTargets;
 
 		TArray<PooledRenderTarget*> mPooledRenderTargetSnapshots;
 

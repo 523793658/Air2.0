@@ -139,19 +139,15 @@ namespace Air
 		return size;
 	}
 
-	void quantizeSceneBufferSize(int32& inOutBufferSizeX, int32& inOutBufferSizeY)
+	void quantizeSceneBufferSize(const int2& inBufferSize, int2& outBufferSize)
 	{
 		const uint32 dividableBy = 4;
 		const uint32 mask = ~(dividableBy - 1);
-		inOutBufferSizeY = (inOutBufferSizeY + dividableBy - 1) & mask;
-		inOutBufferSizeX = (inOutBufferSizeX + dividableBy - 1) & mask;
+		outBufferSize.y = (inBufferSize.y + dividableBy - 1) & mask;
+		outBufferSize.x = (inBufferSize.x + dividableBy - 1) & mask;
 	}
 
-	RENDER_CORE_API bool isForwardShadingEnabled(ERHIFeatureLevel::Type  featureLevel)
-	{
-		static const int var = 0;
-		return false;
-	}
+
 
 
 	RENDER_CORE_API bool isSimpleForwardShadingEnable(EShaderPlatform platform)
@@ -247,7 +243,7 @@ namespace Air
 		virtual void initRHI() override
 		{
 			VertexDeclarationElementList elements;
-			elements.add(VertexElement(0, 0, VET_Float4, 0, sizeof(Vector4)));
+			elements.add(VertexElement(0, 0, VET_Float4, 0, sizeof(float4)));
 			mVertexDeclarationRHI = RHICreateVertexDeclaration(elements);
 		}
 
@@ -301,4 +297,56 @@ namespace Air
 			}
 		}
 	}
+
+	RENDER_CORE_API bool mobileSupportsGPUScene(EShaderPlatform platform)
+	{
+		return false;
+	}
+
+	RENDER_CORE_API bool useVirtualTexturing(ERHIFeatureLevel::Type inFeatureLevel, const ITargetPlatform* targetPlatform)
+	{
+		return false;
+	}
+
+	void calcMipMapExtent3D(uint32 width, uint32 height, uint32 depth, EPixelFormat format, uint32 mipIndex, uint32& outXExtent, uint32& outYExtent, uint32& outZExtent)
+	{
+		outXExtent = Math::max<uint32>(width >> mipIndex, GPixelFormats[format].BlockSizeX);
+		outYExtent = Math::max<uint32>(height >> mipIndex, GPixelFormats[format].BlockSizeY);
+		outZExtent = Math::max<uint32>(depth >> mipIndex, GPixelFormats[format].BlockSizeZ);
+	}
+
+	SIZE_T calcTextureMipMapSize3D(uint32 width, uint32 height, uint32 depth, EPixelFormat format, uint32 mipIndex)
+	{
+		uint32 xExtent;
+		uint32 yExtent;
+		uint32 zExtent;
+
+		calcMipMapExtent3D(width, height, depth, format, mipIndex, xExtent, yExtent, zExtent);
+
+		xExtent += GPixelFormats[format].BlockSizeX - 1;
+		yExtent += GPixelFormats[format].BlockSizeY - 1;
+		zExtent += GPixelFormats[format].BlockSizeZ - 1;
+
+		const uint32 xPitch = (xExtent / GPixelFormats[format].BlockSizeX) * GPixelFormats[format].BlockBytes;
+		const uint32 numRows = yExtent / GPixelFormats[format].BlockSizeY;
+		const uint32 numLayers = zExtent / GPixelFormats[format].BlockSizeZ;
+
+		return numLayers * numRows * xPitch;
+	}
+
+	SIZE_T calcTextureSize3D(uint32 width, uint32 height, uint32 depth, EPixelFormat format, uint32 mipCount)
+	{
+		SIZE_T size = 0;
+		for (uint32 mipIndex = 0; mipIndex < mipCount; ++mipIndex)
+		{
+			size += calcTextureMipMapSize3D(width, height, depth, format, mipIndex);
+		}
+		return size;
+	}
+
+	RENDER_CORE_API uint64 GForwardShadingPlatformMask = 0;
+	static_assert(SP_NumPlatforms <= sizeof(GForwardShadingPlatformMask) * 8, "GForwardShadingPlatformMask must be large enough to support all shader platform");
+
+	RENDER_CORE_API uint64 GSelectiveBasePassOutputsPlatformMask = 0;
+	static_assert(SP_NumPlatforms <= sizeof(GSelectiveBasePassOutputsPlatformMask) * 8, "GSelectiveBasePassOutputsPlatformMask must be large enough to support all shader platform");
 }

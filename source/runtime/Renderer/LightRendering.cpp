@@ -12,10 +12,9 @@ namespace Air
 {
 	static int32 bAllowSimpleLight = 0;
 
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(DeferredLightConstantStruct, TEXT("DeferredLightConstants"));
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(DeferredLightConstantStruct, "DeferredLightConstants");
 
-	IMPLEMENT_SHADER_TYPE(template<>, TDeferredLightVS<false>, TEXT("DeferredLightVertexShaders"), TEXT("DirectionalVertexMain"), SF_Vertex);
-	//IMPLEMENT_SHADER_TYPE(template<>, TDeferredLightVS<true>, TEXT("DeferredLightVertexShaders"), TEXT("RadialVertexMain"), SF_Vertex);
+	
 
 	uint32 getShadowQuality()
 	{
@@ -23,57 +22,73 @@ namespace Air
 	}
 
 	template<bool bRadiaAttenuation>
-	static VertexDeclarationRHIParamRef getDeferredLightingVertexDeclaration()
+	static RHIVertexDeclaration* getDeferredLightingVertexDeclaration()
 	{
 		return bRadiaAttenuation ? getVertexDeclarationVector4() : GFilterVertexDeclaration.mVertexDeclarationRHI;
 	}
 
-	template<bool bUseIESProfile, bool bRadialAttenuation, bool bInverseSquaredFalloff, bool bVisulaizeLightCulling, bool bUseLightingChannels>
-	class TDeferredLightPS : public GlobalShader
+	enum class ELightSourceShape
 	{
-		DECLARE_SHADER_TYPE(TDeferredLightPS, Global)
+		Directional,
+		Capsule,
+		Rect,
+		MAX
+	};
+
+
+	class DeferredLightPS : public GlobalShader
+	{
+		DECLARE_GLOBAL_SHADER(DeferredLightPS)
+
+		SHADER_PERMUTATION_ENUM_CLASS(SourceShapeDim, "LIGHT_00SOURCE_SHAPE", ELightSourceShape);
+		SHADER_PERMUTATION_BOOL(SourceTextureDim, "USE_SOURCE_TEXTURE");
+
+
+		using PermutationDomain = TShaderPermutationDomain<SourceShapeDim, SourceTextureDim>;
+
+
 	public:
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
-			return isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4);
-		}
-		static void modifyCompilationEnvironment(EShaderPlatform platform, ShaderCompilerEnvironment& outEnvironment)
-		{
-			GlobalShader::modifyCompilationEnvironment(platform, outEnvironment);
-			outEnvironment.setDefine(TEXT("USE_IES_PROFILE"), (uint32)bUseIESProfile);
-			outEnvironment.setDefine(TEXT("RADIAL_ATTENUATION"), (uint32)bRadialAttenuation);
-			
-			outEnvironment.setDefine(TEXT("INVERSE_SQUARED_FALLOFF"), (uint32)bInverseSquaredFalloff);
+			PermutationDomain permutationVector(parameters.mPermutationId);
 
-			outEnvironment.setDefine(TEXT("LIGHT_SOURCE_SHAPE"), 1);
-			
-			outEnvironment.setDefine(TEXT("VISUALIZE_LIGHT_CULLING"), (uint32)bVisulaizeLightCulling);
-			outEnvironment.setDefine(TEXT("USE_LIGHTING_CHANNELS"), (uint32)bUseLightingChannels);
-		}
+			if (permutationVector.get<SourceShapeDim>() == ELightSourceShape::Rect)
+			{
 
-		TDeferredLightPS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+			}
+			else
+			{
+				if (permutationVector.get<SourceTextureDim>())
+				{
+					return false;
+				}
+			}
+
+
+			return isFeatureLevelSupported(parameters.mPlatform, ERHIFeatureLevel::SM4);
+		}
+		
+		DeferredLightPS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)
 		{
-			mDeferredParameters.bind(initializer.mParameterMap);
+			mSceneTextureParameters.bind(initializer);
 		}
-		TDeferredLightPS()
+		DeferredLightPS()
 		{}
 
-		void setParameters(RHICommandList& RHICmdList, const SceneView& view, const LightSceneInfo* lightSceneInfo)
+		void setParameters(RHICommandList& RHICmdList, const SceneView& view, const LightSceneInfo* lightSceneInfo, IPooledRenderTarget* screenShadowMaskTexture)
 		{
-			const PixelShaderRHIParamRef shaderRHI = getPixelShader();
-			setParametersBase(RHICmdList, shaderRHI, view, nullptr);
+			RHIPixelShader* shaderRHI = getPixelShader();
+			setParametersBase(RHICmdList, shaderRHI, view, screenShadowMaskTexture, nullptr);
 			setDeferredLightParameters(RHICmdList, shaderRHI, getConstantBufferParameter<DeferredLightConstantStruct>(), lightSceneInfo, view);
 		}
 
 		virtual bool serialize(Archive& ar) override
 		{
 			bool bShaderHasOutdatedParameters = GlobalShader::serialize(ar);
-			ar << mDeferredParameters;
+			ar << mSceneTextureParameters;
 			ar << mLightAttenuationTexture;
 			ar << mLightAttenuationTextureSampler;
-			ar << mPreIntegratedBRDF;
-			ar << mPreIntegratedBRDFSampler;
 			ar << mIESTexture;
 			ar << mIESTextureSampler;
 			ar << mLightingChannelsTexture;
@@ -90,35 +105,31 @@ namespace Air
 
 	private:
 
-		void setParametersBase(RHICommandList& RHICmdList, const PixelShaderRHIParamRef shaderRHI, const SceneView& view, Texture* IESTextureResource)
+		void setParametersBase(RHICommandList& RHICmdList, RHIPixelShader* shaderRHI, const SceneView& view, IPooledRenderTarget* screenShadowMaskTexture, Texture* IESTextureResource)
 		{
-			GlobalShader::setParameters(RHICmdList, shaderRHI, view);
-			mDeferredParameters.set(RHICmdList, shaderRHI, view);
+			GlobalShader::setParameters<ViewConstantShaderParameters>(RHICmdList, shaderRHI, view.mViewConstantBuffer);
+			mSceneTextureParameters.set(RHICmdList, shaderRHI, view.mFeatureLevel, ESceneTextureSetupMode::All);
 
 			SceneRenderTargets& sceneRendertargets = SceneRenderTargets::get(RHICmdList);
 			if (mLightAttenuationTexture.isBound())
 			{
-				setTextureParameter(RHICmdList, shaderRHI, mLightAttenuationTexture, mLightAttenuationTextureSampler, TStaticSamplerState<SF_Point, AM_Wrap, AM_Wrap, AM_Wrap>::getRHI(), sceneRendertargets.getEffectiveLightAttenuationTexture(true));
+				setTextureParameter(RHICmdList, shaderRHI, mLightAttenuationTexture, mLightAttenuationTextureSampler, TStaticSamplerState<SF_Point, AM_Wrap, AM_Wrap, AM_Wrap>::getRHI(), screenShadowMaskTexture ? screenShadowMaskTexture->getRenderTargetItem().mShaderResourceTexture : GWhiteTexture->mTextureRHI);
 			}
+
+
 			
 		}
 
-
-		DeferredPixelShaderParameters mDeferredParameters;
+		SceneTextureShaderParameters mSceneTextureParameters;
 		ShaderResourceParameter	mLightAttenuationTexture;
 		ShaderResourceParameter mLightAttenuationTextureSampler;
-		ShaderResourceParameter mPreIntegratedBRDF;
-		ShaderResourceParameter mPreIntegratedBRDFSampler;
 		ShaderResourceParameter mIESTexture;
 		ShaderResourceParameter mIESTextureSampler;
 		ShaderResourceParameter mLightingChannelsTexture;
 		ShaderResourceParameter mLightingChannelsSampler;
 	};
-
-#define IMPLEMENT_DEFERREDLIGHT_PIXELSHADER_TYPE(A, B, C, D, E, EntryName)	\
-	typedef TDeferredLightPS<A, B, C, D, E> TDeferredLightPS##A##B##C##D##E;	\
-	IMPLEMENT_SHADER_TYPE(template<>, TDeferredLightPS##A##B##C##D##E, TEXT("DeferredLightPixelShaders"), EntryName, SF_Pixel);
-	IMPLEMENT_DEFERREDLIGHT_PIXELSHADER_TYPE(false, false, false, false, false, TEXT("DirectionalPixelMain"));
+	
+	IMPLEMENT_GLOBAL_SHADER(DeferredLightPS, "DeferredLightPixelShaders.hlsl", "DeferredLightPixelMain", SF_Pixel);
 
 	template<bool bUseIESProfile, bool bRadialAttenuation, bool bInverseSquaredFalloff>
 	static void setShaderTemplLighting(
@@ -148,7 +159,7 @@ namespace Air
 
 
 
-	void DeferredShadingSceneRenderer::renderLights(RHICommandListImmediate& RHICmdList)
+	void DeferredShadingSceneRenderer::renderLights(RHICommandListImmediate& RHICmdList, SortedLightSetSceneInfo& sortedLightSet)
 	{
 		bool bStencilBufferDirty = false;
 
@@ -172,7 +183,7 @@ namespace Air
 				{
 					if (lightSceneInfo->shouldRenderLight(mViews[viewIndex]))
 					{
-						SortedLightSceneInfo* sortedLightInfo = new (sortedLights)SortedLightSceneInfo(lightSceneInfoCompact);
+						SortedLightSceneInfo* sortedLightInfo = new (sortedLights)SortedLightSceneInfo(lightSceneInfo);
 						sortedLightInfo->mSortKey.mFields.mLightType = lightSceneInfoCompact.mLightType;
 						sortedLightInfo->mSortKey.mFields.bTextureProfile = false;
 						sortedLightInfo->mSortKey.mFields.bShadowed = dynamicShadows && checkForProjectedShadows(lightSceneInfo);
@@ -245,10 +256,10 @@ namespace Air
 					for (int32 lightIndex = standardDeferredStart; lightIndex < attenuationLightStart; lightIndex++)
 					{
 						const SortedLightSceneInfo& sortedLightInfo = sortedLights[lightIndex];
-						const LightSceneInfoCompact& lightSceneInfoCompact = sortedLightInfo.mSceneInfo;
-						const LightSceneInfo* const lightSceneInfo = lightSceneInfoCompact.mLightSceneInfo;
+					
+						const LightSceneInfo* const lightSceneInfo = sortedLightInfo.mLightSceneInfo;
 
-						renderLight(RHICmdList, lightSceneInfo, false, false);
+						renderLight(RHICmdList, lightSceneInfo, nullptr, false, false);
 					}
 				}
 			}
@@ -260,11 +271,14 @@ namespace Air
 			}
 			{
 				bool bDirectLighting = mViewFamily.mEngineShowFlags.DirectLighting;
+
+				TRefCountPtr<IPooledRenderTarget> screenShadowMaskTexture;
+
 				for (int32 lightIndex = attenuationLightStart; lightIndex < sortedLights.size(); lightIndex)
 				{
 					const SortedLightSceneInfo& sortedLightInfo = sortedLights[lightIndex];
-					const LightSceneInfoCompact& lightSceneInfoCompact = sortedLightInfo.mSceneInfo;
-					const LightSceneInfo& lightSceneInfo = *lightSceneInfoCompact.mLightSceneInfo;
+
+					const LightSceneInfo& lightSceneInfo = *sortedLightInfo.mLightSceneInfo;
 					bool bDrawShadows = sortedLightInfo.mSortKey.mFields.bShadowed;
 					bool bDrawLightFunction = sortedLightInfo.mSortKey.mFields.bLightFunction;
 					bool bUseLightAttenuation = false;
@@ -295,7 +309,7 @@ namespace Air
 					sceneContext.beginRenderingSceneColor(RHICmdList, ESimpleRenderTargetMode::EExistingColorAndDepth, FExclusiveDepthStencil::DepthRead_StencilWrite);
 					if (bDirectLighting)
 					{
-						renderLight(RHICmdList, &lightSceneInfo, false, true);
+						renderLight(RHICmdList, &lightSceneInfo, screenShadowMaskTexture, false, true);
 					}
 				}
 				sceneContext.setLightAttenuationMode(true);
@@ -303,10 +317,13 @@ namespace Air
 		}
 	}
 
-	void DeferredShadingSceneRenderer::renderLight(RHICommandList& RHICmdList, const LightSceneInfo* lightSceneInfo, bool bRenderOverlap, bool bIssueDrawEvent)
+	void DeferredShadingSceneRenderer::renderLight(RHICommandList& RHICmdList, const LightSceneInfo* lightSceneInfo, IPooledRenderTarget* screenShadowMaskTexture, bool bRenderOverlap, bool bIssueDrawEvent)
 	{
-		RHICmdList.setBlendState(TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_One, BO_Add, BF_One, BF_One>::getRHI());
-		bool bStencilDirty = false;
+		GraphicsPipelineStateInitializer graphicsPSOInit;
+		RHICmdList.applyCachedRenderTargets(graphicsPSOInit);
+		graphicsPSOInit.mBlendState = TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_One, BO_Add, BF_One, BF_One>::getRHI();
+		graphicsPSOInit.mPrimitiveType = PT_TriangleList;
+
 		for (int32 viewIndex = 0; viewIndex < mViews.size(); viewIndex++)
 		{
 			ViewInfo& view = mViews[viewIndex];
@@ -324,24 +341,29 @@ namespace Air
 
 			if (lightSceneInfo->mProxy->getLightType() == LightType_Directional)
 			{
+				graphicsPSOInit.bDepthBounds = false;
 				TShaderMapRef<TDeferredLightVS<false>> vertexShader(view.mShaderMap);
-				RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-				RHICmdList.setDepthStencilState(TStaticDepthStencilState<false
-					, CF_Always>::getRHI());
+
+				graphicsPSOInit.mRasterizerState = TStaticRasterizerState<FM_Solid, CM_None>::getRHI();
+				graphicsPSOInit.mDepthStencilState = TStaticDepthStencilState<false, CF_Always>::getRHI();
+
+
 				if (bRenderOverlap)
 				{
 				
 				}
 				else
 				{
-					if (bUseIESTexture)
-					{
+					DeferredLightPS::PermutationDomain permutationVector;
+					permutationVector.set<DeferredLightPS::SourceShapeDim>(ELightSourceShape::Directional);
 
-					}
-					else
-					{
-						setShaderTemplLighting<false, false, false>(RHICmdList, view, *vertexShader, lightSceneInfo);
-					}
+					TShaderMapRef<DeferredLightPS> pixelShader(view.mShaderMap, permutationVector);
+					graphicsPSOInit.mBoundShaderState.mVertexDeclarationRHI = GFilterVertexDeclaration.mVertexDeclarationRHI;
+					graphicsPSOInit.mBoundShaderState.mVertexShaderRHI = GETSAFERHISHADER_VERTEX(*vertexShader);
+					graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+
+					setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+					pixelShader->setParameters(RHICmdList, view, lightSceneInfo, screenShadowMaskTexture);
 				}
 				vertexShader->setParameters(RHICmdList, view, lightSceneInfo);
 
@@ -352,10 +374,7 @@ namespace Air
 
 			}
 		}
-		if (bStencilDirty)
-		{
-			RHICmdList.clearDepthStencilTexture(SceneRenderTargets::get(RHICmdList).getSceneDepthTexture(), EClearDepthStencil::Stencil, (float)ERHIZBuffer::FarPlane, 0, IntRect());
-		}
+		
 	}
 
 	bool DeferredShadingSceneRenderer::renderLightFunction(RHICommandListImmediate& RHICmdList, const LightSceneInfo* lightSceneInfo, bool bLightAttenuationCleared, bool bProjectingForForwardShading)
@@ -367,5 +386,119 @@ namespace Air
 		}
 
 		return false;
+	}
+
+	int32 bAllowSimpleLights = 0;
+
+	void DeferredShadingSceneRenderer::gatherAndSortLights(SortedLightSetSceneInfo& outSortedLights)
+	{
+		if (bAllowSimpleLights)
+		{
+			
+		}
+
+		SimpleLightArray& simpleLights = outSortedLights.mSimpleLights;
+
+		TArray<SortedLightSceneInfo, SceneRenderingAllocator>& sortedLights = outSortedLights.mSortedLights;
+		sortedLights.empty(mScene->mLights.size() + simpleLights.mInstanceData.size());
+
+		bool bDynamicShadows = mViewFamily.mEngineShowFlags.DynamicShadows && getShadowQuality() > 0;
+
+		for (TSparseArray<LightSceneInfoCompact>::TConstIterator lightIt(mScene->mLights); lightIt; ++lightIt)
+		{
+			const LightSceneInfoCompact& lightSceneInfoCompact = *lightIt;
+			const LightSceneInfo* const lightSceneInfo = lightSceneInfoCompact.mLightSceneInfo;
+			if (lightSceneInfo->shouldRenderLightViewIndependent() && !mViewFamily.mEngineShowFlags.ReflectionOverride)
+			{
+				for (int32 viewIndex = 0; viewIndex < mViews.size(); viewIndex++)
+				{
+					if (lightSceneInfo->shouldRenderLight(mViews[viewIndex]))
+					{
+
+						SortedLightSceneInfo* sortedLightInfo = new (sortedLights)SortedLightSceneInfo(lightSceneInfo);
+
+						sortedLightInfo->mSortKey.mFields.mLightType = lightSceneInfoCompact.mLightType;
+						sortedLightInfo->mSortKey.mFields.bTextureProfile = mViewFamily.mEngineShowFlags.TexturedLightProfiles && lightSceneInfo->mProxy->getIESTextureResource();
+						sortedLightInfo->mSortKey.mFields.bShadowed = bDynamicShadows && checkForProjectedShadows(lightSceneInfo);
+						sortedLightInfo->mSortKey.mFields.bLightFunction = mViewFamily.mEngineShowFlags.LightFunctions && checkForLightFunction(lightSceneInfo);
+						sortedLightInfo->mSortKey.mFields.bUsesLightingChannels = mViews[viewIndex].bUseLightingChannels && lightSceneInfo->mProxy->getLightingChannelMask() != getDefaultLightingChannelMask();
+						sortedLightInfo->mSortKey.mFields.bIsNotSimpleLight = 1;
+
+
+						const bool bTiledOrClusteredDeferredSupported = !sortedLightInfo->mSortKey.mFields.bTextureProfile &&
+							!sortedLightInfo->mSortKey.mFields.bShadowed &&
+							!sortedLightInfo->mSortKey.mFields.bLightFunction &&
+							!sortedLightInfo->mSortKey.mFields.bUsesLightingChannels
+							&& lightSceneInfoCompact.mLightType != LightType_Directional
+							&& lightSceneInfoCompact.mLightType != LightType_Rect;
+
+						sortedLightInfo->mSortKey.mFields.bTiledDeferredNotSupported = !(bTiledOrClusteredDeferredSupported && lightSceneInfo->mProxy->isTitledDferredLightingSupported());
+						sortedLightInfo->mSortKey.mFields.bClusteredDeferredNotSupported = !bTiledOrClusteredDeferredSupported;
+						break;
+					}
+				}
+			}
+		}
+		for (int32 simpleLightIndex = 0; simpleLightIndex < simpleLights.mInstanceData.size(); simpleLightIndex++)
+		{
+			SortedLightSceneInfo* sortedLightInfo = new(sortedLights)SortedLightSceneInfo(simpleLightIndex);
+			sortedLightInfo->mSortKey.mFields.mLightType = LightType_Point;
+			sortedLightInfo->mSortKey.mFields.bTextureProfile = 0;
+			sortedLightInfo->mSortKey.mFields.bShadowed = 0;
+			sortedLightInfo->mSortKey.mFields.bLightFunction = 0;
+			sortedLightInfo->mSortKey.mFields.bUsesLightingChannels = 0;
+			sortedLightInfo->mSortKey.mFields.bIsNotSimpleLight = 0;
+			sortedLightInfo->mSortKey.mFields.bTiledDeferredNotSupported = 0;
+			sortedLightInfo->mSortKey.mFields.bClusteredDeferredNotSupported = 0;
+		}
+
+		struct CompareSortedLightSceneInfo
+		{
+			FORCEINLINE bool operator()(const SortedLightSceneInfo& a, const SortedLightSceneInfo& b) const
+			{
+				return a.mSortKey.mPacked < b.mSortKey.mPacked;
+			}
+		};
+
+		sortedLights.sort(CompareSortedLightSceneInfo());
+
+		outSortedLights.mSimpleLightsEnd = sortedLights.size();
+		outSortedLights.mTiledSupportedEnd = sortedLights.size();
+		outSortedLights.mClusteredSupportedEnd = sortedLights.size();
+		outSortedLights.mAttenuationLightStart = sortedLights.size();
+
+		for (int32 lightIndex = 0; lightIndex < sortedLights.size(); lightIndex++)
+		{
+			const SortedLightSceneInfo& sortedLightInfo = sortedLights[lightIndex];
+			const bool bDrawShadows = sortedLightInfo.mSortKey.mFields.bShadowed;
+			const bool bDrawLightFunction = sortedLightInfo.mSortKey.mFields.bLightFunction;
+			const bool bTextureLightProfile = sortedLightInfo.mSortKey.mFields.bTextureProfile;
+			const bool bLightingChannels = sortedLightInfo.mSortKey.mFields.bUsesLightingChannels;
+
+			if (sortedLightInfo.mSortKey.mFields.bIsNotSimpleLight && outSortedLights.mSimpleLightsEnd == sortedLights.size())
+			{
+				outSortedLights.mSimpleLightsEnd = lightIndex;
+			}
+
+			if (sortedLightInfo.mSortKey.mFields.bTiledDeferredNotSupported && outSortedLights.mTiledSupportedEnd == sortedLights.size())
+			{
+				outSortedLights.mTiledSupportedEnd = lightIndex;
+			}
+
+			if (sortedLightInfo.mSortKey.mFields.bClusteredDeferredNotSupported && outSortedLights.mClusteredSupportedEnd == sortedLights.size())
+			{
+				outSortedLights.mClusteredSupportedEnd = lightIndex;
+			}
+
+			if (bDrawShadows || bDrawLightFunction || bLightingChannels)
+			{
+				BOOST_ASSERT(sortedLightInfo.mSortKey.mFields.bTiledDeferredNotSupported);
+				outSortedLights.mAttenuationLightStart = lightIndex;
+				break;
+			}
+		}
+		BOOST_ASSERT(outSortedLights.mTiledSupportedEnd >= outSortedLights.mSimpleLightsEnd);
+		BOOST_ASSERT(outSortedLights.mClusteredSupportedEnd >= outSortedLights.mTiledSupportedEnd);
+		BOOST_ASSERT(outSortedLights.mAttenuationLightStart >= outSortedLights.mClusteredSupportedEnd);
 	}
 }

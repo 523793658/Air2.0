@@ -351,7 +351,9 @@ namespace Air
 
 		void addParameterCollectionInstances(class MaterialParameterCollection* collection, bool bUpdateScene);
 
-		void updateParameterCollectionInstances(bool bUpdateInstanceConstantBuffers);
+		void updateParameterCollectionInstances(bool bUpdateInstanceConstantBuffers, bool bRecreateConstantBuffer);
+
+		void setMaterialParameterCollectionInstanceNeedsUpdate();
 
 	private:
 		void conditionallyCreateDefaultLevelCollections();

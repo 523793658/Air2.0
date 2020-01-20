@@ -88,6 +88,8 @@ namespace Air
 		uint32 bUseWireframeSelectionColoring : 1;
 		uint32 bUseSelectionOutline : 1;
 		uint32 bDitheredLODTransition : 1;
+		uint32 bSelectable : 1;
+		uint32 bUseForDepthPass : 1;
 		float	DitheredLODTransitionAlpha{ 0.0f };
 		HitProxyId mBatchHitPrixyId;
 
@@ -152,5 +154,7 @@ namespace Air
 		{
 			new(mElements)MeshBatchElement();
 		}
+
+		ENGINE_API void preparePrimitiveConstantBuffer(const PrimitiveSceneProxy* primitiveSceneProxy, ERHIFeatureLevel::Type featureLevel);
 	};
 }

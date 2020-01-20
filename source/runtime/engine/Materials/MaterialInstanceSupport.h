@@ -18,7 +18,7 @@ namespace Air
 		void GameThread_setParent(std::shared_ptr<MaterialInterface>& parentMaterialInterface);
 
 		template<typename ValueType>
-		void RenderThread_UpdateParameter(const wstring name, ValueType& value)
+		void RenderThread_UpdateParameter(const wstring name, const ValueType& value)
 		{
 			invalidateConstantExpressionCache();
 			TArray<TNamedParameter<ValueType>>& valueArray = getValueArray<ValueType>();

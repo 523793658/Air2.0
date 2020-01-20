@@ -6,11 +6,36 @@
 #define INTERNAL_DECORATOR_COMPUTE(Method) cmdList.getComputeContext().Method
 #endif
 
+#if !defined(INTERNAL_DECORATOR_CONTEXT_PARAM1)
+#define INTERNAL_DECORATOR_CONTEXT(Method) IRHIComputeContext& context = (CmdListType == ECmdList::EGfx) ? cmdList.getContext() : cmdList.getComputeContext() ; context.Method
+#endif
 
+
+template<ECmdList CmdListType>
+void RHICommandWaitComputeFence<CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_CONTEXT(RHIWaitComputeFence)(mWaitFence);
+}
+
+template struct RHICommandWaitComputeFence<ECmdList::EGfx>;
+template struct RHICommandWaitComputeFence<ECmdList::ECompute>;
+
+
+template struct RHICommandTransitionUAVs<ECmdList::EGfx>;
+template struct RHICommandTransitionUAVs<ECmdList::ECompute>;
 void RHICommandBeginDrawingViewport::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHIBeginDrawingViewport)(mViewport, mRenderTargetRHI);
 }
+
+template<ECmdList CmdListType>
+void RHICommandSubmitCommandsHint<CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_CONTEXT(RHISubmitCommandsHint)();
+}
+
+template struct RHICommandSubmitCommandsHint<ECmdList::EGfx>;
+template struct RHICommandSubmitCommandsHint<ECmdList::ECompute>;
 
 void RHICommandEndDrawingViewport::execute(RHICommandListBase& cmdList)
 {
@@ -52,10 +77,6 @@ void RHICommandSetRenderTargetsAndClear::execute(RHICommandListBase& cmdList)
 	INTERNAL_DECORATOR(RHISetRenderTargetsAndClear)(mRenderTargetInfo);
 }
 
-void RHICommandClearColorTextures::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHIClearColorTextures)(mNumClearColors, mTextures, mColorArray, mExcludeRect);
-}
 
 void RHICommandBindClearMRTValues::execute(RHICommandListBase& cmdList)
 {
@@ -75,20 +96,6 @@ void RHICommandBuildLocalConstantBuffer::execute(RHICommandListBase& cmdList)
 	mWorkArea.mContents = nullptr;
 }
 
-void RHICommandSetBlendState::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHISetBlendState)(mState, mBlendFactor);
-}
-
-void RHICommandSetRasterizerState::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHISetRasterizerState)(mState);
-}
-void RHICommandSetDepthStencilState::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHISetDepthStencilState)(mState, mStencilRef);
-}
-
 void RHICommandSetStencilRef::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetStencilRef)(mStencilRef);
@@ -98,46 +105,52 @@ void RHICommandSetViewport::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetViewport)(mX, mY, mZ, mWidth, mHeight, mDepth);
 }
-void RHICommandBuildLocalBoundShaderState::execute(RHICommandListBase& cmdList)
+
+void RHICommandSetBlendFactor::execute(RHICommandListBase& cmdList)
 {
-	BOOST_ASSERT(!isValidRef(mWorkArea.mComputedBSS->mBSS));
-	if (mWorkArea.mComputedBSS->mUseCount)
-	{
-		mWorkArea.mComputedBSS->mBSS = RHICreateBoundShaderState(mWorkArea.mArgs.mVertexDeclarationRHI,
-			mWorkArea.mArgs.mVertexShaderRHI,
-			mWorkArea.mArgs.mHullShaderRHI,
-			mWorkArea.mArgs.mDomainShaderRHI,
-			mWorkArea.mArgs.mGeometryShaderRHI,
-			mWorkArea.mArgs.mPixelShaderRHI);
-	}
+	INTERNAL_DECORATOR(RHISetBlendFactor)(mBlendFactor);
 }
 
-void RHICommandSetLocalBoundShaderState::execute(RHICommandListBase& cmdList)
+template<ECmdList CmdListType>
+void RHICommandTransitionUAVs<CmdListType>::execute(RHICommandListBase& cmdList)
 {
-	BOOST_ASSERT(mLocalBoundShaderState.mWorkArea->mComputedBSS->mUseCount > 0 && isValidRef(mLocalBoundShaderState.mWorkArea->mComputedBSS->mBSS));
-	INTERNAL_DECORATOR(RHISetBoundShaderState)(mLocalBoundShaderState.mWorkArea->mComputedBSS->mBSS);
-	if (--mLocalBoundShaderState.mWorkArea->mComputedBSS->mUseCount == 0)
-	{
-		mLocalBoundShaderState.mWorkArea->mComputedBSS->~ComputedBSS();
-	}
+	INTERNAL_DECORATOR(RHITransitionResources)(mTransitionType, mTransitionPipeline, mUAVs, mNumUAVs, mWriteFence);
 }
 
-template<typename TShaderRHIParamRef, ECmdList cmdListType>
-void RHICommandSetShaderConstantBuffer<TShaderRHIParamRef, cmdListType>::execute(RHICommandListBase & cmdList)
+
+template<typename TRHIShader, ECmdList CmdListType>
+void RHICommandSetShaderResourceViewParameter<TRHIShader, CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHISetShaderResourceViewParameter)(mShader, mSamplerIndex, mSRV);
+}
+
+template struct RHICommandSetShaderResourceViewParameter<RHIVertexShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderResourceViewParameter<RHIHullShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderResourceViewParameter<RHIDomainShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderResourceViewParameter<RHIGeometryShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderResourceViewParameter<RHIPixelShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderResourceViewParameter<RHIComputeShader, ECmdList::EGfx>;
+template<> void RHICommandSetShaderResourceViewParameter<RHIComputeShader, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_COMPUTE(RHISetShaderResourceViewParameter)(mShader, mSamplerIndex, mSRV);
+};
+
+template<typename TRHIShader, ECmdList cmdListType>
+void RHICommandSetShaderConstantBuffer<TRHIShader, cmdListType>::execute(RHICommandListBase & cmdList)
 {
 	INTERNAL_DECORATOR(RHISetShaderConstantBuffer)(mShader, mBaseIndex, mConstantBuffer);
 }
 
-template struct RHICommandSetShaderConstantBuffer<VertexShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderConstantBuffer<HullShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderConstantBuffer<DomainShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderConstantBuffer<GeometryShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderConstantBuffer<PixelShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderConstantBuffer<ComputeShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderConstantBuffer<ComputeShaderRHIParamRef, ECmdList::ECompute>;
+template struct RHICommandSetShaderConstantBuffer<RHIVertexShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderConstantBuffer<RHIHullShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderConstantBuffer<RHIDomainShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderConstantBuffer<RHIGeometryShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderConstantBuffer<RHIPixelShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderConstantBuffer<RHIComputeShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderConstantBuffer<RHIComputeShader, ECmdList::ECompute>;
 
-template<typename TShaderRHIParamRef>
-void RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>::execute(RHICommandListBase& cmdList)
+template<typename TRHIShader>
+void RHICommandSetLocalConstantBuffer<TRHIShader>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetShaderConstantBuffer)(mShader, mBaseIndex, mLocalConstantBuffer.mWorkArea->mComputedConstantBuffer->mConstantBuffer);
 	if (--mLocalConstantBuffer.mWorkArea->mComputedConstantBuffer->mUseCount == 0)
@@ -145,12 +158,12 @@ void RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>::execute(RHICommandLis
 		mLocalConstantBuffer.mWorkArea->mComputedConstantBuffer->~ComputedConstantBuffer();
 	}
 }
-template struct RHICommandSetLocalConstantBuffer<VertexShaderRHIParamRef>;
-template struct RHICommandSetLocalConstantBuffer<HullShaderRHIParamRef>;
-template struct RHICommandSetLocalConstantBuffer<DomainShaderRHIParamRef>;
-template struct RHICommandSetLocalConstantBuffer<GeometryShaderRHIParamRef>;
-template struct RHICommandSetLocalConstantBuffer<PixelShaderRHIParamRef>;
-template struct RHICommandSetLocalConstantBuffer<ComputeShaderRHIParamRef>;
+template struct RHICommandSetLocalConstantBuffer<RHIVertexShader>;
+template struct RHICommandSetLocalConstantBuffer<RHIHullShader>;
+template struct RHICommandSetLocalConstantBuffer<RHIDomainShader>;
+template struct RHICommandSetLocalConstantBuffer<RHIGeometryShader>;
+template struct RHICommandSetLocalConstantBuffer<RHIPixelShader>;
+template struct RHICommandSetLocalConstantBuffer<RHIComputeShader>;
 
 
 void RHICommandSetBoundShaderState::execute(RHICommandListBase& cmdList)
@@ -158,32 +171,6 @@ void RHICommandSetBoundShaderState::execute(RHICommandListBase& cmdList)
 	INTERNAL_DECORATOR(RHISetBoundShaderState)(mBoundShaderState);
 }
 
-void RHICommandEndDrawIndexedPrimitiveUP::execute(RHICommandListBase& cmdList)
-{
-	void* vertexBuffer = nullptr;
-	void* indexBuffer = nullptr;
-	INTERNAL_DECORATOR(RHIBeginDrawIndexedPrimitiveUP)(
-		mPrimitiveType,
-		mNumPrimitive,
-		mNumVertices,
-		mVertexDataStride,
-		vertexBuffer,
-		mMinVertexIndex,
-		mNumIndices,
-		mIndexDataStride,
-		indexBuffer);
-	Memory::memcpy(vertexBuffer, mOutVertexData, mNumVertices * mVertexDataStride);
-	Memory::memcpy(indexBuffer, mOutIndexData, mNumIndices * mIndexDataStride);
-	INTERNAL_DECORATOR(RHIEndDrawIndexedPrimitiveUP)();
-}
-
-void RHICommandEndDrawPrimitiveUP::execute(RHICommandListBase& cmdList)
-{
-	void* buffer = nullptr;
-	INTERNAL_DECORATOR(RHIBeginDrawPrimitiveUP)(mPrimitiveType, mNumPrimitives, mNumVertices, mVertexDataStride, buffer);
-	Memory::memcpy(buffer, mOutVertexData, mNumVertices * mVertexDataStride);
-	INTERNAL_DECORATOR(RHIEndDrawPrimitiveUP)();
-}
 
 void RHICommandDrawIndexedPrimitive::execute(RHICommandListBase& cmdList)
 {
@@ -192,22 +179,22 @@ void RHICommandDrawIndexedPrimitive::execute(RHICommandListBase& cmdList)
 
 void RHICommandDrawPrimitive::execute(RHICommandListBase& cmdList)
 {
-	INTERNAL_DECORATOR(RHIDrawPrimitive)(mPrimitiveType, mBaseVertexIndex, mNumPrimitives, mNumInstances);
+	INTERNAL_DECORATOR(RHIDrawPrimitive)(mBaseVertexIndex, mNumPrimitives, mNumInstances);
 }
 
-template<typename TShaderRHIParamRef, ECmdList cmdListType>
-void RHICommandSetShaderTexture<TShaderRHIParamRef, cmdListType>::execute(RHICommandListBase& cmdList)
+template<typename TRHIShader, ECmdList cmdListType>
+void RHICommandSetShaderTexture<TRHIShader, cmdListType>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetShaderTexture)(mShader, mTextureIndex, mTexture);
 }
 
-template struct RHICommandSetShaderTexture<VertexShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderTexture<HullShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderTexture<DomainShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderTexture<GeometryShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderTexture<PixelShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderTexture<ComputeShaderRHIParamRef, ECmdList::EGfx>;
-template<> void RHICommandSetShaderTexture<ComputeShaderRHIParamRef, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
+template struct RHICommandSetShaderTexture<RHIVertexShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderTexture<RHIHullShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderTexture<RHIDomainShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderTexture<RHIGeometryShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderTexture<RHIPixelShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderTexture<RHIComputeShader, ECmdList::EGfx>;
+template<> void RHICommandSetShaderTexture<RHIComputeShader, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR_COMPUTE(RHISetShaderTexture)(mShader, mTextureIndex, mTexture);
 }
@@ -215,52 +202,53 @@ template<> void RHICommandSetShaderTexture<ComputeShaderRHIParamRef, ECmdList::E
 
 
 
-template<typename TShaderRHIParamRef, ECmdList cmdListType>
-void RHICommandSetShaderSampler<TShaderRHIParamRef, cmdListType>::execute(RHICommandListBase& cmdList)
+template<typename TRHIShader, ECmdList cmdListType>
+void RHICommandSetShaderSampler<TRHIShader, cmdListType>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetShaderSampler)(mShader, mSamplerIndex, mState);
 }
 
-template struct RHICommandSetShaderSampler<VertexShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderSampler<HullShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderSampler<DomainShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderSampler<GeometryShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderSampler<PixelShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderSampler<ComputeShaderRHIParamRef, ECmdList::EGfx>;
-template<> void RHICommandSetShaderSampler<ComputeShaderRHIParamRef, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
+template struct RHICommandSetShaderSampler<RHIVertexShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderSampler<RHIHullShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderSampler<RHIDomainShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderSampler<RHIGeometryShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderSampler<RHIPixelShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderSampler<RHIComputeShader, ECmdList::EGfx>;
+template<> void RHICommandSetShaderSampler<RHIComputeShader, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR_COMPUTE(RHISetShaderSampler)(mShader, mSamplerIndex, mState);
 }
 
 void RHICommandSetStreamSource::execute(RHICommandListBase& cmdList)
 {
-	INTERNAL_DECORATOR(RHISetStreamSource)(mStreamIndex, mVertexBuffer, mStride, mOffset);
+	INTERNAL_DECORATOR(RHISetStreamSource)(mStreamIndex, mVertexBuffer, mOffset);
 }
 
-template<typename TShaderRHIParamRef, ECmdList CmdListType>
-void RHICommandSetShaderParameter<TShaderRHIParamRef, CmdListType>::execute(RHICommandListBase& cmdList)
+void RHICommandSetGraphicsPipelineState::execute(RHICommandListBase& cmdList)
+{
+	RHIGraphicsPipelineState* RHiGraphicsPipelineState = executeSetGraphicsPipelineState(mGraphicsPipelineState);
+	INTERNAL_DECORATOR(RHISetGraphicsPipelineState)(RHiGraphicsPipelineState);
+}
+
+template<typename TRHIShader, ECmdList CmdListType>
+void RHICommandSetShaderParameter<TRHIShader, CmdListType>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetShaderParameter)(mShader, mBufferIndex, mBaseIndex, mNumBytes, newValue);
 }
-template struct RHICommandSetShaderParameter<VertexShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderParameter<HullShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderParameter<DomainShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderParameter<GeometryShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderParameter<PixelShaderRHIParamRef, ECmdList::EGfx>;
-template struct RHICommandSetShaderParameter<ComputeShaderRHIParamRef, ECmdList::EGfx>;
-template<> void RHICommandSetShaderParameter<ComputeShaderRHIParamRef, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
+template struct RHICommandSetShaderParameter<RHIVertexShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderParameter<RHIHullShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderParameter<RHIDomainShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderParameter<RHIGeometryShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderParameter<RHIPixelShader, ECmdList::EGfx>;
+template struct RHICommandSetShaderParameter<RHIComputeShader, ECmdList::EGfx>;
+template<> void RHICommandSetShaderParameter<RHIComputeShader, ECmdList::ECompute>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR_COMPUTE(RHISetShaderParameter)(mShader, mBufferIndex, mBaseIndex, mNumBytes, newValue);
 }
 
 void RHICommandCopyToResolveTarget::execute(RHICommandListBase& cmdList)
 {
-	INTERNAL_DECORATOR(RHICopyToResolveTarget)(mSourceTexture, mDestTexture, bKeepOriginalSurface, mResolveParams);
-}
-
-void RHICommandClearDepthStencilTexture::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHIClearDepthStencilTexture)(mTexture, mClearDepthStencil, mDepth, mStencil, mExcludeRect);
+	INTERNAL_DECORATOR(RHICopyToResolveTarget)(mSourceTexture, mDestTexture, mResolveParams);
 }
 
 void RHICommandSetScissorRect::execute(RHICommandListBase& cmdList)
@@ -282,4 +270,53 @@ void RHICommandSetRenderTargets::execute(RHICommandListBase& cmdList)
 void RHICommandUpdateTextureReference::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHIUpdateTextureReference)(mTextureRef, mNewTexture);
+}
+
+void RHICommandBeginRenderPass::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHIBeginRenderPass)(mInfo, mName);
+}
+
+void RHICommandEndRenderPass::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHIEndRenderPass)();
+}
+
+void RHICommandAutomaticCacheFlushAfterComputeShader::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHIAutomaticCacheFlushAfterComputeShader)(bEnable);
+}
+
+void RHICommandFlushComputeShaderCache::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHIFlushComputeShaderCache)();
+}
+
+void RHICommandSetStereoViewport::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHISetStereoViewport)(mLeftMinX, mRightMinX, mLeftMinY, mRightMinY, mMinZ, mLeftMaxX, mRightMaxX, mLeftMaxY, mRightMaxY, mMaxZ);
+}
+
+template<ECmdList CmdListType>
+void RHICommandDispatchComputeShader<CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_CONTEXT(RHIDispatchComputeShader)(mThreadGroupCountX, mThreadGroupCountY, mThreadGroupCountZ);
+}
+
+template<ECmdList CmdListType>
+void RHICommandSetComputeShader<CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_CONTEXT(RHISetComputeShader)(mShader);
+}
+
+template<typename TRHIShader, ECmdList CmdListType>
+void RHICommandSetUAVParameter<TRHIShader, CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_CONTEXT(RHISetUAVParameter)(mShader, mUAVIndex, mUAV);
+}
+
+template<typename TRHIShader, ECmdList CmdListType>
+void RHICommandSetUAVParameter_InitialCount<TRHIShader, CmdListType>::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_CONTEXT(RHISetUAVParameter)(mShader, mUAVIndex, mUAV, mInitialCount);
 }

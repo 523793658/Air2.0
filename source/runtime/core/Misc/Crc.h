@@ -6,6 +6,12 @@ namespace Air
 {
 	struct CORE_API Crc
 	{
+		template<typename T> 
+		static uint32 typeCrc32(const T& data, uint32 crc = 0)
+		{
+			return memCrc32(&data, sizeof(T), crc);
+		}
+
 		static uint32 memCrc32(const void* data, int32 length, uint32 crc = 0);
 
 		static uint32 memCrc_DEPRECATED(const void* inData, int32 length, uint32 crc = 0u)

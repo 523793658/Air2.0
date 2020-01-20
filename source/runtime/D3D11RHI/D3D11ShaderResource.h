@@ -17,4 +17,6 @@ namespace Air
 			,mResource(inResource)
 		{}
 	};
+
+	DECL_D3D11_RESOURCE_TRAITS(D3D11ShaderResourceView, RHIShaderResourceView);
 }

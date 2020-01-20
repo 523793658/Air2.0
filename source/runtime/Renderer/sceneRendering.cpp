@@ -4,9 +4,12 @@
 #include "RenderTarget.h"
 #include "RendererModule.h"
 #include "scene.h"
+#include "PostProcess/PostProcessing.h"
 #include "LightSceneInfo.h"
 #include "ScenePrivate.h"
 #include "PostProcess/SceneRenderTargets.h"
+#include "RHIStaticStates.h"
+#include "HdrCustomResolveShaders.h"
 namespace Air
 {
 	SceneRenderer::SceneRenderer(const SceneViewFamily* inViewFamily, HitProxyConsumer* hitProxyConsumer)
@@ -113,6 +116,148 @@ namespace Air
 		for (int32 viewIndex = 0; viewIndex < mViews.size(); ++viewIndex)
 		{
 			ViewInfo& view = mViews[viewIndex];
+		}
+	}
+
+	class DummySceneColorResolveBuffer : public VertexBuffer
+	{
+	public:
+		virtual void initRHI() override
+		{
+			const int32 mNumDummyVerts = 3;
+			const uint32 mSize = sizeof(float4) * mNumDummyVerts;
+			RHIResourceCreateInfo mCreateInfo;
+			void* bufferData = nullptr;
+			mVertexBufferRHI = RHICreateAndLockVertexBuffer(mSize, BUF_Static, mCreateInfo, bufferData);
+			Memory::Memset(bufferData, 0, mSize);
+			RHIUnlockVertexBuffer(mVertexBufferRHI);
+		}
+	};
+
+	TGlobalResource<DummySceneColorResolveBuffer> GResolveDummyVertexBuffer;
+
+	void SceneRenderer::resolveSceneColor(RHICommandList& RHICmdList)
+	{
+	
+
+		SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+
+		auto& currentSceneColor = sceneContext.getSceneColor();
+		uint32 currentNumSamples = currentSceneColor->getDesc().mNumSamples;
+
+		const EShaderPlatform currentShaderPlatform = GShaderPlatformForFeatureLevel[sceneContext.getCurrentFeatureLevel()];
+
+		if (currentNumSamples <= 1 || !RHISupportsSeparateMSAAAndResolveTextures(currentShaderPlatform))
+		{
+			RHICmdList.copyToResolveTarget(sceneContext.getSceneColorSurface(), sceneContext.getSceneColorTexture(), ResolveRect(0, 0, mFamilySize.x, mFamilySize.y));
+		}
+		else
+		{
+			RHICmdList.transitionResource(EResourceTransitionAccess::EReadable, sceneContext.getSceneColorSurface());
+
+			Texture2DRHIRef maskTexture = GDynamicRHI->RHIGetMaskTexture(sceneContext.getSceneColorSurface());
+
+			RHIRenderPassInfo RPInfo(sceneContext.getSceneColorTexture(), ERenderTargetActions::Load_Store);
+			RHICmdList.beginRenderPass(RPInfo, TEXT("ResolveColor"));
+			{
+				for (int32 viewIndex = 0; viewIndex < mViews.size(); viewIndex++)
+				{
+					const ViewInfo& view = mViews[viewIndex];
+					GraphicsPipelineStateInitializer graphicsPSOInit;
+					RHICmdList.applyCachedRenderTargets(graphicsPSOInit);
+
+					graphicsPSOInit.mBlendState = TStaticBlendState<>::getRHI();
+					graphicsPSOInit.mRasterizerState = TStaticRasterizerState<>::getRHI();
+					graphicsPSOInit.mDepthStencilState = TStaticDepthStencilState<false, CF_Always>::getRHI();
+					RHICmdList.setStreamSource(0, GResolveDummyVertexBuffer.mVertexBufferRHI, 0);
+
+					RHICmdList.setScissorRect(true, view.mViewRect.min.x, view.mViewRect.min.y, view.mViewRect.max.x, view.mViewRect.max.y);
+
+					int32 resolveWith = 0;
+					if (currentNumSamples <= 1)
+					{
+						resolveWith = 0;
+					}
+					if (resolveWith != 0)
+					{
+						
+					}
+					else
+					{
+						auto shaderMap = getGlobalShaderMap(sceneContext.getCurrentFeatureLevel());
+						TShaderMapRef<HdrCustomResolveVS> vertexShader(shaderMap);
+						graphicsPSOInit.mBoundShaderState.mVertexDeclarationRHI = getVertexDeclarationVector4();
+						graphicsPSOInit.mBoundShaderState.mVertexShaderRHI = GETSAFERHISHADER_VERTEX(*vertexShader);
+						graphicsPSOInit.mPrimitiveType = PT_TriangleList;
+
+						if (maskTexture->isValid())
+						{
+							if (currentNumSamples == 2)
+							{
+								TShaderMapRef<HdrCustomResolveMask2xPS> pixelShader(shaderMap);
+								graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+
+								setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+								pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture, maskTexture);
+
+							}
+							else if (currentNumSamples == 4)
+							{
+								TShaderMapRef<HdrCustomResolveMask4xPS> pixelShader(shaderMap);
+								graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+
+								setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+								pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture, maskTexture);
+							}
+							else if (currentNumSamples == 8)
+							{
+								TShaderMapRef<HdrCustomResolveMask8xPS> pixelShader(shaderMap);
+								graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+
+								setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+								pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture, maskTexture);
+							}
+							else
+							{
+								BOOST_ASSERT(false);
+								break;
+							}
+						}
+						else
+						{
+							if (currentNumSamples == 2)
+							{
+								TShaderMapRef<HdrCustomResolve2xPS> pixelShader(shaderMap);
+								graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+								setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+								pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture);
+							}
+							if (currentNumSamples == 4)
+							{
+								TShaderMapRef<HdrCustomResolve4xPS> pixelShader(shaderMap);
+								graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+								setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+								pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture);
+							}
+							if (currentNumSamples == 8)
+							{
+								TShaderMapRef<HdrCustomResolve8xPS> pixelShader(shaderMap);
+								graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+								setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+								pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture);
+							}
+							else
+							{
+								BOOST_ASSERT(false);
+								break;
+							}
+						}
+						RHICmdList.drawPrimitive(0, 1, 1);
+					}
+				}
+				RHICmdList.setScissorRect(false, 0, 0, 0, 0);
+			}
+			RHICmdList.endRenderPass();
 		}
 	}
 
@@ -301,5 +446,141 @@ namespace Air
 		{
 			mDynamicResources[resourceIndex]->initPrimitiveResource();
 		}
+	}
+
+	void SceneRenderer::prepareViewRectsForRendering()
+	{
+		BOOST_ASSERT(isInRenderingThread());
+
+		if (!mViewFamily.supportsScreenPercentage())
+		{
+			for (ViewInfo& view : mViews)
+			{
+				view.mViewRect = view.mUnscaledViewRect;
+			}
+			computeFamilySize();
+			return;
+		}
+
+		TArray<SceneViewScreenPercentageConfig> viewScreenPercentageConfigs;
+		viewScreenPercentageConfigs.reserve(mViews.size());
+
+		for (ViewInfo& view : mViews)
+		{
+			BOOST_ASSERT(view.mViewRect.area() == 0);
+
+			{
+				const bool bWillApplyTemporalAA = GPostProcessing.allowFullPostProcessing(view, mFeatureLevel) || (view.bIsPlanarRefelction && mFeatureLevel >= ERHIFeatureLevel::SM4);
+				if (!bWillApplyTemporalAA)
+				{
+					view.mAntiAliasingMethod = AAM_None;
+				}
+			}
+
+			SceneViewScreenPercentageConfig config;
+			viewScreenPercentageConfigs.add(SceneViewScreenPercentageConfig());
+		}
+
+		BOOST_ASSERT(mViewFamily.mScreenPercentageInterface);
+		mViewFamily.mScreenPercentageInterface->computePrimaryResolutionFractions_RenderThread(viewScreenPercentageConfigs);
+		BOOST_ASSERT(viewScreenPercentageConfigs.size() == mViews.size());
+
+		for (int32 i = 0; i < mViews.size(); i++)
+		{
+			ViewInfo& view = mViews[i];
+			float primaryResolutionFraction = viewScreenPercentageConfigs[i].mPrimaryResolutionFraction;
+
+			if (!mViewFamily.mEngineShowFlags.ScreenPercentage)
+			{
+				BOOST_ASSERT(primaryResolutionFraction = 1.0f);
+				BOOST_ASSERT(primaryResolutionFraction <= mViewFamily.getPrimaryResolutionFractionUpperBound());
+				BOOST_ASSERT(SceneViewScreenPercentageConfig::isValidResolutionFraction(primaryResolutionFraction));
+				float resolutionFraction = primaryResolutionFraction * mViewFamily.mSecondaryViewFraction;
+
+				int2 viewSize = applyResolutionFraction(mViewFamily, view.mUnscaledViewRect.size(), resolutionFraction);
+
+				int2 viewRectMin = quantizeViewRectMin(int2(Math::ceilToInt(view.mUnscaledViewRect.min.x * resolutionFraction),
+					Math::ceilToInt(view.mUnscaledViewRect.min.y * resolutionFraction)));
+
+				view.mViewRect.min = viewRectMin;
+				view.mViewRect.max = viewRectMin + viewSize;
+
+				{
+					//if(view.primaryscree)
+				}
+			}
+		}
+		{
+			int2 topLeftShift = mViews[0].mViewRect.min;
+			for (int32 i = 1; i < mViews.size(); ++i)
+			{
+				topLeftShift.x = Math::min(topLeftShift.x, mViews[i].mViewRect.min.x);
+				topLeftShift.y = Math::min(topLeftShift.y, mViews[i].mViewRect.min.y);
+			}
+
+			for (int32 i = 0; i < mViews.size(); i++)
+			{
+				mViews[i].mViewRect -= topLeftShift;
+			}
+		}
+
+		computeFamilySize();
+	}
+
+	int2 SceneRenderer::applyResolutionFraction(const SceneViewFamily& viewFamily, const int2& unscaledViewSize, float resolutionFraction)
+	{
+		int2 viewSize;
+		viewSize.x = Math::ceilToInt(unscaledViewSize.x * resolutionFraction);
+		viewSize.y = Math::ceilToInt(unscaledViewSize.y * resolutionFraction);
+		return viewSize;
+	}
+
+	int2 SceneRenderer::quantizeViewRectMin(const int2& viewRectMin)
+	{
+		int2 out;
+		quantizeSceneBufferSize(viewRectMin, out);
+		return out;
+	}
+
+	void SceneRenderer::computeFamilySize()
+	{
+		BOOST_ASSERT(mFamilySize.x == 0);
+		BOOST_ASSERT(isInRenderingThread());
+
+		bool bInitializeExtents = false;
+
+		float maxFamilyX = 0;
+		float maxFamilyY = 0;
+
+		for (const ViewInfo& view : mViews)
+		{
+			float finalViewMaxX = (float)view.mViewRect.max.x;
+			float finalViewMaxY = (float)view.mViewRect.max.y;
+			const float xScale = finalViewMaxX / (float)view.mUnscaledViewRect.max.x;
+			const float yScale = finalViewMaxY / (float)view.mUnscaledViewRect.max.y;
+			if (!bInitializeExtents)
+			{
+				maxFamilyX = view.mUnconstrainedViewRect.max.x * xScale;
+				maxFamilyY = view.mUnconstrainedViewRect.max.y * yScale;
+				bInitializeExtents = true;
+			}
+			else
+			{
+				maxFamilyX = Math::max(maxFamilyX, view.mUnconstrainedViewRect.max.x * xScale);
+				maxFamilyY = Math::max(maxFamilyY, view.mUnconstrainedViewRect.max.y * yScale);
+			}
+			maxFamilyX = Math::max(maxFamilyX, finalViewMaxX);
+			maxFamilyY = Math::max(maxFamilyY, finalViewMaxY);
+		}
+		mFamilySize.x = Math::truncToInt(maxFamilyX);
+		mFamilySize.y = Math::truncToInt(maxFamilyY);
+
+		BOOST_ASSERT(mFamilySize.x != 0);
+		BOOST_ASSERT(bInitializeExtents);
+	}
+
+
+	void SceneRenderer::renderFinish(RHICommandListImmediate& RHICmdList)
+	{
 	}
 }

@@ -381,6 +381,8 @@ namespace Air
 	class ENGINE_API StaticMeshSceneProxy : public PrimitiveSceneProxy
 	{
 	public:
+		size_t getTypeHash() const override;
+
 		StaticMeshSceneProxy(StaticMeshComponent* component, bool bCanLODsShareStaticLighting);
 
 		virtual ~StaticMeshSceneProxy() {}

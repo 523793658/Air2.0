@@ -22,7 +22,9 @@ namespace Air
 			return mResource;
 		}
 
-		void updateRenderState();
+		void updateRenderState(bool bRecreateConstantBuffer);
+
+		void deferredUpdateRenderState(bool bRecreateConstantBuffer);
 	protected:
 		void getParameterData(TArray<float4>& parameterData) const;
 
@@ -35,5 +37,7 @@ namespace Air
 		TMap<wstring, float> mScalarParameterValues;
 
 		TMap<wstring, LinearColor> mVectorParameterValues;
+
+		bool bNeedsRenderStateUpdate;
 	};
 }

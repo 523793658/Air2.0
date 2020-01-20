@@ -22,6 +22,13 @@ namespace Air
 	class SceneViewFamily;
 	class ViewElementDrawer;
 
+	enum class ERayTracingRenderMode
+	{
+		Disabled				= 0,
+		Pathtracing				= 1,
+		RayTracingdebug			= 2,
+	};
+
 
 	static const Matrix invertProjectionMatrix(const Matrix& M)
 	{
@@ -297,6 +304,15 @@ namespace Air
 		};
 	}
 
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT_WITH_CONSTRUCTOR(ViewConstantShaderParameters, ENGINE_API)
+		VIEW_CONSTANT_BUFFER_MEMBER_TABLE
+		SHADER_PARAMETER_TEXTURE(TextureCube, SkyBoxTexture)
+		SHADER_PARAMETER_SAMPLER(SamplerState, SkyBoxTextureSampler)
+		SHADER_PARAMETER_SRV(StructuredBuffer<float4>, PrimitiveSceneData)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT(ViewConstantShaderParameters)
+
+	class ForwardLightingViewResources;
+
 	class ENGINE_API SceneView
 	{
 	public:
@@ -318,6 +334,8 @@ namespace Air
 		inline bool isPerspectiveProjection() const { return mViewMatrices.isPerspectiveProjection(); }
 
 		EShaderPlatform getShaderPlatform() const;
+
+
 	public:
 
 		const SceneViewFamily* mFamily;
@@ -325,7 +343,7 @@ namespace Air
 
 		TConstantBufferRef<ViewConstantShaderParameters> mDownsampledTranslucencyViewConstantBuffer;
 		
-
+		ForwardLightingViewResources* mForwardLightingResources;
 
 		IntRect mCameraConstrainedViewRect;
 
@@ -406,7 +424,48 @@ namespace Air
 		TextureRHIRef mSkyTexture;
 	};
 
-	
+	struct SceneViewScreenPercentageConfig
+	{
+		float mPrimaryResolutionFraction;
+
+		SceneViewScreenPercentageConfig()
+			:mPrimaryResolutionFraction(1.0f)
+		{}
+
+		static constexpr float kMinResolutionFraction = 0.01f;
+		static constexpr float kMaxResolutionFraction = 4.0f;
+
+		static constexpr float kMinTAAUpsampleResolutionFraction = 0.5f;
+		static constexpr float kMaxTAAUpsampleResolutionFraction = 2.0f;
+
+#if DO_CHECK
+		static bool isValidResolutionFraction(float resolutionFraction)
+		{
+			return resolutionFraction >= kMinResolutionFraction && resolutionFraction <= kMaxResolutionFraction;
+		}
+#endif
+	};
+
+	class ENGINE_API ISceneViewFamilyScreenPercentage
+	{
+	protected:
+		virtual ~ISceneViewFamilyScreenPercentage() {};
+
+		virtual float getPrimaryResolutionFractionUpperBound() const = 0;
+
+		virtual ISceneViewFamilyScreenPercentage* fork_GameThread(const class SceneViewFamily& viewFamily) const = 0;
+
+		virtual void computePrimaryResolutionFractions_RenderThread(TArray<SceneViewScreenPercentageConfig>& outViewScreenPercentageConfigs) const = 0;
+
+		friend class SceneViewFamily;
+		friend class SceneRenderer;
+	};
+
+	enum class ESecondaryScreenPercentageMethod
+	{
+		NearestSpatialUpscale,
+		LowerPixelDensitySimulation,
+	};
 
 	class ENGINE_API SceneViewFamily
 	{
@@ -528,6 +587,23 @@ namespace Air
 			return mDebugViewShaderMode;
 		}
 #endif
+
+		const SceneView& getSteredEyeView(const EStereoscopicPass eye) const;
+
+		bool supportsScreenPercentage() const;
+
+		FORCEINLINE float getPrimaryResolutionFractionUpperBound() const
+		{
+			BOOST_ASSERT(mScreenPercentageInterface != nullptr);
+			float primaryUpperBoundFraction = mScreenPercentageInterface->getPrimaryResolutionFractionUpperBound();
+
+			if (!mEngineShowFlags.ScreenPercentage)
+			{
+				BOOST_ASSERT(primaryUpperBoundFraction >= 1.0f);
+			}
+
+			return primaryUpperBoundFraction;
+		}
 	public:
 		SceneInterface* mScene{ nullptr };
 
@@ -548,6 +624,9 @@ namespace Air
 		bool bResolveScene;
 		bool bEarlyZPassMovable;
 
+		float mSecondaryViewFraction;
+		ESecondaryScreenPercentageMethod mSecondaryScreenPercentageMethod;
+
 		ESceneCaptureSource mSceneCaptureSource{ SCS_FinalColorLDR };
 
 		ESceneCaptureCompositeMode mSceneCaptureCompositeMode{ SCCM_Overrite };
@@ -555,6 +634,13 @@ namespace Air
 		float mGammaCorrect;
 
 		TArray<std::shared_ptr<class ISceneViewExtension>> mViewExtensions;
+
+	private:
+		SceneViewFamily(const SceneViewFamily&) = default;
+
+		ISceneViewFamilyScreenPercentage* mScreenPercentageInterface;
+
+		friend class SceneRenderer;
 	};
 
 	class SceneViewFamilyContext : public SceneViewFamily
@@ -567,12 +653,7 @@ namespace Air
 		ENGINE_API ~SceneViewFamilyContext();
 	};
 
-	BEGIN_CONSTANT_BUFFER_STRUCT(BuiltinSamplersParameters, ENGINE_API)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, Bilinear)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, BilinearClamped)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, Point)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, PointClamped)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, Trilinear)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, TrilinearClamped)
-	END_CONSTANT_BUFFER_STRUCT(BuiltinSamplersParameters)
+	
+
+	
 }

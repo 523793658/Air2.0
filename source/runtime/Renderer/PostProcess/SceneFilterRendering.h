@@ -6,6 +6,12 @@ namespace Air
 {
 	extern TGlobalResource<FilterVertexDeclaration> GFilterVertexDeclaration;
 
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(DrawRectangleParameters, )
+		SHADER_PARAMETER(float4, PosScaleBias)
+		SHADER_PARAMETER(float4, UVScaleBias)
+		SHADER_PARAMETER(float4, InvTargetSizeAndTextureSize)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT(DrawRectangleParameters)
+
 	enum EDrawRectangleFlags
 	{
 		EDRF_Default,

@@ -235,6 +235,61 @@ namespace Air
 	typedef TD3D11Texture2D<D3D11BaseTexture2DArray> D3D11Texture2DArray;
 	typedef TD3D11Texture2D<D3D11BaseTextureCube>	D3D11TextureCube;
 
+	class D3D11Texture3D : public RHITexture3D, public D3D11TextureBase
+	{
+	public:
+		D3D11Texture3D(
+			class D3D11DynamicRHI* inD3DRHI,
+			ID3D11Texture3D* inResource,
+			ID3D11ShaderResourceView* inShaderResourceView,
+			const TArray<TRefCountPtr<ID3D11RenderTargetView>>& inRenderTargetViews,
+			uint32 inWidth,
+			uint32 inHeight,
+			uint32 inDepth,
+			uint32 inNumMips,
+			EPixelFormat inFormat,
+			uint32 inFlags,
+			const ClearValueBinding& inClearValue
+		)
+			:RHITexture3D(inWidth, inHeight, inDepth, inNumMips, inFormat, inFlags, inClearValue)
+			, D3D11TextureBase(
+				inD3DRHI,
+				inResource,
+				inShaderResourceView,
+				1,
+				false,
+				inRenderTargetViews,
+				nullptr
+			)
+		{
+
+		}
+
+		virtual ~D3D11Texture3D();
+
+		ID3D11Texture3D* getResource() const { return (ID3D11Texture3D*)D3D11TextureBase::getResource(); }
+
+		virtual void* getTextureBaseRHI() override final
+		{
+			return static_cast<D3D11TextureBase*>(this);
+		}
+
+		virtual uint32 AddRef() const
+		{
+			return RHIResource::AddRef();
+		}
+
+		virtual uint32 Release() const
+		{
+			return RHIResource::Release();
+		}
+
+		virtual uint32 GetRefCount() const
+		{
+			return RHIResource::GetRefCount();
+		}
+	};
+
 	class D3D11TextureReference : public RHITextureReference, public D3D11TextureBase
 	{
 	public:

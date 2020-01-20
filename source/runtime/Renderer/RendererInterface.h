@@ -212,7 +212,14 @@ namespace Air
 
 		TextureRHIRef mShaderResourceTexture;
 
+		UnorderedAccessViewRHIRef mUAV;
+
+		TArray<UnorderedAccessViewRHIRef, TInlineAllocator<1>> mMipUAVs;
+
 		TArray<ShaderResourceViewRHIRef> MipSRVs;
+
+		ShaderResourceViewRHIRef mRTWriteMaskBufferRHI_SRV;
+		StructuredBufferRHIRef mRTWriteMaskDataBufferRHI;
 	};
 
 	struct IPooledRenderTarget : public IRefCountedObject 

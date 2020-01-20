@@ -448,6 +448,23 @@ namespace Air
 		}
 	}
 
+	bool ConfigFile::getString(const TCHAR* section, const TCHAR* key, wstring& value) const
+	{
+		const auto& it = this->find(section);
+		if (it == this->end())
+		{
+			return false;
+		}
+
+		auto& pairString = it->second.find(key);
+		if (pairString == it->second.end())
+		{
+			return false;
+		}
+		value = pairString->second.getValue();
+		return true;
+	}
+
 
 	static void loadAnIniFile(const wstring& filenameToLoad, ConfigFile& configFile)
 	{

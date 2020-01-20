@@ -178,12 +178,8 @@ namespace Air
 				uvBaseOffset = STRUCT_OFFSET(VertexType, mUVs);
 			});
 
-		ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER(
-			InitStaticMeshVertexFactory,
-			InitStaticMeshVertexFactoryParams, params, params,
-			uint32, tangentXOffset, tangentXOffset,
-			uint32, tangentYOffset, tangentYOffset,
-			uint32, uvBaseOffset, uvBaseOffset,
+		ENQUEUE_RENDER_COMMAND(
+			InitStaticMeshVertexFactory)([params, tangentXOffset, tangentYOffset, uvBaseOffset](RHICommandListImmediate& RHICmdList)
 			{
 				LocalVertexFactory::DataType data;
 				data.mPositionComponents = VertexStreamComponent(

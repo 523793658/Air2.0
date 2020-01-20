@@ -126,15 +126,42 @@ namespace Air
 				uint32 bTextureProfile : 1;
 				uint32 bLightFunction : 1;
 				uint32 bShadowed : 1;
+				uint32 bUsesLightingChannels : 1;
+				uint32 bIsNotSimpleLight : 1;
+				uint32 bTiledDeferredNotSupported : 1;
+				uint32 bClusteredDeferredNotSupported : 1;
 			} mFields;
 			int32 mPacked;
 		}mSortKey;
-		LightSceneInfoCompact mSceneInfo;
-		explicit SortedLightSceneInfo(const LightSceneInfoCompact& inSceneInfo)
-			:mSceneInfo(inSceneInfo)
+		const LightSceneInfo* mLightSceneInfo;
+		int32 mSimpleLightIndex;
+
+		explicit SortedLightSceneInfo(const LightSceneInfo* inSceneInfo)
+			:mLightSceneInfo(inSceneInfo)
+			,mSimpleLightIndex(-1)
 		{
 			mSortKey.mPacked = 0;
+			mSortKey.mFields.bIsNotSimpleLight = 1;
 		}
 
+		explicit SortedLightSceneInfo(int32 inSimpleLightIndex)
+			:mLightSceneInfo(nullptr)
+			, mSimpleLightIndex(inSimpleLightIndex)
+		{
+
+		}
+	};
+
+	struct SortedLightSetSceneInfo
+	{
+		int mSimpleLightsEnd;
+		int mTiledSupportedEnd;
+		int mClusteredSupportedEnd;
+
+		int mAttenuationLightStart;
+
+		SimpleLightArray mSimpleLights;
+
+		TArray<SortedLightSceneInfo, SceneRenderingAllocator> mSortedLights;
 	};
 }

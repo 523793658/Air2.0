@@ -22,10 +22,10 @@ namespace Air
 		}
 		else
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-				LinkGlobalBoundShaderStateResource, GlobalBoundShaderStateResource*, resource, this,
+			ENQUEUE_RENDER_COMMAND(
+				LinkGlobalBoundShaderStateResource)([this](RHICommandListImmediate&)
 				{
-					resource->mGlobalListLink.linkHead(getGlobalBoundShaderStateList());
+					this->mGlobalListLink.linkHead(getGlobalBoundShaderStateList());
 				}
 			);
 		}
@@ -36,7 +36,7 @@ namespace Air
 		mGlobalListLink.unLink();
 	}
 
-	BoundShaderStateRHIParamRef GlobalBoundShaderStateResource::getInitializedRHI(VertexDeclarationRHIParamRef vertexDeclaration, VertexShaderRHIParamRef vertexShader, PixelShaderRHIParamRef pixelShader, GeometryShaderRHIParamRef geometryShader)
+	RHIBoundShaderState* GlobalBoundShaderStateResource::getInitializedRHI(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShader, RHIPixelShader* pixelShader, RHIGeometryShader* geometryShader)
 	{
 		BOOST_ASSERT(isInitialized());
 		BOOST_ASSERT(GIsRHIInitialized);
@@ -54,7 +54,7 @@ namespace Air
 		return mBoundShaderState;
 	}
 
-	BoundShaderStateRHIParamRef GlobalBoundShaderStateResource::getPreinitializedRHI()
+	RHIBoundShaderState* GlobalBoundShaderStateResource::getPreinitializedRHI()
 	{
 		return mBoundShaderState;
 	}
@@ -64,56 +64,11 @@ namespace Air
 		mBoundShaderState.safeRelease();
 	}
 
-	static BoundShaderStateRHIParamRef getGlobalBoundShaderState_Internal(GlobalBoundShaderState& globalBoundShaderState, ERHIFeatureLevel::Type inFeatureLevel)
-	{
-		auto workArea = globalBoundShaderState.get(inFeatureLevel);
-		GlobalBoundShaderState_Internal* BSS = workArea->BSS;
-		bool bNewBSS = false;
-		if (!BSS)
-		{
-			BSS = new GlobalBoundShaderState_Internal();
-			bNewBSS = true;
-		}
-		BoundShaderStateRHIParamRef result = BSS->getInitializedRHI(workArea->mArgs.mVertexDeclarationRHI, GETSAFERHISHADER_VERTEX(workArea->mArgs.mVertexShader),
-			GETSAFERHISHADER_PIXELSHADER(workArea->mArgs.mPixelShader),
-			GETSAFERHISHADER_GEOMETRY(workArea->mArgs.mGeometryShader));
-		if (bNewBSS)
-		{
-			PlatformMisc::memoryBarrier();
-			GlobalBoundShaderState_Internal *oldBSS = (GlobalBoundShaderState_Internal*)PlatformAtomics::interLockedCompareExchangePointer((void**)&workArea->BSS, BSS, nullptr);
-			BOOST_ASSERT(!oldBSS);
-		}
-		return result;
-	}
+	
 
-	class SetGlobalBoundShaderStateRenderThreadTask
-	{
-		RHICommandList& RHICmdList;
-		GlobalBoundShaderState& mGlobalBoundShaderState;
-		ERHIFeatureLevel::Type mFeatureLevel;
-	public:
-		SetGlobalBoundShaderStateRenderThreadTask(RHICommandList& inRHICmdList, GlobalBoundShaderState& inGlobalBoundShaderState, ERHIFeatureLevel::Type inFeatureLevel)
-			:RHICmdList(inRHICmdList)
-			, mGlobalBoundShaderState(inGlobalBoundShaderState)
-			, mFeatureLevel(inFeatureLevel)
-		{
+	
 
-		}
-
-		ENamedThreads::Type getDesiredThread()
-		{
-			return ENamedThreads::RenderThread_Local;
-		}
-
-		static ESubsequentsMode::Type getSubsequentsMode() { return ESubsequentsMode::TrackSubsequents; }
-
-		void doTask(ENamedThreads::Type currentThread, const GraphEventRef& myCompletionGraphEvent)
-		{
-			RHICmdList.setBoundShaderState(getGlobalBoundShaderState_Internal(mGlobalBoundShaderState, mFeatureLevel));
-		}
-	};
-
-	void setGlobalBoundShaderState(RHICommandList& RHICmdList, ERHIFeatureLevel::Type featureLevel, GlobalBoundShaderState& boundShaderState, VertexDeclarationRHIParamRef vertexDeclaration, Shader* vertexShader, Shader* pixelShader, Shader* geometryShader)
+	/*void setGlobalBoundShaderState(RHICommandList& RHICmdList, ERHIFeatureLevel::Type featureLevel, GlobalBoundShaderState& boundShaderState, RHIVertexDeclaration* vertexDeclaration, Shader* vertexShader, Shader* pixelShader, Shader* geometryShader)
 	{
 		GlobalBoundShaderStateWorkArea* existingGlobalBoundShaderState = boundShaderState.get(featureLevel);
 		if (!existingGlobalBoundShaderState)
@@ -151,7 +106,7 @@ namespace Air
 		}
 		if (existingGlobalBoundShaderState->BSS)
 		{
-			BoundShaderStateRHIParamRef boundShaderState = existingGlobalBoundShaderState->BSS->getPreinitializedRHI();
+			RHIBoundShaderState* boundShaderState = existingGlobalBoundShaderState->BSS->getPreinitializedRHI();
 			if (boundShaderState)
 			{
 				RHICmdList.setBoundShaderState(boundShaderState);
@@ -162,5 +117,5 @@ namespace Air
 		cmdList->copyRenderThreadContexts(RHICmdList);
 		GraphEventRef renderThreadCompletionEvent = GraphTask<SetGlobalBoundShaderStateRenderThreadTask>::createTask().constructAndDispatchWhenReady(*cmdList, boundShaderState, featureLevel);
 		RHICmdList.queueRenderThreadCommandListSubmit(renderThreadCompletionEvent, cmdList);
-	}
+	}*/
 }

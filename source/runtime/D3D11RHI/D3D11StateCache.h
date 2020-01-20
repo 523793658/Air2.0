@@ -42,7 +42,11 @@ namespace Air
 			SRV_Static
 		};
 
+		bool bDepthBoundsEnabled{ false };
 
+		float mDepthBoundsMin{ 0.0f };
+
+		float mDepthBoundsMax{ 1.0f };
 	public:
 		void init(ID3D11DeviceContext* inContext, bool bInAlwaysSetIndexBuffers = false)
 		{
@@ -289,6 +293,11 @@ namespace Air
 		D3D11_STATE_CACHE_INLINE void setStreamSource(ID3D11Buffer* vertexBuffer, uint32 streamIndex, uint32 stride, uint32 offset)
 		{
 			internalSetStreamSource(vertexBuffer, streamIndex, stride, offset, nullptr);
+		}
+
+		D3D11_STATE_CACHE_INLINE void setStreamSource(ID3D11Buffer* vertexBuffer, uint32 streamIndex, uint32 offset)
+		{
+			internalSetStreamSource(vertexBuffer, streamIndex, mStreamStrides[streamIndex], offset, nullptr);
 		}
 
 		D3D11_STATE_CACHE_INLINE void setIndexBuffer(ID3D11Buffer* indexBuffer, DXGI_FORMAT format, uint32 offset)
@@ -782,6 +791,7 @@ namespace Air
 		ID3D11Buffer* mCurrentIndexBuffer;
 		DXGI_FORMAT	mCurrentIndexFormat;
 		uint32 mCurrentIndexOffset;
+		uint16 mStreamStrides[MaxVertexElementCount];
 
 		D3D11_PRIMITIVE_TOPOLOGY	mCurrentPrimitiveTopology;
 

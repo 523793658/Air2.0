@@ -4,14 +4,7 @@
 #include "Classes/Components/LightComponent.h"
 namespace Air
 {
-	SIZE_T StaticMeshDrawListBase::mTotalBytesUsed = 0;
 
-
-	template<>
-	TStaticMeshDrawList<TBasePassDrawingPolicy<ConstantLightMapPolicy>>& Scene::getBasePassDrawList<ConstantLightMapPolicy>(EBasePassDrawListType drawType)
-	{
-		return mBasePassConstantLightMapPolicyDrawList[drawType];
-	}
 
 	void Scene::addLight(LightComponent* light)
 	{
@@ -23,12 +16,12 @@ namespace Air
 			proxy->setTransform(light->mComponentToWorld.toMatrixNoScale(), light->getLightPosition());
 			proxy->mLightSceneInfo = new LightSceneInfo(proxy, true);
 			++mNumVisibleLights_GameThread;
-			ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-				AddLightCommand,
-				Scene*, scene, this,
-				LightSceneInfo*, lightSceneInfo, proxy->mLightSceneInfo,
+			LightSceneInfo* lightSceneInfo = proxy->mLightSceneInfo;
+
+			ENQUEUE_RENDER_COMMAND(
+				AddLightCommand)([this, lightSceneInfo](RHICommandListImmediate& RHICmdList)
 				{
-					scene->addLightSceneInfo_RenderThread(lightSceneInfo);
+					this->addLightSceneInfo_RenderThread(lightSceneInfo);
 				}
 			);
 		}
@@ -47,20 +40,19 @@ namespace Air
 			UpdateLightColorParameters newParameters;
 			newParameters.newColor = LinearColor(light->mLightColor) * light->computeLightBrightness();
 			newParameters.newIndirectLightingScale = light->mIndirectLightingIntensity;
-			ENQUEUE_UNIQUE_RENDER_COMMAND_THREEPARAMETER(
-				UpdateLightColorAndBrightness, 
-				LightSceneInfo*, lightSceneInfo, light->mSceneProxy->getLightSceneInfo(),
-				Scene*, scene, this,
-				UpdateLightColorParameters, parameters, newParameters,
+			LightSceneInfo* lightSceneInfo = light->mSceneProxy->getLightSceneInfo();
+
+			ENQUEUE_RENDER_COMMAND(
+				UpdateLightColorAndBrightness)([lightSceneInfo, this, newParameters](RHICommandListImmediate& RHICmdList)
 				{
 					if (lightSceneInfo && lightSceneInfo->bVisible)
 					{
-						lightSceneInfo->mProxy->setColor(parameters.newColor);
-						lightSceneInfo->mProxy->mIndirectLightingScale = parameters.newIndirectLightingScale;
+						lightSceneInfo->mProxy->setColor(newParameters.newColor);
+						lightSceneInfo->mProxy->mIndirectLightingScale = newParameters.newIndirectLightingScale;
 
 						if (lightSceneInfo->mId != INDEX_NONE)
 						{
-							scene->mLights[lightSceneInfo->mId].mColor = parameters.newColor;
+							this->mLights[lightSceneInfo->mId].mColor = newParameters.newColor;
 						}
 					}
 				});
@@ -83,7 +75,7 @@ namespace Air
 
 			}
 		}
-		const bool bForwardShading = isForwardShadingEnabled(mFeatureLevel);
+		const bool bForwardShading = isForwardShadingEnabled(getFeatureLevelShaderPlatform(mFeatureLevel));
 		if (bForwardShading && lightSceneInfo->mProxy->castsDynamicShadow())
 		{
 

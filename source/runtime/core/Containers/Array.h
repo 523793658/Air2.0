@@ -5,6 +5,7 @@
 #include "Template/MemoryOps.h"
 #include "Template/Sorting.h"
 #include "Containers/ContainerAllocationPolicies.h"
+#include "Template/AirTypeTraits.h"
 namespace Air
 {
 #if BUILD_SHIPPING || BUILD_TEST
@@ -784,6 +785,32 @@ namespace Air
 			}
 			return false;
 		}
+
+		template<typename Predicate>
+		FORCEINLINE const ElementType* findByPredicate(Predicate pred) const
+		{
+			return const_cast<TArray*>(this)->findByPredicate(pred);
+		}
+
+		template<typename Predicate>
+		ElementType* findByPredicate(Predicate pred)
+		{
+			for (ElementType* RESTRICT data = getData(), *RESTRICT dataEnd = data + mArrayNum; data != dataEnd; ++data)
+			{
+				if (pred(*data))
+				{
+					return data;
+				}
+			}
+			return nullptr;
+		}
+
+		template<typename Predicate> 
+		FORCEINLINE bool containsByPredicate(Predicate pred) const
+		{
+			return findByPredicate(pred) != nullptr;
+		}
+
 		FORCEINLINE void resizeShrink()
 		{
 			const int32 newArrayMax = mAllocatorInstance.calculateSlackShrink(mArrayNum, mArrayMax, sizeof(ElementType));
@@ -1073,7 +1100,17 @@ namespace Air
 			int32 mArrayMax;
 	};
 
-	
+
+
+}
+namespace std
+{
+	template<typename InElementType, typename Allocator>
+	struct TContainerTraits<Air::TArray<InElementType, Allocator>> : public TContainerTraitsBase<Air::TArray<InElementType, Allocator>>
+	{
+		static_assert(TAllocatorTraits<Allocator>::SupportsMove, "TArray no longer supports move-unaware allocators");
+		enum { MoveWillEmptyContainer = TAllocatorTraits<Allocator>::SupportsMove };
+	};
 }
 
 template<typename T, typename Allocator> void* operator new(size_t size, Air::TArray<T, Allocator>& inArray)

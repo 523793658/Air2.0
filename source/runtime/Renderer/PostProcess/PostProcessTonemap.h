@@ -1,7 +1,29 @@
 #include "CoreMinimal.h"
+#include "ShaderPermutation.h"
+#include "ShaderParameterUtils.h"
 #include "PostProcess/RenderingCompositionGraph.h"
 namespace Air
 {
+	static float grainHalton(int32 index, int32 base)
+	{
+		float result = 0.0f;
+		float invBase = 1.0f / base;
+		float fraction = invBase;
+		while (index > 0)
+		{
+			result += (index % base) * fraction;
+			index /= base;
+			fraction *= invBase;
+		}
+		return result;
+	}
+
+	static void grainRandomFromFrame(float3* RESTRICT const constant, uint32 frameNumber)
+	{
+		constant->x = grainHalton(frameNumber & 1023, 2);
+		constant->y = grainHalton(frameNumber % 1023, 3);
+	}
+
 	class RCPassPostProcessTonemap : public TRenderingCompositePassBase<4, 1>
 	{
 	public:
@@ -29,61 +51,99 @@ namespace Air
 		void setShader(const RenderingCompositePassContext& context);
 	};
 
-	template<bool bUseAutoExposure>
-	class TPostProcessTonemapVS : public GlobalShader
+	class PostProcessTonemapVS : public GlobalShader
 	{
-		DECLARE_SHADER_TYPE(TPostProcessTonemapVS, Global);
-		static bool shouldCache(EShaderPlatform platform)
+		DECLARE_GLOBAL_SHADER(PostProcessTonemapVS);
+	
+		SHADER_PERMUTATION_BOOL(TonemapperVSSwitchAxis, "NEEDTOSWITCHVERTICLEAXIS");
+		SHADER_PERMUTATION_BOOL(TonemapperVSUseAutoExposure, "EYEADAPTATION_EXPOSURE_FIX");
+
+		using PermutationDomain = TShaderPermutationDomain<TonemapperVSSwitchAxis, TonemapperVSUseAutoExposure>;
+
+
+		
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
+			PermutationDomain permutationVector(parameters.mPermutationId);
+			if (permutationVector.get<TonemapperVSSwitchAxis>() && !RHINeedsToSwitchVerticalAxis(parameters.mPlatform))
+			{
+				return false;
+			}
+
 			return true;
 		}
 
-		TPostProcessTonemapVS() {}
+		PostProcessTonemapVS() {}
 	public:
 		PostProcessPassParameters mPostprocessParameter;
 		ShaderResourceParameter mEyeAdaptation;
 		ShaderParameter mGrainRandomFull;
-		ShaderParameter mFringeUVParams;
-
+		ShaderParameter mScreenPosToScenePixel;
 		ShaderParameter mDefaultEyeExposure;
 
-		TPostProcessTonemapVS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+		PostProcessTonemapVS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)
 		{
 			mPostprocessParameter.bind(initializer.mParameterMap);
-
+			mEyeAdaptation.bind(initializer.mParameterMap, TEXT("EyeAdaptation"));
+			mGrainRandomFull.bind(initializer.mParameterMap, TEXT("GrainRandomFull"));
+			mDefaultEyeExposure.bind(initializer.mParameterMap, TEXT("DefaultEyeExposure"));
+			mScreenPosToScenePixel.bind(initializer.mParameterMap, TEXT("ScreenPosToScenePixel"));
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			GlobalShader::modifyCompilationEnvironment(platform, outEnvironment);
+			GlobalShader::modifyCompilationEnvironment(parameters, outEnvironment);
 			//outEnvironment.setDefine(TEXT(")
 		}
 
-		void setVS(const RenderingCompositePassContext& context)
+		void setVS(const RenderingCompositePassContext& context, const PermutationDomain& permutationVector)
 		{
-			const VertexShaderRHIParamRef shaderRHI = getVertexShader();
-			GlobalShader::setParameters(context.mRHICmdList, shaderRHI, context.mView);
+			RHIVertexShader* shaderRHI = getVertexShader();
+			GlobalShader::setParameters<ViewConstantShaderParameters>(context.mRHICmdList, shaderRHI, context.mView.mViewConstantBuffer);
 
 			mPostprocessParameter.setVS(shaderRHI, context, TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::getRHI());
 
-			setTextureParameter(context.mRHICmdList, shaderRHI, mEyeAdaptation, GWhiteTexture->mTextureRHI);
-
-			if (!bUseAutoExposure)
+			float3 grainRandomFullValue;
 			{
-				float defaultEyeExposureValue = 1.0f;
-				setShaderValue(context.mRHICmdList, shaderRHI, mDefaultEyeExposure, defaultEyeExposureValue);
+				uint8 frameIndexMod8 = 0;
+				if (context.mView.mState)
+				{
+					frameIndexMod8 = context.mView.mViewState->getFrameIndex(8);
+				}
+				grainRandomFromFrame(&grainRandomFullValue, frameIndexMod8);
 			}
 
+			setShaderValue(context.mRHICmdList, shaderRHI, mGrainRandomFull, grainRandomFullValue);
+
+			if (false)
 			{
-				//float offset = context.mView.mfinpos
+
+			}
+			else
+			{
+				setTextureParameter(context.mRHICmdList, shaderRHI, mEyeAdaptation, GWhiteTexture->mTextureRHI);
+			}
+			/*if (!permutationVector.get<TonemapperVSUseAutoExposure>())
+			{
+				float fixedExposure = RCPassPostProcessEyeAdaptation::
+			}*/
+			{
+				int2 viewportOffset = context.mSceneColorViewRect.min;
+				int2 viewportExtent = context.mSceneColorViewRect.size();
+				float4 screenPosToScenePixelValue(
+					viewportExtent.x * 0.5f,
+					-viewportExtent.y * 0.5f,
+					viewportExtent.x * 0.5f - 0.5f + viewportOffset.x,
+					viewportExtent.y * 0.5f - 0.5f + viewportOffset.y);
+				setShaderValue(context.mRHICmdList, shaderRHI, mScreenPosToScenePixel, screenPosToScenePixelValue);
 			}
 		}
 
 		virtual bool serialize(Archive& ar) override
 		{
 			bool bShaderHasOutdatedParameters = GlobalShader::serialize(ar);
-			ar << mPostprocessParameter << mGrainRandomFull << mEyeAdaptation << mFringeUVParams << mDefaultEyeExposure;
+			ar << mPostprocessParameter << mGrainRandomFull << mEyeAdaptation << mDefaultEyeExposure << mScreenPosToScenePixel;
 			return bShaderHasOutdatedParameters;
 		}
 	};

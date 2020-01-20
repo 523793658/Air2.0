@@ -10,6 +10,8 @@ namespace Air
 	double App::mFixedDeltaTime = 1 / 30.0;
 	double App::mIdleTime = 0.0;
 
+	wstring App::mGraphicsRHI = wstring();
+
 	bool App::shouldUseThreadingForPerformance()
 	{
 		static bool onlyOneThread = !PlatformProcess::supportsMultithreading() || PlatformMisc::numberOfCores() < 2;
@@ -36,6 +38,16 @@ namespace Air
 
 #endif
 
+	}
+
+	void App::setGraphicsRHI(wstring RHIString)
+	{
+		mGraphicsRHI = RHIString;
+	}
+
+	wstring App::getGraphicsRHI()
+	{
+		return mGraphicsRHI;
 	}
 
 }

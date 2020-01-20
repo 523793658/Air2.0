@@ -1,69 +1,42 @@
 #pragma once
-#include "DeferredShadingRenderer.h"
-#include "SceneRenderTargetParameters.h"
+#include "Rendering/SceneRenderTargetParameters.h"
 #include "SceneCore.h"
 #include "HitProxies.h"
-#include "DrawingPolicy.h"
 #include "MaterialShared.h"
 #include "ShaderBaseClasses.h"
 #include "RenderUtils.h"
 #include "Classes/Materials/Material.h"
 #include "RHIDefinitions.h"
 #include "DebugViewModeHelpers.h"
-#include "Materials/MeshMaterialShader.h"
+#include "Classes/Materials/MeshMaterialShader.h"
 #include "VertexFactory.h"
 #include "ShaderParameterUtils.h"
 #include "RenderResource.h"
+#include "sceneRendering.h"
 namespace Air
 {
-	class BasePassOpaqueDrawingPolicyFactory
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(SharedBasePassConstantParameters,)
+		SHADER_PARAMETER_STRUCT(ForwardLightData, Forward)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(OpaqueBasePassConstantParameters, )
+		SHADER_PARAMETER_STRUCT(SharedBasePassConstantParameters, Shared)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(TranslucentBasePassConstantParameters,)
+		SHADER_PARAMETER_STRUCT(SharedBasePassConstantParameters, Shared)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+	class ForwardLocalLightData
 	{
-	public:
-		enum { bAllowSimpleElements = true };
-		struct ContextType
-		{
-			bool bEditorCompositeDepthTest;
-			ESceneRenderTargetsMode::Type mTextureMode;
-			ContextType(bool bInEditorCompositeDepthTest, ESceneRenderTargetsMode::Type inTextureMode)
-				:bEditorCompositeDepthTest(bInEditorCompositeDepthTest)
-				,mTextureMode(inTextureMode)
-			{}
-		};
-
-		static void addStaticMesh(RHICommandList& cmdList, Scene* scene, StaticMesh* staticMesh);
-		static bool drawDynamicMesh(
-			RHICommandList& RHICmdList,
-			const ViewInfo& view,
-			ContextType drawingContext,
-			const MeshBatch& mesh,
-			bool bPreFog,
-			const DrawingPolicyRenderState& drawRenderState,
-			const PrimitiveSceneProxy* primitiveSceneProxy,
-			HitProxyId hitProxyId,
-			const bool bIsInstancedStereo = false
-		);
-
-	};
-
-	class BasePassDrawingPolicy : public MeshDrawingPolicy
-	{
-	public:
-		BasePassDrawingPolicy(
-			const VertexFactory* inVertexFactory,
-			const MaterialRenderProxy* inMaterialRenderProxy,
-			const FMaterial& inMaterialResource,
-			const MeshDrawingPolicyOverrideSettings& inOverrideSettings,
-			EDebugViewShaderMode inDebugViewShaderMode,
-			bool bInEnableReceiveDecalOutput) : MeshDrawingPolicy(inVertexFactory, inMaterialRenderProxy, inMaterialResource, inOverrideSettings, inDebugViewShaderMode),
-			bEnableReceiveDecalOutput(bInEnableReceiveDecalOutput)
-		{}
-
-		
-
-		void applyDitheredLODTransitionState(RHICommandList& RHICmdList, DrawingPolicyRenderState& drawRenderState, const ViewInfo& viewInfo, const StaticMesh& mesh, const bool inAllowStencilDither);
-	protected:
-		uint32 bEnableReceiveDecalOutput : 1;
-
+	public:	 
+		float4 mLightPositionAndInvRadius;
+		float4 mLightColorAndFalloffExponent;
+		float4 mLightDirectionAndShadowMapChannelMask;
+		float4 mSpotAnglesAndSourceRadiusPacked;
+		float4 mLightTangnetAndSoftSourceRadius;
+		float4 mRectBarnDoor;
 	};
 
 	template<typename VertexParametersType>
@@ -92,21 +65,7 @@ namespace Air
 			MeshMaterialShader::setParameters(RHICmdList, getVertexShader(), materialRenderProxy, inMaterialResource, view, viewConstantBuffer, textureMode);
 			
 		}
-		void setMesh(RHICommandList& RHICmdList, const VertexFactory* vertexFactory, const SceneView& view, const PrimitiveSceneProxy* proxy, const MeshBatch& mesh, const MeshBatchElement& batchElement, const DrawingPolicyRenderState& drawRenderState)
-		{
-			VertexShaderRHIParamRef vertexShaderRHI = getVertexShader();
-			MeshMaterialShader::setMesh(RHICmdList, vertexShaderRHI, vertexFactory, view, proxy, batchElement, drawRenderState);
-			const bool bHashPrevousLocalToWorldParameter = false;
-			const bool bHashSkipOutputVelocityParameter = false;
-			if (bHashPrevousLocalToWorldParameter)
-			{
-
-			}
-			if (bHashSkipOutputVelocityParameter)
-			{
-
-			}
-		}
+		
 
 		void setInstancedEyeIndex(RHICommandList& RHICmdList, const uint32 eyeIndex)
 		{
@@ -114,119 +73,77 @@ namespace Air
 	private:
 	};
 
-	class SkyLightReflectionParameters
+
+
+	inline void bindBasePassConstantBuffer(const ShaderParameterMap& parameterMap, ShaderConstantBufferParameter& basePassConstantBuffer)
 	{
-	public:
-		void bind(const ShaderParameterMap& parameterMap)
+		TArray<const ShaderParametersMetadata*> nestedStructs;
+		OpaqueBasePassConstantParameters::StaticStructMetadata.getNestedStructs(nestedStructs);
+		TranslucentBasePassConstantParameters::StaticStructMetadata.getNestedStructs(nestedStructs);
+
+		for (int32 structIndex = 0; structIndex < nestedStructs.size(); structIndex++)
 		{
-			mSkyLightCubemap.bind(parameterMap, TEXT("SkyLightCubemap"));
-			mSkyLightCubemapSampler.bind(parameterMap, TEXT("SkyLightCubemapSampler"));
-			mSkyLightBlendDestinationCubemap.bind(parameterMap, TEXT("SkyLightBlendDestinationCubemap"));
-			mSkyLightBlendDestinationCubemapSampler.bind(parameterMap, TEXT("SkyLightBlendDestinationCubemapSampler"));
-			mSkyLightParameters.bind(parameterMap, TEXT("SkyLightParameters"));
-			mSkyLightCubemapBrightness.bind(parameterMap, TEXT("SkyLightCubemapBrightness"));
+			const TCHAR* structVariableName = nestedStructs[structIndex]->getShaderVariableName();
+			BOOST_ASSERT(!parameterMap.containsParameterAllocation(structVariableName));
 		}
 
-		template<typename TParamRef, typename TRHICmdList>
-		void setParameters(TRHICmdList& RHICmdList, const TParamRef& shaderRHI, const Scene* scene, bool bApplySkyLight)
+		const bool bNeedsOpaqueBasePass = parameterMap.containsParameterAllocation(OpaqueBasePassConstantParameters::StaticStructMetadata.getShaderVariableName());
+		const bool bNeedsTranslucentBasePass = parameterMap.containsParameterAllocation(TranslucentBasePassConstantParameters::StaticStructMetadata.getShaderVariableName());
+
+		BOOST_ASSERT(!(bNeedsOpaqueBasePass && bNeedsTranslucentBasePass));
+
+		basePassConstantBuffer.bind(parameterMap, OpaqueBasePassConstantParameters::StaticStructMetadata.getShaderVariableName());
+		if (!basePassConstantBuffer.isBound())
 		{
-			if (mSkyLightCubemap.isBound() || mSkyLightBlendDestinationCubemap.isBound() || mSkyLightParameters.isBound())
+			basePassConstantBuffer.bind(parameterMap, TranslucentBasePassConstantParameters::StaticStructMetadata.getShaderVariableName());
+		}
+	}
+
+
+	template<typename LightMapPolicyType>
+	class TBasePassPixelShaderPolicyParamType : public MeshMaterialShader, public LightMapPolicyType::PixelParametersType
+	{
+	public:
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
+		{
+			MeshMaterialShader::modifyCompilationEnvironment(parameters, outEnvironment);
+			const bool bOutputVelocity = false;
+		}
+
+		static bool validateCompileResult(EShaderPlatform platfom, const TArray<FMaterial*>& materials, const VertexFactoryType* vertexFactoryType, const ShaderParameterMap& parameterMap, TArray<wstring>& outError)
+		{
+			if (parameterMap.containsParameterAllocation(SceneTextureConstantParameters::StaticStructMetadata.getShaderVariableName()))
 			{
-				Texture* skyLightTextureResource = GBlackTextureCube;
-				Texture* skyLightBlendDistinationTextureResource = GBlackTextureCube;
-				float applySkyLightMask = 0;
-				float skyMipCount = 0;
-				float blendFraction = 0;
-				bool bSkyLightIsDynamic = false;
-				float skyAverageBrightness = 1.0f;
-				getSkyParametersFromScene(scene, bApplySkyLight, skyLightTextureResource, skyLightBlendDistinationTextureResource, applySkyLightMask, skyMipCount, bSkyLightIsDynamic, blendFraction, skyAverageBrightness);
-				setTextureParameter(RHICmdList, shaderRHI, mSkyLightCubemap, mSkyLightCubemapSampler, skyLightTextureResource);
-				setTextureParameter(RHICmdList, shaderRHI, mSkyLightBlendDestinationCubemap, mSkyLightBlendDestinationCubemapSampler, skyLightBlendDistinationTextureResource);
-				const float4 skyParametersValue(skyMipCount - 1.0f, applySkyLightMask, bSkyLightIsDynamic ? 1.0f : 0.0f, blendFraction);
-				setShaderValue(RHICmdList, shaderRHI, mSkyLightParameters, skyParametersValue);
-				setShaderValue(RHICmdList, shaderRHI, mSkyLightCubemapBrightness, skyAverageBrightness);
+				outError.add(TEXT("Base pass shaders cannot read from the SceneTexturesStruct."));
+				return false;
 			}
+			return true;
 		}
 
-	private:
-		ShaderResourceParameter mSkyLightCubemap;
-		ShaderResourceParameter mSkyLightCubemapSampler;
-		ShaderResourceParameter mSkyLightBlendDestinationCubemap;
-		ShaderResourceParameter mSkyLightBlendDestinationCubemapSampler;
 
-		ShaderParameter mSkyLightParameters;
-		ShaderParameter mSkyLightCubemapBrightness;
-
-
-		void getSkyParametersFromScene(
-			const Scene* scene,
-			bool bApplySkyLight,
-			Texture*& outSkyLightTextureResource,
-			Texture*& outSkyLightBlendDestinationTextureResource,
-			float& outApplySkyLightMask,
-			float& outSkyMipCount,
-			bool& bSkyLightIsDynamic,
-			float& outBlendFraction,
-			float& outSkyAverageBrightness
-		);
-	};
-
-	class BasePassReflectionParameters
-	{
-	public:
-		void bind(const ShaderParameterMap& parameterMap)
-		{
-			mSkyLightReflectionParameters.bind(parameterMap);
-		}
-
-		void set(RHICommandList& RHICmdList, PixelShaderRHIParamRef pixelShaderRHI, const ViewInfo* view);
-
-	private:
-		SkyLightReflectionParameters mSkyLightReflectionParameters;
-	};
-
-
-	template<typename PixelParametersType>
-	class TBasePassPixelShaderPolicyParamType : public MeshMaterialShader, public PixelParametersType
-	{
-	public:
 		TBasePassPixelShaderPolicyParamType(const MeshMaterialShaderType::CompiledShaderInitializerType& initializer)
 			:MeshMaterialShader(initializer)
 		{
-			PixelParametersType::bind(initializer.mParameterMap);
-			mReflectionParameters.bind(initializer.mParameterMap);
+			LightMapPolicyType::PixelParametersType::bind(initializer.mParameterMap);
+			bindBasePassConstantBuffer(initializer.mParameterMap, mPassConstantBuffer);
+			mReflectionCaptureBuffer.bind(initializer.mParameterMap, TEXT("ReflectionCapture"));
 		}
 
 		TBasePassPixelShaderPolicyParamType() {}
 
-
-		void setMesh(RHICommandList& RHICmdList, const VertexFactory* vertexFactory, const SceneView& view, const PrimitiveSceneProxy* proxy, const MeshBatchElement& batchElement, const DrawingPolicyRenderState& drawRenderState, EBlendMode blendMode);
-
-		void setParameters(
-			RHICommandList& RHICmdList,
-			const MaterialRenderProxy* materialRenderProxy,
-			const FMaterial& materialResource,
-			const ViewInfo* view,
-			EBlendMode blendMode,
-			bool bEnableEditorPrimitiveDepthTest,
-			ESceneRenderTargetsMode::Type textureMode,
-			bool bIsInstancedStereo,
-			bool bUseDownsampledTranslucencyViewConstantBuffer)
+		virtual bool serialize(Archive& ar)
 		{
-			const PixelShaderRHIParamRef shaderRHI = getPixelShader();
-			BOOST_ASSERT(!bUseDownsampledTranslucencyViewConstantBuffer || view->mDownsampledTranslucencyViewConstantBuffer);
-			const TConstantBufferRef<ViewConstantShaderParameters>& viewConstantBuffer = bUseDownsampledTranslucencyViewConstantBuffer ? view->mDownsampledTranslucencyViewConstantBuffer : view->mViewConstantBuffer;
-			MeshMaterialShader::setParameters(RHICmdList, shaderRHI, materialRenderProxy, materialResource, *view, viewConstantBuffer, textureMode);
-			
-			mReflectionParameters.set(RHICmdList, shaderRHI, view);
-			//reflection parameter
-			//transparent parameters
-			//forwardlighting parameter
-			
-
+			bool bShaderHasOutdatedParameters = MeshMaterialShader::serialize(ar);
+			LightMapPolicyType::VertexParametersType::serialize(ar);
+			ar << mReflectionCaptureBuffer;
+			return bShaderHasOutdatedParameters;
 		}
-	private:
-		BasePassReflectionParameters mReflectionParameters;
+		
+		void getShaderBindings(const Scene* scene, ERHIFeatureLevel::Type mFeatureLevel, const PrimitiveSceneProxy* primitiveSceneProxy, const MaterialRenderProxy* materialRenderProxy, const FMaterial& material, const MeshPassProcessorRenderState& drawRenderState, const MeshMaterialShaderElementData& shaderElementData, MeshDrawSingleShaderBindings& shaderBindings);
+
+		void getElementShaderBindings(const Scene* scene, const SceneView* viewIfDynamicMeshCommand, const VertexFactory* vertexFactory, const EVertexInputStreamType inputStreamType, ERHIFeatureLevel::Type featureLevel, const PrimitiveSceneProxy* primitiveSceneProxy, const MeshBatch& meshBatch, const MeshBatchElement& batchElement, const MeshMaterialShaderElementData& shaderElementData, MeshDrawSingleShaderBindings& shaderBindings, VertexInputStreamArray& vertexStreams) const;
+
+		ShaderConstantBufferParameter mReflectionCaptureBuffer;
 	};
 
 	template<typename LightMapPolicyType>
@@ -239,31 +156,31 @@ namespace Air
 		TBasePassVertexShaderBaseType() {}
 
 	public:
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
-			return LightMapPolicyType::shouldCache(platform, material, vertexFactoryType);
+			return LightMapPolicyType::shouldCompilePermutation(parameters);
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			LightMapPolicyType::modifyCompilationEnvironment(platform, material, outEnvironment);
-			Super::modifyCompilationEnvironment(platform, material, outEnvironment);
+			LightMapPolicyType::modifyCompilationEnvironment(parameters, outEnvironment);
+			Super::modifyCompilationEnvironment(parameters, outEnvironment);
 		}
 	};
 
 	template<typename LightMapPolicyType>
-	class TBasePassPixelShaderBaseType : public TBasePassPixelShaderPolicyParamType<typename LightMapPolicyType::PixelParametersType>
+	class TBasePassPixelShaderBaseType : public TBasePassPixelShaderPolicyParamType<LightMapPolicyType>
 	{
-		typedef TBasePassPixelShaderPolicyParamType<typename LightMapPolicyType::PixelParametersType> Super;
+		typedef TBasePassPixelShaderPolicyParamType<LightMapPolicyType> Super;
 	public:
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
-			return LightMapPolicyType::shouldCache(platform, material, vertexFactoryType);
+			return LightMapPolicyType::shouldCompilePermutation(parameters);
 		}
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			LightMapPolicyType::modifyCompilationEnvironment(platform, material, outEnvironment);
-			Super::modifyCompilationEnvironment(platform, material, outEnvironment);
+			LightMapPolicyType::modifyCompilationEnvironment(parameters, outEnvironment);
+			Super::modifyCompilationEnvironment(parameters, outEnvironment);
 		}
 
 		TBasePassPixelShaderBaseType(const MeshMaterialShaderType::CompiledShaderInitializerType& initializer) : Super(initializer) {}
@@ -278,7 +195,7 @@ namespace Air
 	{
 		DECLARE_SHADER_TYPE(TBasePassPS, MeshMaterial);
 	public:
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
 			static const auto supportStationarySkyLight = false;
 			static const auto supportAllShaderPremutations = false;
@@ -286,16 +203,16 @@ namespace Air
 			const bool bForceAllPermutations = supportAllShaderPremutations;
 			const bool bProjectSupportsStationarySkyLight = true;
 
-			const bool bCachedShaders = !bEnableSkyLight || (bProjectSupportsStationarySkyLight && (material->getShadingModel() != MSM_Unlit));
+			const bool bCachedShaders = !bEnableSkyLight || (bProjectSupportsStationarySkyLight && (parameters.mMaterial->getShadingModel() != MSM_Unlit));
 
-			return bCachedShaders && (isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4)) && TBasePassPixelShaderBaseType<LightMapPolicyType>::shouldCache(platform, material, vertexFactoryType);
+			return bCachedShaders && (isFeatureLevelSupported(parameters.mPlatform, ERHIFeatureLevel::SM5)) && TBasePassPixelShaderBaseType<LightMapPolicyType>::shouldCompilePermutation(parameters);
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			outEnvironment.setDefine(TEXT("SCENE_TEXTURES_DISABLED"), material->getMaterialDomain() == MD_DeferredDecal);
+			outEnvironment.setDefine(TEXT("SCENE_TEXTURES_DISABLED"), parameters.mMaterial->getMaterialDomain() == MD_DeferredDecal);
 			outEnvironment.setDefine(TEXT("ENABLE_SKY_LIGHT"), bEnableSkyLight);
-			TBasePassPixelShaderBaseType<LightMapPolicyType>::modifyCompilationEnvironment(platform, material, outEnvironment);
+			TBasePassPixelShaderBaseType<LightMapPolicyType>::modifyCompilationEnvironment(parameters, outEnvironment);
 		}
 
 		TBasePassPS(const ShaderMetaType::CompiledShaderInitializerType& initializer):
@@ -314,9 +231,9 @@ namespace Air
 		TBasePassHS(const MeshMaterialShaderType::CompiledShaderInitializerType& initializer) : BaseHS(initializer)
 		{}
 
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* materia, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
-			return (bEnableAtmosphericFog == false || isMetalPlatform(platform)) && BaseHS::shouldCache(platform, materia, vertexFactoryType) && TBasePassVS<LightMapPolicyType, false>::shouldCache(platform, materia, vertexFactoryType);
+			return (bEnableAtmosphericFog == false || isMetalPlatform(parameters.mPlatform)) && BaseHS::shouldCompilePermutation(parameters) && TBasePassVS<LightMapPolicyType, bEnableAtmosphericFog>::shouldCompilePermutation(parameters);
 		}
 	};
 
@@ -329,14 +246,14 @@ namespace Air
 		TBasePassDS(const MeshMaterialShaderType::CompiledShaderInitializerType& inInitializer)
 			:BaseDS(inInitializer)
 		{}
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
-			return BaseDS::shouldCache(platform, material, vertexFactoryType) && TBasePassVS<LightMapPolicyType, false>::shouldCache(platform, material, vertexFactoryType);
+			return BaseDS::shouldCompilePermutation(parameters) && TBasePassVS<LightMapPolicyType, false>::shouldCompilePermutation(parameters);
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			TBasePassVS<LightMapPolicyType, false>::modifyCompilationEnvironment(platform, material, outEnvironment);
+			TBasePassVS<LightMapPolicyType, false>::modifyCompilationEnvironment(parameters, outEnvironment);
 		}
 	public:	 
 		virtual bool serialize(Archive& ar) override
@@ -358,21 +275,21 @@ namespace Air
 		TBasePassVS(const MeshMaterialShaderType::CompiledShaderInitializerType& initializer) : Super(initializer)
 		{}
 	public:
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
 			static const auto supportAtmosphericFog = false;
 			static const auto supportAllShaderPermutations = false;
 			const bool bForceAllPermutations = supportAllShaderPermutations && false;
 			const bool bPrejectAllowsAtmosphericFog = false;
 
-			bool bShouldCache = Super::shouldCache(platform, material, vertexFactoryType);
+			bool bShouldCache = Super::shouldCompilePermutation(parameters);
 			//bShouldCache &= false;
-			return bShouldCache && (isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4));
+			return bShouldCache && (isFeatureLevelSupported(parameters.mPlatform, ERHIFeatureLevel::SM4));
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			Super::modifyCompilationEnvironment(platform, material, outEnvironment);
+			Super::modifyCompilationEnvironment(parameters, outEnvironment);
 			outEnvironment.setDefine(TEXT("BASEPASS_ATMOSPHERIC_FOG"), bEnableAtmosphericFog);
 		}
 	};
@@ -387,8 +304,8 @@ namespace Air
 		bool bEnableSkyLight,
 		BaseHS*& hullShader,
 		BaseDS*& domainShader,
-		TBasePassVertexShaderPolicyParamType<typename LightMapPolicyType::VertexParametersType>*& vertexShader,
-		TBasePassPixelShaderPolicyParamType<typename LightMapPolicyType::PixelParametersType>*& pixelShader
+		TBasePassVertexShaderPolicyParamType<LightMapPolicyType>*& vertexShader,
+		TBasePassPixelShaderPolicyParamType<LightMapPolicyType>*& pixelShader
 	)
 	{
 		if (bNeedsHSDS)
@@ -411,180 +328,7 @@ namespace Air
 	}
 
 
-	template<typename LightMapPolicyType>
-	class TBasePassDrawingPolicy : public BasePassDrawingPolicy
-	{
-
-	public:
-		class ElementDataType
-		{
-		public:	 
-			typename LightMapPolicyType::ElementDataType LightMapElementData;
-			ElementDataType()
-			{}
-			ElementDataType(const typename LightMapPolicyType::ElementDataType& inLightMapElementData)
-				:LightMapElementData(inLightMapElementData)
-			{}
-		};
-
-
-		TBasePassDrawingPolicy(const VertexFactory* inVertexFactory, const MaterialRenderProxy* inMaterialRenderProxy, const FMaterial& inMaterialResource, ERHIFeatureLevel::Type inFeatureLevel, LightMapPolicyType inLightMapPolicy, EBlendMode inBlendMode, ESceneRenderTargetsMode::Type inSceneTextureMode, bool bInEnableSkyLight, bool bInEnableAtmosphericFog, const MeshDrawingPolicyOverrideSettings& inOverrideSettings, EDebugViewShaderMode inDebugViewShaderMode = DVSM_None, bool bInEnableEditorPrimitiveDepthTest = false, bool bInEnableReciveDecalOutput = false) :
-			BasePassDrawingPolicy(inVertexFactory, inMaterialRenderProxy, inMaterialResource, inOverrideSettings, inDebugViewShaderMode, bInEnableReciveDecalOutput),
-			mLightMapPolicy(inLightMapPolicy),
-			mBlendMode(inBlendMode),
-			mSceneTextureMode(inSceneTextureMode),
-			bEnableSkyLight(bInEnableSkyLight),
-			bEnableEditorPrimitvieDepthTest(bInEnableEditorPrimitiveDepthTest),
-			bEnableAtmosphericFog(bInEnableAtmosphericFog)
-		{
-			mHullShader = nullptr;
-			mDomainShader = nullptr;
-			const  EMaterialTessellationMode materialTessellationMode = inMaterialResource.getTessellationMode();
-
-			const bool bNeedsHSDS = RHISupportsTessellation(GShaderPlatformForFeatureLevel[inFeatureLevel]) && inVertexFactory->getType()->supportsTessellationShaders() && materialTessellationMode != MTM_NOTessellation;
-
-			getBasePassShaders<LightMapPolicyType>(inMaterialResource, mVertexFactory->getType(), inLightMapPolicy, bNeedsHSDS, bEnableAtmosphericFog, bEnableSkyLight, mHullShader, mDomainShader, mVertexShader, mPixelShader);
-		}
-
-		DrawingPolicyMatchResult matches(const TBasePassDrawingPolicy& other) const
-		{
-			DRAWING_POLICY_MATCH_BEGIN
-				DRAWING_POLICY_MATCH(MeshDrawingPolicy::matches(other)) &&
-				DRAWING_POLICY_MATCH(mVertexShader == other.mVertexShader) &&
-				DRAWING_POLICY_MATCH(mPixelShader == other.mPixelShader) &&
-				DRAWING_POLICY_MATCH(mHullShader == other.mHullShader) &&
-				DRAWING_POLICY_MATCH(mDomainShader == other.mDomainShader) &&
-				DRAWING_POLICY_MATCH(mSceneTextureMode == other.mSceneTextureMode) &&
-				DRAWING_POLICY_MATCH(bEnableSkyLight == other.bEnableSkyLight) &&
-				DRAWING_POLICY_MATCH(mLightMapPolicy == other.mLightMapPolicy);
-			DRAWING_POLICY_MATCH_END
-		}
-
-		BoundShaderStateInput getBoundShaderStateInput(ERHIFeatureLevel::Type inFealtureLevel)
-		{
-			BoundShaderStateInput boundShaderStateInput(
-				MeshDrawingPolicy::getVertexDeclaration(),
-				mVertexShader->getVertexShader(),
-				GETSAFERHISHADER_HULL(mHullShader),
-				GETSAFERHISHADER_DOMAIN(mDomainShader),
-				GeometryShaderRHIRef(),
-				mPixelShader->getPixelShader()
-			);
-			if (useDebugViewPS())
-			{
-				//Debugview
-			}
-			return boundShaderStateInput;
-		}
-
-		void setMeshRenderState(RHICommandList& RHICmdList,
-			const ViewInfo& view,
-			const PrimitiveSceneProxy* primitiveSceneProxy,
-			const MeshBatch& mesh,
-			int32 batchElementIndex,
-			DrawingPolicyRenderState& drawRenderState,
-			const ElementDataType& elementData,
-			const ContextDataType& policyContext)const
-		{
-			const MeshBatchElement& batchElement = mesh.mElements[batchElementIndex];
-			if (view.mFamily->useDebugViewVSDSHS())
-			{
-
-			}
-			else
-			{
-				mLightMapPolicy.setMesh(RHICmdList, view, primitiveSceneProxy, mVertexShader, !useDebugViewPS() ? mPixelShader : nullptr, mVertexShader, mPixelShader, mVertexFactory, mMaterialRenderProxy, elementData.LightMapElementData);
-				mVertexShader->setMesh(RHICmdList, mVertexFactory, view, primitiveSceneProxy, mesh, batchElement, drawRenderState);
-				if (mHullShader && mDomainShader)
-				{
-					mHullShader->setMesh(RHICmdList, mVertexFactory, view, primitiveSceneProxy, batchElement, drawRenderState);
-					mDomainShader->setMesh(RHICmdList, mVertexFactory, view, primitiveSceneProxy, batchElement, drawRenderState);
-				}
-			}
-			if (useDebugViewPS())
-			{
-
-			}
-			else
-			{
-				mPixelShader->setMesh(RHICmdList, mVertexFactory, view, primitiveSceneProxy, batchElement, drawRenderState, mBlendMode);
-			}
-			MeshDrawingPolicy::setMeshRenderState(RHICmdList, view, primitiveSceneProxy, mesh, batchElementIndex, drawRenderState, MeshDrawingPolicy::ElementDataType(), policyContext);
-		}
-
-		void setInstancedEyeIndex(RHICommandList& RHICmdList, const uint32 eyeIndex) const
-		{
-			mVertexShader->setInstancedEyeIndex(RHICmdList, eyeIndex);
-		}
-
-	protected:
-		TBasePassVertexShaderPolicyParamType<typename LightMapPolicyType::VertexParametersType>* mVertexShader;
-
-		BaseHS* mHullShader;
-		BaseDS* mDomainShader;
-		TBasePassPixelShaderPolicyParamType<typename LightMapPolicyType::PixelParametersType>* mPixelShader;
-
-		LightMapPolicyType mLightMapPolicy;
-		EBlendMode	mBlendMode;
-		ESceneRenderTargetsMode::Type mSceneTextureMode;
-		uint32	bEnableSkyLight : 1;
-		uint32 bEnableEditorPrimitvieDepthTest : 1;
-		uint32 bEnableAtmosphericFog : 1;
-
-	public:
-
-		void setSharedState(RHICommandList& RHICmdList, const ViewInfo* view, const ContextDataType policyContext, const DrawingPolicyRenderState& drawRenderState, bool bUseDownsampledTranslucencyViewConstantBuffer = false) const
-		{
-			if (false)
-			{
-
-			}
-			else
-			{
-				mLightMapPolicy.set(RHICmdList, mVertexShader, mPixelShader, mVertexShader, mPixelShader, mVertexFactory, mMaterialRenderProxy, view);
-				mVertexShader->setParameters(RHICmdList, mMaterialRenderProxy, mVertexFactory, *mMaterialResource, *view, mSceneTextureMode, policyContext.bIsInstancedStereo, bUseDownsampledTranslucencyViewConstantBuffer);
-				if (mHullShader)
-				{
-					mHullShader->setParameters(RHICmdList, mMaterialRenderProxy, *view);
-				}
-				if (mDomainShader)
-				{
-					mDomainShader->setParameters(RHICmdList, mMaterialRenderProxy, *view);
-				}
-			}
-			if (false)
-			{
-
-			}
-			else
-			{
-				mPixelShader->setParameters(RHICmdList, mMaterialRenderProxy, *mMaterialResource, view, mBlendMode, bEnableEditorPrimitvieDepthTest, mSceneTextureMode, policyContext.bIsInstancedStereo, bUseDownsampledTranslucencyViewConstantBuffer);
-
-				switch (mBlendMode)
-				{
-				default:
-				case Air::BLEND_Opaque:
-
-					break;
-				case Air::BLEND_Masked:
-					break;
-				case Air::BLEND_Translucent:
-					RHICmdList.setBlendState(TStaticBlendState<CW_RGBA, BO_Add, BF_SourceAlpha, BF_InverseSourceAlpha, BO_Add, BF_Zero, BF_InverseSourceAlpha>::getRHI());
-					break;
-				case Air::BLEND_Additive:
-					RHICmdList.setBlendState(TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_One, BO_Add, BF_Zero, BF_InverseSourceAlpha>::getRHI());
-					break;
-				case Air::BLEND_Modulate:
-					RHICmdList.setBlendState(TStaticBlendState<CW_RGB, BO_Add, BF_DestColor, BF_Zero>::getRHI());
-					break;
-				case Air::BLEND_AlphaComposite:
-					RHICmdList.setBlendState(TStaticBlendState<CW_RGBA, BO_Add, BF_One, BF_InverseSourceAlpha, BO_Add, BF_Zero, BF_InverseSourceAlpha>::getRHI());
-					break;
-				}
-			}
-		}
-	};
-
+	
 	class ProcessBasePassMeshParameters
 	{
 	public:

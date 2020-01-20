@@ -22,28 +22,28 @@ namespace Air
 		}
 	}
 
-	void PostProcessPassParameters::setPS(const PixelShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, SamplerStateRHIParamRef filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, SamplerStateRHIParamRef* filterOverrideArray /* = 0 */)
+	void PostProcessPassParameters::setPS(RHIPixelShader* shaderRHI, const RenderingCompositePassContext& context, RHISamplerState* filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, RHISamplerState** filterOverrideArray /* = 0 */)
 	{
 		set(shaderRHI, context, context.mRHICmdList, filter, fallbackColor, filterOverrideArray);
 	}
 
 	template<typename TRHICmdList>
-	void PostProcessPassParameters::setCS(const ComputeShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, SamplerStateRHIParamRef filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, SamplerStateRHIParamRef* filterOverrideArray /* = nullptr */)
+	void PostProcessPassParameters::setCS(RHIComputeShader* shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, RHISamplerState* filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, RHISamplerState** filterOverrideArray /* = nullptr */)
 	{
 		set(shaderRHI, context, RHICmdList, filter, fallbackColor, filterOverrideArray);
 	}
 
-	template void PostProcessPassParameters::setCS<RHICommandListImmediate>(const ComputeShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, RHICommandListImmediate& RHICmdList, SamplerStateRHIParamRef filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, SamplerStateRHIParamRef* filterOverrideArray /* = nullptr */);
+	template void PostProcessPassParameters::setCS<RHICommandListImmediate>(RHIComputeShader* shaderRHI, const RenderingCompositePassContext& context, RHICommandListImmediate& RHICmdList, RHISamplerState* filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, RHISamplerState** filterOverrideArray /* = nullptr */);
 
-	template void PostProcessPassParameters::setCS<RHIAsyncComputeCommandListImmediate>(const ComputeShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, RHIAsyncComputeCommandListImmediate& RHICmdList, SamplerStateRHIParamRef filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, SamplerStateRHIParamRef* filterOverrideArray /* = nullptr */);
+	template void PostProcessPassParameters::setCS<RHIAsyncComputeCommandListImmediate>(RHIComputeShader* shaderRHI, const RenderingCompositePassContext& context, RHIAsyncComputeCommandListImmediate& RHICmdList, RHISamplerState* filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, RHISamplerState** filterOverrideArray /* = nullptr */);
 
-	void PostProcessPassParameters::setVS(const VertexShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, SamplerStateRHIParamRef filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, SamplerStateRHIParamRef* filterOverrideArray /* = nullptr */)
+	void PostProcessPassParameters::setVS(RHIVertexShader* shaderRHI, const RenderingCompositePassContext& context, RHISamplerState* filter /* = TStaticSamplerState<>::getRHI() */, EFallbackColor fallbackColor /* = eFC_0000 */, RHISamplerState** filterOverrideArray /* = nullptr */)
 	{
 		set(shaderRHI, context, context.mRHICmdList, filter, fallbackColor, filterOverrideArray);
 	}
 
 	template<typename ShaderRHIParamRef, typename TRHICmdList>
-	void PostProcessPassParameters::set(const ShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, SamplerStateRHIParamRef filter, EFallbackColor fallbackColor, SamplerStateRHIParamRef* filterOverrideArray /* = nullptr */)
+	void PostProcessPassParameters::set(ShaderRHIParamRef shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, RHISamplerState* filter, EFallbackColor fallbackColor, RHISamplerState** filterOverrideArray /* = nullptr */)
 	{
 		RenderingCompositeOutput* output = context.mPass->getOutput(ePId_Output0);
 		BOOST_ASSERT(output);
@@ -128,7 +128,7 @@ namespace Air
 				inputPooledElement = input->requestInput();
 			}
 
-			SamplerStateRHIParamRef localFilter = filterOverrideArray ? filterOverrideArray[id] : filter;
+			RHISamplerState* localFilter = filterOverrideArray ? filterOverrideArray[id] : filter;
 			if (inputPooledElement)
 			{
 				BOOST_ASSERT(!inputPooledElement->isFree());

@@ -74,6 +74,11 @@ namespace Air
 			return 1 << ceilLogTwo(arg);
 		}
 
+		static FORCEINLINE int32 ceilToInt(float f)
+		{
+			return -(_mm_cvt_ss2si(_mm_set_ss(-0.5f - (f + f))) >> 1);
+		}
+
 #endif
 	};
 

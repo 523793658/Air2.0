@@ -18,7 +18,19 @@ namespace Air
 
 
 
+	struct MaterialShaderPermutationParameters
+	{
+		const EShaderPlatform mPlatform;
+		const FMaterial* mMaterial;
 
+		const int32 mPermutationId;
+
+		MaterialShaderPermutationParameters(EShaderPlatform inPlatform, const FMaterial* inMaterial, int32 inPermutationId)
+			:mPlatform(inPlatform)
+			,mMaterial(inMaterial)
+			,mPermutationId(inPermutationId)
+		{}
+	};
 
 
 	class MaterialShaderType : public ShaderType
@@ -33,6 +45,7 @@ namespace Air
 			const wstring mDebugDescription;
 			CompiledShaderInitializerType(
 				ShaderType* inType,
+				int32 inPermutationId,
 				const ShaderCompilerOutput& compilerOutput,
 				ShaderResource*	inResource,
 				const ConstantExpressionSet& inConstantExpressionSet,
@@ -41,7 +54,7 @@ namespace Air
 				VertexFactoryType* inVertexFactoryType,
 				const wstring & inDebugDescription
 			)
-				:GlobalShaderType::CompiledShaderInitializerType(inType, compilerOutput, inResource, inMaterialShaderMapHash, inShaderPipeline, inVertexFactoryType)
+				:GlobalShaderType::CompiledShaderInitializerType(inType, inPermutationId, compilerOutput, inResource, inMaterialShaderMapHash, inShaderPipeline, inVertexFactoryType)
 				,mConstantExpressionSet(inConstantExpressionSet)
 				,mDebugDescription(inDebugDescription)
 			{}
@@ -50,14 +63,14 @@ namespace Air
 
 		typedef Shader* (*ConstructCompiledType)(const CompiledShaderInitializerType&);
 
-		typedef bool(*ShouldCacheType)(EShaderPlatform, const FMaterial*);
+		typedef bool(*ShouldCompilePermutationType)(const MaterialShaderPermutationParameters&);
 		typedef bool(*ModifyCompilationEnvironmentType)(EShaderPlatform, const FMaterial*, ShaderCompilerEnvironment&);
 
-		bool shouldCache(EShaderPlatform platform, const FMaterial* material) const {
-			return (*mShouldCacheType)(platform, material);
+		bool shouldCompilePermutation(EShaderPlatform platform, const FMaterial* material, int32 permuationId) const {
+			return (*mShouldCompilePermutationRef)(MaterialShaderPermutationParameters(platform, material, permuationId));
 		}
 
-		class ShaderCompileJob* beginCompileShader(uint32 shaderMapId, const FMaterial* material, ShaderCompilerEnvironment* materialEnvironment, const ShaderPipelineType* shaderPipeline, EShaderPlatform platform, TArray<ShaderCommonCompileJob*>& newJobs);
+		class ShaderCompileJob* beginCompileShader(uint32 shaderMapId, int32 permutationId, const FMaterial* material, ShaderCompilerEnvironment* materialEnvironment, const ShaderPipelineType* shaderPipeline, EShaderPlatform platform, TArray<ShaderCommonCompileJob*>& newJobs);
 
 		static void beginCompileShaderPipeline(uint32 shaderMapId, EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment* materialEnvironment,
 			const ShaderPipelineType* shaderPipeline, const TArray<MaterialShaderType*>& shaderStages, TArray<ShaderCommonCompileJob*>& newJobs);
@@ -79,7 +92,7 @@ namespace Air
 	private:
 		ConstructCompiledType mConstructCompiledRef;
 
-		ShouldCacheType	mShouldCacheType;
+		ShouldCompilePermutationType	mShouldCompilePermutationRef;
 
 		ModifyCompilationEnvironmentType mModifyCompilationEnvironmentType;
 	};

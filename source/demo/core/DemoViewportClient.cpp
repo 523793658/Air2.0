@@ -128,7 +128,7 @@ namespace Air
 		}
 		else
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND(GameViewportClient_FlushRHIResources, 
+			ENQUEUE_RENDER_COMMAND(GameViewportClient_FlushRHIResources)([](RHICommandListBase& cmdList)
 				{
 					RHICommandListExecutor::getImmediateCommandList().immediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
 				});

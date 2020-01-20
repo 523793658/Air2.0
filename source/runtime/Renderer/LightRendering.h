@@ -27,13 +27,13 @@ namespace Air
 
 		void setParameters(RHICommandList& RHICmdList, const ViewInfo& view, const LightSceneInfo* lightSceneInfo)
 		{
-			GlobalShader::setParameters(RHICmdList, getVertexShader(), view);
+			GlobalShader::setParameters<ViewConstantShaderParameters>(RHICmdList, getVertexShader(), view.mViewConstantBuffer);
 			mStencilingGeometryParameters.set(RHICmdList, this, view, lightSceneInfo);
 		}
 
 		void setSimpleLightParameters(RHICommandList& RHICmdList, const ViewInfo& view, const Sphere& lightBounds)
 		{
-			GlobalShader::setParameters(RHICmdList, getVertexShader(), view);
+			GlobalShader::setParameters<ViewConstantShaderParameters>(RHICmdList, getVertexShader(), view.mViewConstantBuffer);
 			float4 stencilingSpherePosAndScale;
 			StencilingGeometry::GStencilSphereVertexBuffer.calcTransform(stencilingSpherePosAndScale, lightBounds, view.mViewMatrices.getPreviewTranslation());
 			mStencilingGeometryParameters.set(RHICmdList, this, stencilingSpherePosAndScale);

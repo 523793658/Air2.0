@@ -39,7 +39,7 @@ namespace Air
 	{
 		DECLARE_EXPORTED_SHADER_TYPE(ScreenVS, Global, ENGINE_API);
 	public:
-		static bool shouldCache(EShaderPlatform platform) { return true; }
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameter) { return true; }
 
 		ScreenVS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)
@@ -49,9 +49,9 @@ namespace Air
 
 		ScreenVS() {}
 
-		void setParameters(RHICommandList& RHICmdList, const SceneView& view)
+		void setParameters(RHICommandList& RHICmdList, RHIConstantBuffer* viewConstantBuffer)
 		{
-			GlobalShader::setParameters(RHICmdList, getVertexShader(), view);
+			GlobalShader::setParameters<ViewConstantShaderParameters>(RHICmdList, getVertexShader(), viewConstantBuffer);
 		}
 
 		virtual bool serialize(Archive& ar) override
@@ -80,7 +80,7 @@ namespace Air
 			setTextureParameter(RHICmdList, getPixelShader(), inTexture, inTextureSampler, texture);
 		}
 
-		void setParameters(RHICommandList& RHICmdList, SamplerStateRHIParamRef samplerStateRHI, TextureRHIParamRef textureRHI)
+		void setParameters(RHICommandList& RHICmdList, RHISamplerState* samplerStateRHI, RHITexture* textureRHI)
 		{
 			setTextureParameter(RHICmdList, getPixelShader(), inTexture, inTextureSampler, samplerStateRHI, textureRHI);
 		}

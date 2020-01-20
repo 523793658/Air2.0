@@ -100,16 +100,15 @@ namespace Air
 
 			SceneRenderer* sceneRenderer = SceneRenderer::createSceneRenderer(viewFamily);
 
-			ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-				ViewExtensionPreDrawCommand,
-				SceneRenderer*, sceneRenderer, sceneRenderer,
+			ENQUEUE_RENDER_COMMAND(
+				ViewExtensionPreDrawCommand)([
+				sceneRenderer](RHICommandListImmediate& RHICmdList)
 				{
 					ViewExtensionPreRender_RenderThread(RHICmdList, sceneRenderer);
 				});
 
-			ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-				DrawSceneCommand,
-				SceneRenderer*, sceneRenderer, sceneRenderer,
+			ENQUEUE_RENDER_COMMAND(
+				DrawSceneCommand)([sceneRenderer](RHICommandListImmediate& RHICmdList)
 				{
 					RenderViewFamily_RenderThread(RHICmdList, sceneRenderer);
 					flushPendingDeleteRHIResource_RenderThread();

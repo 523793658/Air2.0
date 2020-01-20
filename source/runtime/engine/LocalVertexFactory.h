@@ -26,13 +26,16 @@ namespace Air
 			VertexStreamComponent mColorComponent;
 		};
 
-		static bool shouldCache(EShaderPlatform platform, const class FMaterial* material, const class ShaderType* shaderType);
+		static bool shouldCompilePermutation(EShaderPlatform platform, const class FMaterial* material, const class ShaderType* shaderType);
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const VertexFactoryType*, EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
 		{
 		}
 
 		static VertexFactoryShaderParameters* constructShaderParameters(EShaderFrequency shaderFrequency);
+
+		static void validateCompiledResult(const VertexFactoryType* type, EShaderPlatform platform, const ShaderParameterMap& parameterMap, TArray<wstring>& outErrors);
+
 
 		static bool supportsTessellationShaders() { return true; }
 
@@ -42,7 +45,7 @@ namespace Air
 		{
 			BOOST_ASSERT(colorVertexBuffer->isInitialized());
 			BOOST_ASSERT(isInitialized() && mData.mColorComponent.bSetByVertexFactoryInSetMesh && mColorStreamIndex > 0);
-			RHICmdList.setStreamSource(mColorStreamIndex, colorVertexBuffer->mVertexBufferRHI, mData.mColorComponent.mStride, 0);
+			RHICmdList.setStreamSource(mColorStreamIndex, colorVertexBuffer->mVertexBufferRHI, 0);
 		}
 
 		void setData(const DataType& inData);

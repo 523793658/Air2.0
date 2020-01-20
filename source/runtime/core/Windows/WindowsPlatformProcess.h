@@ -57,7 +57,7 @@ namespace Air
 
 		static void* loadLibraryWithSearchPaths(const wstring& fileName, const TArray<wstring>& searchPaths);
 
-		static void* getDllExport(void* dllHandle, const char* ProcName);
+		static void* getDllExport(void* dllHandle, const TCHAR* ProcName);
 
 		static const TCHAR* getBinariesSubDirectory();
 

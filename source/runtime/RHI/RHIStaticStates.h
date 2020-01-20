@@ -35,7 +35,7 @@ namespace Air
 
 		ENamedThreads::Type getDesiredThread()
 		{
-			return ENamedThreads::RenderThread_Local;
+			return ENamedThreads::getRenderThread_Local();
 		}
 
 		static ESubsequentsMode::Type getSubsequentsMode() { return ESubsequentsMode::FireAndForget; }
@@ -82,7 +82,7 @@ namespace Air
 						BOOST_ASSERT(isInParallelRenderingThread());
 						{
 							ScopedEvent Event;
-							GraphTask<FInitStaticResourceRenderThreadTask>::createTask().constructAndDispatchWhenReady(&GetRHI_WithNoReturnValue, Event);
+							TGraphTask<FInitStaticResourceRenderThreadTask>::createTask().constructAndDispatchWhenReady(&GetRHI_WithNoReturnValue, Event);
 						}
 					}
 					else
@@ -154,7 +154,7 @@ namespace Air
 		uint32 BorderColor = 0,
 		/** Only supported in D3D11 */
 		ESamplerCompareFunction SamplerComparisonFunction = SCF_Never>
-		class TStaticSamplerState : public TStaticStateRHI<TStaticSamplerState<Filter, AddressU, AddressV, AddressW, MipBias, MaxAnisotropy, BorderColor, SamplerComparisonFunction>, SamplerStateRHIRef, SamplerStateRHIParamRef>
+		class TStaticSamplerState : public TStaticStateRHI<TStaticSamplerState<Filter, AddressU, AddressV, AddressW, MipBias, MaxAnisotropy, BorderColor, SamplerComparisonFunction>, SamplerStateRHIRef, RHISamplerState*>
 	{
 	public:
 		static SamplerStateRHIRef createRHI()
@@ -171,7 +171,7 @@ namespace Air
 	* Should only be used from the rendering thread.
 	*/
 	template<ERasterizerFillMode FillMode = FM_Solid, ERasterizerCullMode CullMode = CM_None, bool bEnableLineAA = false, bool bEnableMSAA = true>
-	class TStaticRasterizerState : public TStaticStateRHI<TStaticRasterizerState<FillMode, CullMode, bEnableLineAA>, RasterizerStateRHIRef, RasterizerStateRHIParamRef>
+	class TStaticRasterizerState : public TStaticStateRHI<TStaticRasterizerState<FillMode, CullMode, bEnableLineAA>, RasterizerStateRHIRef, RHIRasterizerState*>
 	{
 	public:
 		FORCEINLINE_DEBUGGABLE static RasterizerStateRHIRef createRHI()
@@ -183,7 +183,7 @@ namespace Air
 
 	/** Given a fill and cull mode, returns a static rasterizer state. */
 	template<bool bEnableMSAA>
-	FORCEINLINE_DEBUGGABLE RasterizerStateRHIParamRef getStaticRasterizerState(ERasterizerFillMode FillMode, ERasterizerCullMode CullMode)
+	FORCEINLINE_DEBUGGABLE RHIRasterizerState* getStaticRasterizerState(ERasterizerFillMode FillMode, ERasterizerCullMode CullMode)
 	{
 		switch (FillMode)
 		{
@@ -258,7 +258,7 @@ namespace Air
 		StencilWriteMask
 		>,
 		DepthStencilStateRHIRef,
-		DepthStencilStateRHIParamRef
+		RHIDepthStencilState*
 		>
 	{
 	public:
@@ -370,7 +370,7 @@ namespace Air
 		RT7ColorWriteMask, RT7ColorBlendOp, RT7ColorSrcBlend, RT7ColorDestBlend, RT7AlphaBlendOp, RT7AlphaSrcBlend, RT7AlphaDestBlend
 		>,
 		BlendStateRHIRef,
-		BlendStateRHIParamRef
+		RHIBlendState*
 		>
 	{
 	public:

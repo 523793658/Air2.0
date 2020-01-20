@@ -9,7 +9,7 @@ namespace Air
 	class MaterialParameterCollectionInstanceResource
 	{
 	public:
-		void GameThread_UpdateContents(const Guid& inId, const TArray<float4>& data);
+		void GameThread_UpdateContents(const Guid& inId, const TArray<float4>& data, const wstring& inOwnerName, bool bRecreateConstantBuffer);
 
 		void GameThread_Destroy();
 
@@ -17,7 +17,7 @@ namespace Air
 		{
 			return mID;
 		}
-		ConstantBufferRHIParamRef getConstantBuffer() const
+		RHIConstantBuffer* getConstantBuffer() const
 		{
 			return mConstantBuffer;
 		}
@@ -26,9 +26,10 @@ namespace Air
 		~MaterialParameterCollectionInstanceResource();
 	private:
 		Guid mID;
+		wstring mOwnerName;
 		ConstantBufferRHIRef mConstantBuffer;
 		RHIConstantBufferLayout mConstantBufferLayout;
-		void updateContents(const Guid& inId, const TArray<float4>& indata);
+		void updateContents(const Guid& inId, const TArray<float4>& indata, const wstring& inOwnerName, bool bRecreateConstantBuffer);
 	};
 
 

@@ -42,18 +42,18 @@ namespace Air
 	{
 		void bind(const ShaderParameterMap& parameterMap);
 
-		void setPS(const PixelShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, SamplerStateRHIParamRef filter = TStaticSamplerState<>::getRHI(), EFallbackColor fallbackColor = eFC_0000, SamplerStateRHIParamRef* filterOverrideArray = 0);
+		void setPS(RHIPixelShader* shaderRHI, const RenderingCompositePassContext& context, RHISamplerState* filter = TStaticSamplerState<>::getRHI(), EFallbackColor fallbackColor = eFC_0000, RHISamplerState** filterOverrideArray = 0);
 
 		template<typename TRHICmdList>
-		void setCS(const ComputeShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, SamplerStateRHIParamRef filter = TStaticSamplerState<>::getRHI(), EFallbackColor fallbackColor = eFC_0000, SamplerStateRHIParamRef* filterOverrideArray = nullptr);
+		void setCS(RHIComputeShader* shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, RHISamplerState* filter = TStaticSamplerState<>::getRHI(), EFallbackColor fallbackColor = eFC_0000, RHISamplerState** filterOverrideArray = nullptr);
 
-		void setVS(const VertexShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, SamplerStateRHIParamRef filter = TStaticSamplerState<>::getRHI(), EFallbackColor fallbackColor = eFC_0000, SamplerStateRHIParamRef* filterOverrideArray = nullptr);
+		void setVS(RHIVertexShader* shaderRHI, const RenderingCompositePassContext& context, RHISamplerState* filter = TStaticSamplerState<>::getRHI(), EFallbackColor fallbackColor = eFC_0000, RHISamplerState** filterOverrideArray = nullptr);
 
 		friend Archive& operator << (Archive& ar, PostProcessPassParameters& p);
 
 
 		template<typename ShaderRHIParamRef, typename TRHICmdList>
-		void set(const ShaderRHIParamRef& shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, SamplerStateRHIParamRef filter, EFallbackColor fallbackColor, SamplerStateRHIParamRef* filterOverrideArray = nullptr);
+		void set(ShaderRHIParamRef shaderRHI, const RenderingCompositePassContext& context, TRHICmdList& RHICmdList, RHISamplerState* filter, EFallbackColor fallbackColor, RHISamplerState** filterOverrideArray = nullptr);
 	private:
 		ShaderParameter mViewportSize;
 		ShaderParameter mViewportRect;

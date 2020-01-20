@@ -98,27 +98,55 @@ namespace Air
 		return GDynamicRHI->RHICreateTextureCube(size, format, numMips, flags, createInfo);
 	}
 
-	ShaderResourceViewRHIRef DynamicRHI::RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, Texture2DRHIParamRef Texture2DRHI, uint8 mipLevel)
+	ShaderResourceViewRHIRef DynamicRHI::RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, RHITexture* texture, const RHITextureSRVCreateInfo& createInfo) 
 	{
 		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
-		return GDynamicRHI->RHICreateShaderResourceView(Texture2DRHI, mipLevel);
+		return GDynamicRHI->RHICreateShaderResourceView(texture, createInfo);
 	}
-
-	ShaderResourceViewRHIRef DynamicRHI::RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, Texture2DRHIParamRef Texture2DRHI, uint8 mipLevel, uint8 numMipLevels, uint8 format)
+	StructuredBufferRHIRef DynamicRHI::RHICreateStructuredBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
 	{
 		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
-		return GDynamicRHI->RHICreateShaderResourceView(Texture2DRHI, mipLevel, numMipLevels, format);
+		return GDynamicRHI->RHICreateStructuredBuffer(stride, size, inUsage, createInfo);
 	}
 
-
-	ShaderResourceViewRHIRef DynamicRHI::RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint8 format)
+	ShaderResourceViewRHIRef DynamicRHI::RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, RHIVertexBuffer* vertexBuffer, uint32 stride, uint8 format)
 	{
 		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
 		return GDynamicRHI->RHICreateShaderResourceView(vertexBuffer, stride, format);
 	}
 
+	ShaderResourceViewRHIRef DynamicRHI::RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, RHIStructuredBuffer* structuredBuffer)
+	{
+		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
+		return GDynamicRHI->RHICreateShaderResourceView(structuredBuffer);
+	}
 
-	void* DynamicRHI::lockTexture2D_RenderThread(class RHICommandListImmediate& rhiCmdList, Texture2DRHIParamRef texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail, bool bNeedsDefaultRHIFlush)
+	UnorderedAccessViewRHIRef DynamicRHI::RHICreateUnorderredAccessView_RenderThread(class RHICommandListImmediate& RHICmdList, RHIIndexBuffer* indexBuffer, uint8 format)
+	{
+		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
+		return GDynamicRHI->RHICreateUnorderedAccessView(indexBuffer, format);
+	}
+
+	UnorderedAccessViewRHIRef DynamicRHI::RHICreateUnorderredAccessView_RenderThread(class RHICommandListImmediate& RHICmdList, RHITexture* texture, uint32 mipLevel)
+	{
+		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
+		return GDynamicRHI->RHICreateUnorderedAccessView(texture, mipLevel);
+	}
+
+	UnorderedAccessViewRHIRef DynamicRHI::RHICreateUnorderredAccessView_RenderThread(class RHICommandListImmediate& RHICmdList, RHIVertexBuffer* vertexBuffer, uint8 format)
+	{
+		ScopedRHIThreadStaller stallThread(RHICmdList);
+		return GDynamicRHI->RHICreateUnorderedAccessView(vertexBuffer, format);
+	}
+
+	UnorderedAccessViewRHIRef DynamicRHI::RHICreateUnorderredAccessView_RenderThread(class RHICommandListImmediate& RHICmdList, RHIStructuredBuffer* structuredBuffer, bool bUseUAVCounter, bool bAppendBuffer)
+	{
+		ScopedRHIThreadStaller stallThread(RHICmdList);
+		return GDynamicRHI->RHICreateUnorderedAccessView(structuredBuffer, bUseUAVCounter, bAppendBuffer);
+	}
+
+
+	void* DynamicRHI::lockTexture2D_RenderThread(class RHICommandListImmediate& rhiCmdList, RHITexture2D* texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail, bool bNeedsDefaultRHIFlush)
 	{
 		if (bNeedsDefaultRHIFlush)
 		{
@@ -129,7 +157,7 @@ namespace Air
 		return GDynamicRHI->RHILockTexture2D(texture, mipIndex, lockMode, destStride, bLockWithinMiptail);
 	}
 
-	void DynamicRHI::unlockTexture2D_RenderThread(class RHICommandListImmediate& rhiCmdList, Texture2DRHIParamRef texture, uint32 mipIndex, bool bLockWithMiptail, bool bFlushRHIThread /* = true */)
+	void DynamicRHI::unlockTexture2D_RenderThread(class RHICommandListImmediate& rhiCmdList, RHITexture2D* texture, uint32 mipIndex, bool bLockWithMiptail, bool bFlushRHIThread /* = true */)
 	{
 		if (bFlushRHIThread)
 		{
@@ -165,7 +193,7 @@ namespace Air
 		return GDynamicRHI->RHICreateIndexBuffer(stride, size, inUsage, createInfo);
 	}
 
-	void* DynamicRHI::lockIndexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, IndexBufferRHIParamRef indexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
+	void* DynamicRHI::lockIndexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, RHIIndexBuffer* indexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		void* result;
@@ -185,11 +213,11 @@ namespace Air
 
 	struct RHICommandUpdateIndexBuffer : RHICommand<RHICommandUpdateIndexBuffer>
 	{
-		IndexBufferRHIParamRef mIndexBuffer;
+		RHIIndexBuffer* mIndexBuffer;
 		void* mBuffer;
 		uint32 mBufferSize;
 		uint32 mOffset;
-		FORCEINLINE_DEBUGGABLE RHICommandUpdateIndexBuffer(IndexBufferRHIParamRef inIndexBuffer, void* inBuffer, uint32 inOffset, uint32 inBufferSize)
+		FORCEINLINE_DEBUGGABLE RHICommandUpdateIndexBuffer(RHIIndexBuffer* inIndexBuffer, void* inBuffer, uint32 inOffset, uint32 inBufferSize)
 			:mIndexBuffer(inIndexBuffer)
 			,mBuffer(inBuffer)
 			,mBufferSize(inBufferSize)
@@ -205,7 +233,7 @@ namespace Air
 		}
 	};
 
-	void DynamicRHI::unlockIndexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, IndexBufferRHIParamRef indexBuffer)
+	void DynamicRHI::unlockIndexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, RHIIndexBuffer* indexBuffer)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		LockTracker::LockParams params = GLockTracker.unlock(indexBuffer);
@@ -234,7 +262,7 @@ namespace Air
 
 	
 
-	void* DynamicRHI::lockVertexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, VertexBufferRHIParamRef vertexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
+	void* DynamicRHI::lockVertexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, RHIVertexBuffer* vertexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		void* result;
@@ -255,12 +283,12 @@ namespace Air
 
 	struct RHICommandUpdateVertexBuffer : public RHICommand<RHICommandUpdateVertexBuffer>
 	{
-		VertexBufferRHIParamRef mVertexBuffer;
+		RHIVertexBuffer* mVertexBuffer;
 		void* mBuffer;
 		uint32 mBufferSize;
 		uint32 offset;
 
-		FORCEINLINE_DEBUGGABLE RHICommandUpdateVertexBuffer(VertexBufferRHIParamRef inVertexBuffer, void* inBuffer, uint32 inBufferSize, uint32 inOffset)
+		FORCEINLINE_DEBUGGABLE RHICommandUpdateVertexBuffer(RHIVertexBuffer* inVertexBuffer, void* inBuffer, uint32 inBufferSize, uint32 inOffset)
 			:mVertexBuffer(inVertexBuffer),
 			mBuffer(inBuffer),
 			mBufferSize(inBufferSize),
@@ -278,7 +306,7 @@ namespace Air
 		}
 	};
 
-	void DynamicRHI::unlockVertexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, VertexBufferRHIParamRef vertexBuffer)
+	void DynamicRHI::unlockVertexBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, RHIVertexBuffer* vertexBuffer)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		LockTracker::LockParams params = GLockTracker.unlock(vertexBuffer);

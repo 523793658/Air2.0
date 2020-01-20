@@ -57,6 +57,7 @@ namespace Air
 	class SceneView;
 	class RTexture;
 	class MaterialRenderProxy;
+	class MaterialShaderMap;
 
 	namespace EMaterialShaderMapUsage
 	{
@@ -95,7 +96,24 @@ namespace Air
 
 
 
+	struct ConstantExpressionCache
+	{
+		ConstantBufferRHIRef mConstantBuffer;
+		LocalConstantBuffer mLocalConstantBuffer;
 
+		TArray<Guid> mParameterCollections;
+		bool bUpToData;
+		const MaterialShaderMap* mCachedConstantExpressionShaderMap;
+		ConstantExpressionCache()
+			:bUpToData(false),
+			mCachedConstantExpressionShaderMap(nullptr)
+		{}
+
+		~ConstantExpressionCache()
+		{
+			mConstantBuffer.safeRelease();
+		}
+	};
 	
 
 	class ConstantExpressionSet : public RefCountedObject
@@ -105,10 +123,14 @@ namespace Air
 		ENGINE_API void serialize(Archive& ar);
 		bool isEmpty() const;
 		bool operator == (const ConstantExpressionSet & referenceSet) const; wstring getSummaryString() const;
-		ENGINE_API const ConstantBufferStruct& getConstantBufferStruct() const;
+		ENGINE_API const ShaderParametersMetadata& getShaderParametersMetadata() const;
 		void createBufferStruct();
-		ENGINE_API ConstantBufferRHIRef createConstantBuffer(const MaterialRenderContext& materialRenderContext, RHICommandList* commandListIfLocalMode, struct LocalConstantBuffer* outLocalConstantBuffer) const;
+		
 		void setParameterCollections(const TArray<class MaterialParameterCollection*>& collections);
+
+		ENGINE_API const ShaderParametersMetadata& getConstantBufferStruct() const;
+
+		ENGINE_API void fillConstantBuffer(CONST MaterialRenderContext& materialRenderContext, const ConstantExpressionCache& constantExpressionCache, uint8* tempBuffer, int tempBufferSize) const;
 	protected:
 		TArray<TRefCountPtr<MaterialConstantExpression>> mConstantVectorExpressions;
 		TArray<TRefCountPtr<MaterialConstantExpression>> mConstantScalarExpressions;
@@ -127,7 +149,7 @@ namespace Air
 
 		TArray<Guid> mParameterCollections;
 
-		TOptional<ConstantBufferStruct> mConstantBufferStruct;
+		TOptional<ShaderParametersMetadata> mConstantBufferStruct;
 
 		friend class FMaterial;
 		friend class MaterialShader;
@@ -182,7 +204,7 @@ namespace Air
 
 		SHAHash mBasePropertyOverridesHash;
 
-		bool containsShaderType(const ShaderType* shaderType) const;
+		bool containsShaderType(const ShaderType* shaderType, int32 permutationId) const;
 
 		bool containsShaderPipelineType(const ShaderPipelineType* shaderPipelineType) const;
 
@@ -209,19 +231,64 @@ namespace Air
 			return ref.mBaseMaterialId.A;
 		}
 
-		ENGINE_API void setShaderDependencies(const TArray<ShaderType*>& shaderTypes, const TArray<const ShaderPipelineType*>& shaderPipelineType, const TArray<VertexFactoryType*>& VFType);
+		ENGINE_API void setShaderDependencies(const TArray<ShaderType*>& shaderTypes, const TArray<const ShaderPipelineType*>& shaderPipelineType, const TArray<VertexFactoryType*>& VFType, EShaderPlatform shaderPlatform);
 
 		void appendKeyString(wstring& keyString) const;
 
 		void getMaterialHash(SHAHash& outHash) const;
 
-		void serialize(Archive& ar);
+		void serialize(Archive& ar, bool bLoadedByCookedMaterial);
+	};
+
+	class MeshMaterialShaderMap : public TShaderMap<MeshMaterialShaderType>
+	{
+	public:
+		MeshMaterialShaderMap(EShaderPlatform inPlatform, VertexFactoryType* inVFType)
+			: TShaderMap<MeshMaterialShaderType>(inPlatform)
+			, mVertexFactoryType(inVFType)
+		{}
+		uint32 beginCompile(
+			uint32 shaderMapId,
+			const MaterialShaderMapId& inShaderMapId,
+			const FMaterial* material,
+			ShaderCompilerEnvironment* materialEnvironment,
+			EShaderPlatform platform,
+			TArray<ShaderCommonCompileJob*>& newJobs);
+
+		static bool isComplete(
+			const MeshMaterialShaderMap* meshShaderMap,
+			EShaderPlatform platform,
+			const FMaterial* material,
+			VertexFactoryType* inVertexFactoryType,
+			bool bSilent);
+
+		void loadMissingShadersFromMemory(
+			const SHAHash& materialShaderMapHash,
+			const FMaterial* material,
+			EShaderPlatform platform);
+
+		void flushShaderByShaderType(ShaderType* shaderType);
+
+		void flushShaderByShaderPipelineType(const ShaderPipelineType* shaderPipelineType);
+
+		inline VertexFactoryType* getVertexFactoryType() const {
+			return mVertexFactoryType;
+		}
+
+	private:
+		VertexFactoryType* mVertexFactoryType;
+
+		static bool isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* material, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, int32 permutationId, bool bSilent);
+
 	};
 
 	class MaterialShaderMap : public TShaderMap<MaterialShaderType>, public DeferredCleanupInterface
 	{
 	public:
-		MaterialShaderMap();
+		inline MaterialShaderMap() : MaterialShaderMap(EShaderPlatform::SP_NumPlatforms) {}
+
+		MaterialShaderMap(EShaderPlatform inPlatform);
+
 		~MaterialShaderMap();
 
 
@@ -260,7 +327,7 @@ namespace Air
 			delete this;
 		}
 
-		void serialize(Archive& ar, bool bInlineShaderResources = true);
+		void serialize(Archive& ar, bool bInlineShaderResources = true, bool bLoadedByCookedMaterial = false);
 
 		ENGINE_API void AddRef();
 		ENGINE_API void Release();
@@ -277,7 +344,7 @@ namespace Air
 
 		uint32 getCompilingId()const { return mCompilingId; }
 
-		bool isMaterialShaderComplete(const FMaterial* material, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, bool bSilent);
+		bool isMaterialShaderComplete(const FMaterial* material, const MaterialShaderType* shaderType, const ShaderPipelineType* pipelineType, int32 permutationId, bool bSilent);
 
 		const wstring& getFriendlyName() const { return mFriendlyName; }
 	private:
@@ -296,8 +363,6 @@ namespace Air
 		TArray<MeshMaterialShaderMap*> mOrderredMeshShaderMaps;
 
 		TindirectArray<MeshMaterialShaderMap> mMeshShaderMaps;
-
-		EShaderPlatform mPlatform;
 
 		MaterialShaderMapId mShaderMapId;
 
@@ -413,12 +478,18 @@ namespace Air
 		ERHIFeatureLevel::Type getFeatureLevel() const { return mFeatureLevel; }
 
 		template<typename ShaderType>
-		ShaderType* getShader(VertexFactoryType* vertexFactoryType) const
+		ShaderType* getShader(VertexFactoryType* vertexFactoryType, const typename ShaderType::PermutationDomain& permutationVector, bool bFatalIfMissing = true) const
 		{
-			return (ShaderType*)getShader(&ShaderType::mStaticType, vertexFactoryType);
+			return getShader<ShaderType>(vertexFactoryType, permutationVector.toDimensionValueId(), bFatalIfMissing);
 		}
 
-		ENGINE_API Shader* getShader(class MeshMaterialShaderType* ShaderType, VertexFactoryType* vertexFactoryType) const;
+		template<typename ShaderType>
+		ShaderType* getShader(VertexFactoryType* vertexFactory, int32 permutationId = 0, bool bFatalIfMissing = true)const
+		{
+			return (ShaderType*)getShader(&ShaderType::mStaticType, vertexFactory, permutationId, bFatalIfMissing);
+		}
+
+		ENGINE_API Shader* getShader(class MeshMaterialShaderType* ShaderType, VertexFactoryType* vertexFactoryType, int32 permutationId, bool bFatalIfMissing = true) const;
 
 		class MaterialShaderMap* getGameThreadShaderMap() const
 		{
@@ -545,7 +616,9 @@ namespace Air
 		MaterialConstantExpressionTexture();
 		MaterialConstantExpressionTexture(int32 inTextureIndex, ESamplerSourceMode inSamplerSource);
 		virtual void serialize(Archive& ar);
-		virtual void getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<const RTexture>& outValue, ESamplerSourceMode& outSamplerSource) const;
+		virtual void getTextureValue(const MaterialRenderContext& context, const FMaterial& material, std::shared_ptr<RTexture>& outValue) const;
+
+		ESamplerSourceMode getSamplerSource() const { return mSamplerSource; }
 
 		virtual MaterialConstantExpressionTexture* getTextureConstantExpression() { return this; }
 	protected:
@@ -563,23 +636,7 @@ namespace Air
 
 
 
-	struct ConstantExpressionCache 
-	{
-		ConstantBufferRHIRef mConstantBuffer;
-		LocalConstantBuffer mLocalConstantBuffer;
-		TArray<Guid> mParameterCollections;
-		bool bUpToData;
-		const MaterialShaderMap* mCachedConstantExpressionShaderMap;
-		ConstantExpressionCache()
-			:bUpToData(false),
-			mCachedConstantExpressionShaderMap(nullptr)
-		{}
-
-		~ConstantExpressionCache()
-		{
-			mConstantBuffer.safeRelease();
-		}
-	};
+	
 
 	class MaterialRenderProxy : public RenderResource
 	{
@@ -599,6 +656,8 @@ namespace Air
 		void ENGINE_API cacheConstantExpressions_GameThread();
 
 		void ENGINE_API cacheConstantExpressions();
+
+		ENGINE_API static void updateDeferredCachedConstantExpressions();
 
 		virtual FMaterial* getMaterialNoFallback(ERHIFeatureLevel::Type inFeatureLevel) const;
 
@@ -641,46 +700,7 @@ namespace Air
 
 	
 
-	class MeshMaterialShaderMap : public TShaderMap<MeshMaterialShaderType>
-	{
-	public:
-		MeshMaterialShaderMap(VertexFactoryType* inVFType)
-			:mVertexFactoryType(inVFType)
-		{}
-		uint32 beginCompile(
-			uint32 shaderMapId,
-			const MaterialShaderMapId& inShaderMapId,
-			const FMaterial* material,
-			ShaderCompilerEnvironment* materialEnvironment,
-			EShaderPlatform platform,
-			TArray<ShaderCommonCompileJob*>& newJobs);
-
-		static bool isComplete(
-			const MeshMaterialShaderMap* meshShaderMap,
-			EShaderPlatform platform,
-			const FMaterial* material,
-			VertexFactoryType* inVertexFactoryType,
-			bool bSilent);
-
-		void loadMissingShadersFromMemory(
-			const SHAHash& materialShaderMapHash,
-			const FMaterial* material,
-			EShaderPlatform platform);
-
-		void flushShaderByShaderType(ShaderType* shaderType);
-
-		void flushShaderByShaderPipelineType(const ShaderPipelineType* shaderPipelineType);
-
-		inline VertexFactoryType* getVertexFactoryType() const {
-			return mVertexFactoryType;
-		}
-
-	private:
-		VertexFactoryType* mVertexFactoryType;
-
-		static bool isMeshShaderComplete(const MeshMaterialShaderMap* meshShaderMap, EShaderPlatform platform, const FMaterial* material, const MeshMaterialShaderType* shaderType, const ShaderPipelineType* pipeline, VertexFactoryType* inVertexFactoryType, bool bSilent);
-
-	};
+	
 
 	enum EMaterialValueType
 	{
@@ -689,13 +709,18 @@ namespace Air
 		MCT_Float3		= 4,
 		MCT_Float4		= 8,
 
-		MCT_Float		=8|4|2|1,
-		MCT_Texture2D	=16,
-		MCT_TextureCube =32,
-		MCT_Texture		=16|32,
-		MCT_StaticBool	=64,
-		MCT_Unknown		=128,
-		MCT_MaterialAttributes	= 256
+		MCT_Float				=8|4|2|1,
+		MCT_Texture2D			=1 << 4,
+		MCT_TextureCube			=1 << 5,
+		MCT_VolumeTexture		= 1 << 6,
+		MCT_StaticBool			= 1 << 7,
+		MCT_Unknown				= 1 << 8,
+		MCT_MaterialAttributes	= 1 << 9,
+		MCT_TextureExternal		= 1 << 10,
+		MCT_TextureVirtual		= 1 << 11,
+		MCT_Texture				=MCT_Texture2D | MCT_TextureCube | MCT_VolumeTexture | MCT_TextureExternal | MCT_TextureVirtual,
+		MCT_VTPageTableResult	= 1 << 13,
+		MCT_ShadingModel		= 1 << 14,
 	};
 
 	typedef int32(*MaterialAttributeBlendFunction)(MaterialCompiler* compiler, int32 A, int32 B, int32 Alpha);

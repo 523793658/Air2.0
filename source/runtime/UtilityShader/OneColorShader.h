@@ -15,12 +15,12 @@ namespace Air
 			:GlobalShader(initializer)
 		{}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			GlobalShader::modifyCompilationEnvironment(platform, outEnvironment);
+			GlobalShader::modifyCompilationEnvironment(parameters, outEnvironment);
 		}
 
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
@@ -60,9 +60,36 @@ namespace Air
 			return GlobalShader::serialize(ar);
 		}
 
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
+		}
+	};
+
+	template<int32 NumOutputs>
+	class TOneColorPixelShaderMRT : public OneColorPS
+	{
+		DECLARE_EXPORTED_SHADER_TYPE(TOneColorPixelShaderMRT, Global, UTILITY_SHADER_API);
+
+	public:
+		TOneColorPixelShaderMRT() {}
+		TOneColorPixelShaderMRT(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+			:OneColorPS(initializer)
+		{}
+
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
+		{
+			if (NumOutputs > 1)
+			{
+				return isFeatureLevelSupported(parameters.mPlatform, ERHIFeatureLevel::ES3_1);
+			}
+			return true;
+		}
+
+		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
+		{
+			OneColorPS::modifyCompilationEnvironment(parameters, outEnvironment);
+			outEnvironment.setDefine(TEXT("NUM_OUTPUTS"), NumOutputs);
 		}
 	};
 }

@@ -751,13 +751,15 @@ namespace Air
 		{
 			mParameterCollectionInstances.add(newInstance);
 		}
+
+		newInstance->updateRenderState(true);
 		if (bUpdateScene)
 		{
-			updateParameterCollectionInstances(false);
+			updateParameterCollectionInstances(false, false);
 		}
 	}
 
-	void World::updateParameterCollectionInstances(bool bUpdateInstanceConstantBuffers)
+	void World::updateParameterCollectionInstances(bool bUpdateInstanceConstantBuffers, bool bRecreateConstantBuffer)
 	{
 		if (mScene)
 		{
@@ -767,7 +769,7 @@ namespace Air
 				RMaterialParameterCollectionInstance* instance = mParameterCollectionInstances[instanceIndex].get();
 				if (bUpdateInstanceConstantBuffers)
 				{
-					instance->updateRenderState();
+					instance->updateRenderState(bRecreateConstantBuffer);
 				}
 				instanceResources.add(instance->getResource());
 			}

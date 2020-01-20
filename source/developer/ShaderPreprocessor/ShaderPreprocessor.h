@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "ShaderCore.h"
+#include "ShaderParameterMap.h"
 namespace Air
 {
 #ifdef ShaderPreprocessor_EXPORTS

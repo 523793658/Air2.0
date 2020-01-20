@@ -99,6 +99,12 @@ namespace Air
 			return abs<float>(a - b) <= erroTolerance;
 		}
 
+		template<typename T>
+		static FORCEINLINE bool isPowerOfTwo(T value)
+		{
+			return ((value & (value - 1)) == (T)0);
+		}
+
 		static float CORE_API clampAngle(float angleDegrees, float minAngleDegrees, float maxAngledegress);
 
 		static FORCEINLINE float loge(float value) { return logf(value); }

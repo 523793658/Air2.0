@@ -13,7 +13,13 @@ namespace Air
 		DECLARE_EXPORTED_SHADER_TYPE(ResolveDepthPS, Global, UTILITY_SHADER_API);
 	public:
 		typedef DummyResolveParameter Parameter;
-		static bool shouldCache(EShaderPlatform platform) { return platform == SP_PCD3D_SM5; }
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters) { return getMaxSupportedFeatureLevel(parameters.mPlatform) >= ERHIFeatureLevel::SM5 || isSimulatedPlatform(parameters.mPlatform); }
+
+		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
+		{
+			GlobalShader::modifyCompilationEnvironment(parameters, outEnvironment);
+			outEnvironment.setDefine(TEXT("SIMULATED_PLATFORM"), isSimulatedPlatform(parameters.mPlatform) ? 1 : 0);
+		}
 
 		ResolveDepthPS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)
@@ -45,7 +51,9 @@ namespace Air
 		typedef DummyResolveParameter Parameter;
 
 
-		static bool shouldCache(EShaderPlatform platform) { return getMaxSupportedFeatureLevel(platform) <= ERHIFeatureLevel::SM4; }
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters) { return getMaxSupportedFeatureLevel(parameters.mPlatform) <= ERHIFeatureLevel::SM4; }
+
+
 
 		ResolveDepthNonMSPS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)
@@ -71,7 +79,7 @@ namespace Air
 		DECLARE_EXPORTED_SHADER_TYPE(ResolveSingleSamplePS, Global, UTILITY_SHADER_API);
 	public:
 		typedef uint32 Parameter;
-		static bool shouldCache(EShaderPlatform platform) { return platform == SP_PCD3D_SM5; }
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters) { return parameters.mPlatform== SP_PCD3D_SM5; }
 
 		ResolveSingleSamplePS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)
@@ -99,7 +107,7 @@ namespace Air
 	{
 		DECLARE_EXPORTED_SHADER_TYPE(ResolveVS, Global, UTILITY_SHADER_API);
 	public:
-		static bool shouldCache(EShaderPlatform platform) { return true; }
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters) { return true; }
 
 		ResolveVS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
 			:GlobalShader(initializer)

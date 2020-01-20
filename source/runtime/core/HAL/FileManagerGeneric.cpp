@@ -8,7 +8,16 @@
 #include "HAL/PlatformMisc.h"
 #include "HAL/PlatformProcess.h"
 #include "Logging/LogMacros.h"
-#if AIR_TS_LIBRARY_FILESYSTEM_V3_SUPPORT
+#if AIR_TS_LIBRARY_FILESYSTEM_V4_SUPPORT
+#include<filesystem>
+namespace std
+{
+	namespace experimental
+	{
+		namespace filesystem = std::filesystem;
+	}
+}
+#elif AIR_TS_LIBRARY_FILESYSTEM_V3_SUPPORT
 #include <experimental/filesystem>
 #elif AIR_TS_LIBRARY_FILESYSTEM_V2_SUPPORT
 #include <filesystem>
@@ -78,7 +87,7 @@ namespace Air
 	time_t FileManagerGeneric::getTimeStamp(const TCHAR* fileName)
 	{
 		filesystem::file_time_type t = filesystem::last_write_time(fileName);
-		return decltype(t)::clock::to_time_t(t);
+		return t.time_since_epoch().count();
 	}
 
 	IFileManager& IFileManager::get()

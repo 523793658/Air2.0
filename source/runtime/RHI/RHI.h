@@ -14,6 +14,14 @@ namespace Air
 	
 #define CONSTANT_BUFFER_STRUCT_ALIGNMENT	16
 
+#define SHADER_PARAMETER_STRUCT_ALIGNMENT	16
+
+#define SHADER_PARAMETER_ARRAY_ELEMENT_ALIGNMENT 16
+
+#define SHADER_PARAMETER_POINTER_ALIGNMENT sizeof(uint64)
+
+static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignment of pointer needs to match the largest pointer.");
+
 	extern RHI_API void RHIInit(bool bHasEditorToken);
 
 	extern RHI_API void RHIPostInit();
@@ -37,7 +45,12 @@ namespace Air
 	
 	extern RHI_API ERHIFeatureLevel::Type GMaxRHIFeatureLevel;
 
+	inline bool RHISupportsBufferLoadTypeConversion(EShaderPlatform platform)
+	{
+		return true;
+	}
 
+	extern RHI_API bool GRHISupportsRayTracing;
 
 	extern RHI_API wstring GRHIAdapterName;
 	extern RHI_API wstring GRHIAdapterInternalDriverVersion;
@@ -69,10 +82,26 @@ namespace Air
 
 	extern RHI_API bool GSupportsRenderTargetFormat_PF_FloatRGBA;
 
+	extern RHI_API bool GSupportsRenderTargetFormat_PF_G8;
+
+	extern RHI_API bool GSupportsParallelRenderingTasksWithSeparateRHIThread;
+
+	extern RHI_API bool GSupportsEfficientAsyncCompute;
+
+	extern RHI_API bool GSupportsVolumeTextureRendering;
+
+	extern RHI_API bool GRHISupportsCopyToTextureMultipleMips;
+
+	extern RHI_API bool GRHISupportsBaseVertexIndex;
+
+	extern RHI_API bool GRHIRequiresRenderTargetForPixelShaderUAVs;
+
 	extern RHI_API bool GSupportsSeparateRenderTargetBlendState;
 
 	// Set the RHI initialized flag.
 	extern RHI_API bool GIsRHIInitialized;
+
+	extern RHI_API bool GSupportsResourceView;
 
 	extern RHI_API EPixelFormat GRHIHDRDisplayOutputFormat;
 
@@ -84,7 +113,7 @@ namespace Air
 
 	extern RHI_API bool GSupportsRenderTargetWriteMask;
 
-	extern RHI_API int32 GMaxTexture2DDemensions;
+	extern RHI_API int32 GMaxTextureDemensions;
 
 	extern RHI_API int32 GMaxTextureDepth;
 
@@ -95,6 +124,10 @@ namespace Air
 	extern RHI_API bool GSupportsTimestampRenderQueries;
 
 	extern RHI_API bool GSupportsResolveCubemapFaces;
+
+	extern RHI_API bool GRHISupportsDynamicResolution;
+
+	extern RHI_API bool GSupportsTransientResourceAliasing;
 
 	extern RHI_API int32 GMaxTextureMipCount;
 
@@ -107,7 +140,7 @@ namespace Air
 
 	FORCEINLINE uint32 getMax2DTextureDemension()
 	{
-		return GMaxTexture2DDemensions;
+		return GMaxTextureDemensions;
 	}
 
 	extern RHI_API int32 GMaxTextureArrayLayers;
@@ -122,10 +155,15 @@ namespace Air
 
 	RHI_API bool isRHIDeviceNVIDIA();
 
+	RHI_API uint32 RHIGetShaderLanguageVersion(const EShaderPlatform platform);
+
+
 	extern RHI_API void RHIPrivateBeginFrame();
 
 	RHI_API wstring legacyShaderPlatformToShaderFormat(EShaderPlatform platform);
 
+	RHI_API EShaderPlatform shaderFormatToLegacyShaderPlatform(wstring shaderFormat);
+	
 	extern RHI_API void getFeatureLevelName(ERHIFeatureLevel::Type inFeatureLevel, wstring& outName);
 
 #if PLATFORM_DESKTOP
@@ -187,6 +225,7 @@ namespace Air
 	{
 		ECubeFace mCubeFace;
 		ResolveRect mRect;
+		ResolveRect mDestRect;
 		int32 mMipIndex;
 		int32 mSourceArrayIndex;
 		int32 mDestArrayIndex;
@@ -352,6 +391,10 @@ namespace Air
 		ResourceArrayInterface*	mResourceArray;
 
 		ClearValueBinding mClearValueBinding;
+
+		bool bWithoutNativeResource;
+
+		const TCHAR* mDebugName;
 	};
 	
 	struct VRamAllocation 
@@ -632,15 +675,60 @@ namespace Air
 		}
 	};
 
-#define GETSAFERHISHADER_HULL(shader) (shader ? shader->getHullShader() : (HullShaderRHIParamRef)HullShaderRHIRef())
+	enum ERHITextureSRVOverrideSRGBType
+	{
+		SRGBO_Default,
+		SRGBO_ForceDisable,
+		SRGBO_ForceEnable,
+	};
 
-#define GETSAFERHISHADER_VERTEX(shader) (shader ? shader->getVertexShader() : (VertexShaderRHIParamRef)VertexShaderRHIRef())
+	struct RHITextureSRVCreateInfo
+	{
+		uint8 mFormat;
+		ERHITextureSRVOverrideSRGBType mSRGBOverride;
+		uint8 mMipLevel;
+		uint8 mNumMipLevels;
+		uint32 mFirstArraySize;
+		uint32 mNumArraySlices;
 
-#define GETSAFERHISHADER_DOMAIN(shader) (shader ? shader->getDomainShader() : (DomainShaderRHIParamRef)DomainShaderRHIRef())
+		explicit RHITextureSRVCreateInfo(uint8 inMipLevel = 0u, uint8 inNumMipLevels = 1u, uint8 inFormat = PF_Unknown)
+			:mFormat(inFormat)
+			,mSRGBOverride(SRGBO_Default),
+			mMipLevel(inMipLevel)
+			, mNumMipLevels(inNumMipLevels)
+			, mFirstArraySize(0)
+			,mNumArraySlices(0)
+		{
 
-#define GETSAFERHISHADER_GEOMETRY(shader) (shader ? shader->getGeometryShader() : (GeometryShaderRHIParamRef)GeometryShaderRHIRef())
+		}
 
-#define GETSAFERHISHADER_PIXELSHADER(shader) (shader ? shader->getPixelShader() : (PixelShaderRHIParamRef)PixelShaderRHIRef())
+		explicit RHITextureSRVCreateInfo(uint8 inMipLevel, uint8 inNumMipLevels, uint32 inFirstArraySlice, uint32 inNumArraySlices, uint8 inFormat = PF_Unknown)
+			:mFormat(inFormat)
+			,mSRGBOverride(SRGBO_Default)
+			,mMipLevel(inMipLevel)
+			,mNumMipLevels(inNumMipLevels)
+			,mFirstArraySize(inFirstArraySlice)
+			,mNumArraySlices(inNumArraySlices)
+		{
+
+		}
+	};
+
+#define GETSAFERHISHADER_HULL(shader) ((shader) ? (shader)->getHullShader() : nullptr)
+
+#define GETSAFERHISHADER_VERTEX(shader) ((shader) ? (shader)->getVertexShader() : nullptr)
+
+#define GETSAFERHISHADER_DOMAIN(shader) ((shader) ? (shader)->getDomainShader() : nullptr)
+
+#define GETSAFERHISHADER_GEOMETRY(shader) ((shader) ? (shader)->getGeometryShader() : nullptr)
+
+#define GETSAFERHISHADER_PIXEL(shader) ((shader) ? (shader)->getPixelShader() : nullptr)
+
+	struct RWBufferStructured;
 
 
+	inline bool RHISupportsVertexShaderLayer(const EShaderPlatform platform)
+	{
+		return isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4) && isMetalPlatform(platform) && (isPCPlatform(platform) || (platform == SP_METAL_MRT && RHIGetShaderLanguageVersion(platform) >= 4));
+	}
 }

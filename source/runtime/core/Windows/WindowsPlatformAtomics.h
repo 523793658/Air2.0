@@ -16,7 +16,6 @@ namespace Air
 			return (int32)_InterlockedIncrement((long*)value);
 		}
 
-#if PLATFORM_HAS_64BIT_ATOMICS
 		static FORCEINLINE int64 interlockedIncrement(volatile int64* value)
 		{
 #if PLATFORM_64BITS
@@ -32,7 +31,6 @@ namespace Air
 			}
 #endif
 		}
-#endif
 
 
 		static FORCEINLINE int32 interLockedDecrement(volatile int32* value)
@@ -40,7 +38,6 @@ namespace Air
 			return (int32)::_InterlockedDecrement((long*)value);
 		}
 
-#if PLATFORM_HAS_64BIT_ATOMICS
 		static FORCEINLINE int64 interlockedDecrement(volatile int64* value)
 		{
 #if PLATFORM_64BITS
@@ -56,7 +53,6 @@ namespace Air
 			}
 #endif
 		}
-#endif
 
 
 		static FORCEINLINE int32 interLockedAdd(volatile int32* value, int32 amount)
@@ -64,7 +60,6 @@ namespace Air
 			return (int32)::_InterlockedExchangeAdd((long*)value, (long)amount);
 		}
 
-#if PLATFORM_HAS_64BIT_ATOMICS
 		static FORCEINLINE int64 interLockedAdd(volatile int64* value, int64 amount)
 		{
 #if PLATFORM_64BITS
@@ -80,13 +75,11 @@ namespace Air
 			}
 #endif
 		}
-#endif
 		static FORCEINLINE int32 interlockedExchange(volatile int32* value, int32 exchange)
 		{
 			return (int32)::_InterlockedExchange((long*)value, (long)exchange);
 		}
 
-#if PLATFORM_HAS_64BIT_ATOMICS
 		static FORCEINLINE int64 interlockedExchange(volatile int64* value, int64 exchange)
 		{
 #if PLATFORM_64BITS
@@ -102,7 +95,6 @@ namespace Air
 			}
 #endif
 		}
-#endif
 
 		static FORCEINLINE void* interLockedCompareExchangePointer(void** dest, void* exchange, void* compared)
 		{
@@ -123,7 +115,6 @@ namespace Air
 			return (int32)::_InterlockedCompareExchange((long*)dest, (long)exchange, (long)comparand);
 		}
 
-#if PLATFORM_HAS_64BIT_ATOMICS
 		static FORCEINLINE int64 interlockedCompareExchange(volatile int64* dest, int64 exchange, int64 comparand)
 		{
 			if (isAligned(dest) == false)
@@ -132,7 +123,6 @@ namespace Air
 			}
 			return (int64)::_InterlockedCompareExchange64(dest, exchange, comparand);
 		}
-#endif
 	};
 
 

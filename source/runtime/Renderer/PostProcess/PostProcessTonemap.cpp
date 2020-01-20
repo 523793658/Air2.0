@@ -4,6 +4,7 @@
 #include "StaticBoundShaderState.h"
 #include "GlobalShader.h"
 #include "ShaderParameterUtils.h"
+#include "PostProcessCombineLUTs.h"
 namespace Air
 {
 	typedef enum {
@@ -19,24 +20,86 @@ namespace Air
 		return (configBitmask & option) ? 1 : 0;
 	}
 
-
-
-	template<uint32 ConfigIndex>
-	class PostProcessTonemapPS : public GlobalShader
+	namespace TonemapperPermutation
 	{
-		DECLARE_SHADER_TYPE(PostProcessTonemapPS, Global);
+		SHADER_PERMUTATION_BOOL(TonemapperBloomDim, "USE_BLOOM");
+		SHADER_PERMUTATION_BOOL(TonemapperGammaOnlyDim, "USE_GAMMA_ONLY");
 
-		static bool shouldCache(EShaderPlatform platform)
+
+		using CommonDomain = TShaderPermutationDomain<
+			TonemapperBloomDim,
+			TonemapperGammaOnlyDim>;
+
+
+		FORCEINLINE_DEBUGGABLE bool shouldCompileCommonPermutation(const GlobalShaderPermutationParameters& parameters, const CommonDomain& permutationVector)
 		{
-			return isFeatureLevelSupported(platform, ERHIFeatureLevel::ES2);
+			if (permutationVector.get<TonemapperGammaOnlyDim>())
+			{
+				return !permutationVector.get<TonemapperBloomDim>();
+			}
+			return true;
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, ShaderCompilerEnvironment& outEnvironment)
-		{
-			GlobalShader::modifyCompilationEnvironment(platform, outEnvironment);
+		SHADER_PERMUTATION_BOOL(TonemapperColorFringeDim, "USE_COLOR_FRINGE");
 
-			uint32 configBitmask = TonemapperConfBitmaskPC[ConfigIndex];
-			outEnvironment.setDefine(TEXT("USE_GAMMA_ONLY"), tonemapperIsDefined(configBitmask, TonemapperGammaOnly));
+		using DesktopDomain = TShaderPermutationDomain<CommonDomain,
+			TonemapperColorFringeDim>;
+
+		DesktopDomain remapPermutation(DesktopDomain permutationVector, ERHIFeatureLevel::Type featureLevel)
+		{
+			CommonDomain commonPermutationVector = permutationVector.get<CommonDomain>();
+			if (commonPermutationVector.get<TonemapperGammaOnlyDim>())
+			{
+				return permutationVector;
+			}
+
+			permutationVector.set<CommonDomain>(commonPermutationVector);
+			return permutationVector;
+		}
+
+		bool shouldCompleDesktopPermutation(const GlobalShaderPermutationParameters& parameters, DesktopDomain permutationVector)
+		{
+			auto commonPermutationVector = permutationVector.get<CommonDomain>();
+
+			if (remapPermutation(permutationVector, getMaxSupportedFeatureLevel(parameters.mPlatform)) != permutationVector)
+			{
+				return false;
+			}
+
+			if (!shouldCompileCommonPermutation(parameters, commonPermutationVector))
+			{
+				return false;
+			}
+
+			if (commonPermutationVector.get<TonemapperGammaOnlyDim>())
+			{
+				return !permutationVector.get<TonemapperColorFringeDim>();
+			}
+			return true;
+		}
+	}
+
+
+
+	class PostProcessTonemapPS : public GlobalShader
+	{
+		DECLARE_GLOBAL_SHADER(PostProcessTonemapPS);
+
+		using PermutationDomain = TonemapperPermutation::DesktopDomain;
+
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
+		{
+			if (!isFeatureLevelSupported(parameters.mPlatform, ERHIFeatureLevel::ES3_1))
+			{
+				return false;
+			}
+			return TonemapperPermutation::shouldCompleDesktopPermutation(parameters, PermutationDomain(parameters.mPermutationId));
+		}
+
+		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
+		{
+			const int32 useValumeLut = pipelineVolumeTextureLUTSupportGuaranteedAtRuntime(parameters.mPlatform) ? 1 : 0;
+			outEnvironment.setDefine(TEXT("USE_VOLUME_LUT"), useValumeLut);
 		}
 
 		PostProcessTonemapPS(){}
@@ -66,12 +129,12 @@ namespace Air
 			//const PostProcessSettings& settings = context.mView.mfianl
 
 			const SceneViewFamily& viewFamily = *(context.mView.mFamily);
-			const PixelShaderRHIParamRef shaderRHI = getPixelShader();
+			RHIPixelShader* shaderRHI = getPixelShader();
 
-			GlobalShader::setParameters(context.mRHICmdList, shaderRHI, context.mView);
+			GlobalShader::setParameters<ViewConstantShaderParameters>(context.mRHICmdList, shaderRHI, context.mView.mViewConstantBuffer);
 
 			{
-				SamplerStateRHIParamRef filters[] =
+				RHISamplerState* filters[] =
 				{
 					TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp, 0, 1>::getRHI(),
 					TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp, 0, 1>::getRHI(),
@@ -118,57 +181,12 @@ namespace Air
 
 	};
 
-#define VARIATION1(A) typedef PostProcessTonemapPS<A> PostProcessTonemapPS##A; \
-	IMPLEMENT_SHADER_TYPE2(PostProcessTonemapPS##A, SF_Pixel);
 
-		VARIATION1(0)
-		VARIATION1(1)
-		VARIATION1(2)
-		VARIATION1(3)
-		VARIATION1(4)
-		VARIATION1(5)
-		VARIATION1(6)
-		VARIATION1(7)
-		VARIATION1(8)
-		VARIATION1(9)
-		VARIATION1(10)
-		VARIATION1(11)
-		VARIATION1(12)
-		VARIATION1(13)
-		VARIATION1(14)
-#undef VARIATION1
 
 	namespace PostProcessTonemapUtil
 	{
-		template<uint32 ConfigIndex, bool bDoEyeAdaptation>
-		static inline void setShaderTempl(const RenderingCompositePassContext& context)
-		{
-			typedef TPostProcessTonemapVS<bDoEyeAdaptation> VertexShaderType;
-			typedef PostProcessTonemapPS<ConfigIndex> PixelShaderType;
+		
 
-			TShaderMapRef<PixelShaderType> pixelShader(context.getShaderMap());
-			TShaderMapRef<VertexShaderType> vertexShader(context.getShaderMap());
-
-			static GlobalBoundShaderState boundShaderState;
-
-			setGlobalBoundShaderState(context.mRHICmdList, context.getFeatureLevel(), boundShaderState, GFilterVertexDeclaration.mVertexDeclarationRHI, *vertexShader, *pixelShader);
-
-			vertexShader->setVS(context);
-			pixelShader->setPS(context);
-		}
-
-		template<uint32 ConfigIndex>
-		static inline void setShaderTempl(const RenderingCompositePassContext& context, bool bDoEyeAdaptation)
-		{
-			if (bDoEyeAdaptation)
-			{
-				setShaderTempl<ConfigIndex, true>(context);
-			}
-			else
-			{
-				setShaderTempl<ConfigIndex, false>(context);
-			}
-		}
 	}
 
 
@@ -194,90 +212,11 @@ namespace Air
 
 	void RCPassPostProcessTonemap::process(RenderingCompositePassContext& context)
 	{
-		const PooledRenderTargetDesc* inputDesc = getInputDesc(ePId_Input0);
-		if (!inputDesc)
-		{
-			return;
-		}
-
-		const SceneViewFamily& viewFamily = *(mView.mFamily);
-		IntRect srcRect = mView.mViewRect;
-
-		IntRect destRect = bDoScreenPercentageInTonemapper ? mView.mUnscaledViewRect : mView.mViewRect;
-
-		int2 srcSize = inputDesc->mExtent;
-
-		const SceneRenderTargetItem& destRenderTarget = mPassOutputs[0].requestSurface(context);
-
-		const EShaderPlatform shaderPlatform = GShaderPlatformForFeatureLevel[context.getFeatureLevel()];
-
-		setRenderTarget(context.mRHICmdList, destRenderTarget.mTargetableTexture, TextureRHIParamRef(), ESimpleRenderTargetMode::EUninitializedColorAndDepth);
-		if (viewFamily.mRenderTarget->getRenderTargetTexture() != destRenderTarget.mTargetableTexture)
-		{
-			context.mRHICmdList.clearColorTexture(destRenderTarget.mTargetableTexture, LinearColor::Black, destRect);
-		}
-
-		context.setViewportAndCallRHI(destRect, 0.0f, 1.0f);
-
-		context.mRHICmdList.setBlendState(TStaticBlendState<>::getRHI());
-		context.mRHICmdList.setRasterizerState(TStaticRasterizerState<>::getRHI());
-		context.mRHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
-		switch (mConfigIndexPC)
-		{
-			using namespace PostProcessTonemapUtil;
-		case 0: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 1: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 2: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 3: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 4: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 5: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 6: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 7: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 8: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 9: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 10: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 11: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 12: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 13: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		case 14: setShaderTempl<0>(context, bDoEyeAdaptation); break;
-		default:
-			BOOST_ASSERT(false);
-		}
-
-		SceneRenderTargets& sceneContext = SceneRenderTargets::get(context.mRHICmdList);
-		Shader* vertexShader;
-		if (bDoEyeAdaptation)
-		{
-
-		}
-		else
-		{
-			TShaderMapRef<TPostProcessTonemapVS<false>> vertexShaderMapRef(context.getShaderMap());
-			vertexShader = *vertexShaderMapRef;
-		}
-
-		drawPostProcessPass(
-			context.mRHICmdList,
-			0, 0,
-			destRect.width(), destRect.height(),
-			mView.mViewRect.min.x, mView.mViewRect.min.y,
-			mView.mViewRect.width(), mView.mViewRect.height(),
-			destRect.size(),
-			sceneContext.getBufferSizeXY(),
-			vertexShader,
-			mView.mStereoPass,
-			context.hasHmdMesh(),
-			EDRF_UseTriangleOptimization);
-		context.mRHICmdList.copyToResolveTarget(destRenderTarget.mTargetableTexture, destRenderTarget.mShaderResourceTexture, false, ResolveParams());
-
-		if (context.mView.mFamily->mViews[context.mView.mFamily->mViews.size() - 1] == &context.mView && !GIsEditor)
-		{
-			sceneContext.setSceneColor(nullptr);
-		}
+		
 	}
 
-	IMPLEMENT_SHADER_TYPE(template<>, TPostProcessTonemapVS<true>, TEXT("PostProcessTonemap"), TEXT("MainVS"), SF_Vertex);
-	IMPLEMENT_SHADER_TYPE(template<>, TPostProcessTonemapVS<false>, TEXT("PostProcessTonemap"), TEXT("MainVS"), SF_Vertex);
+	IMPLEMENT_GLOBAL_SHADER(PostProcessTonemapVS, "PostProcessTonemap", "MainVS", SF_Vertex);
+	IMPLEMENT_GLOBAL_SHADER(PostProcessTonemapPS, "PostProcessTonemap", "MainVS", SF_Vertex);
 
 
 }

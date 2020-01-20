@@ -24,20 +24,13 @@ SET(SOURCE_FILE
     ${Renderer_SOURCE_DIR}/ScenePrivate.cpp 
     ${Renderer_SOURCE_DIR}/SystemTextures.h 
     ${Renderer_SOURCE_DIR}/SystemTextures.cpp 
-    ${Renderer_SOURCE_DIR}/StaticMeshDrawList.h 
-    ${Renderer_SOURCE_DIR}/StaticMeshDrawList.inl 
-    ${Renderer_SOURCE_DIR}/StaticMeshDrawList.cpp 
     ${Renderer_SOURCE_DIR}/DepthRendering.h 
     ${Renderer_SOURCE_DIR}/DepthRendering.cpp 
     ${Renderer_SOURCE_DIR}/SceneVisibility.cpp 
     ${Renderer_SOURCE_DIR}/LightSceneInfo.h 
     ${Renderer_SOURCE_DIR}/LightSceneInfo.cpp 
-    ${Renderer_SOURCE_DIR}/DrawingPolicy.h 
-    ${Renderer_SOURCE_DIR}/DrawingPolicy.cpp 
     ${Renderer_SOURCE_DIR}/SceneCore.h 
     ${Renderer_SOURCE_DIR}/SceneCore.cpp 
-    ${Renderer_SOURCE_DIR}/SceneRenderTargetParameters.h 
-    ${Renderer_SOURCE_DIR}/SceneRenderTargetParameters.cpp 
     ${Renderer_SOURCE_DIR}/PrimitiveSceneInfo.h 
     ${Renderer_SOURCE_DIR}/PrimitiveSceneInfo.cpp 
     ${Renderer_SOURCE_DIR}/LightMapRendering.h 
@@ -58,6 +51,27 @@ SET(SOURCE_FILE
     ${Renderer_SOURCE_DIR}/ReflectionEnvironmentCapture.h 
     ${Renderer_SOURCE_DIR}/ReflectionEnvironmentCapture.cpp 
     ${Renderer_SOURCE_DIR}/ReflectionEnvironmentDiffuseIrradiance.cpp 
+    ${Renderer_SOURCE_DIR}/MeshPassProcessor.h 
+    ${Renderer_SOURCE_DIR}/MeshPassProcessor.cpp 
+    ${Renderer_SOURCE_DIR}/MeshDrawShaderBindings.h 
+    ${Renderer_SOURCE_DIR}/MeshDrawCommands.h 
+    ${Renderer_SOURCE_DIR}/MeshDrawCommands.cpp 
+    ${Renderer_SOURCE_DIR}/GPUScene.h 
+    ${Renderer_SOURCE_DIR}/GPUScene.cpp 
+    ${Renderer_SOURCE_DIR}/ByteBuffer.h
+    ${Renderer_SOURCE_DIR}/ByteBuffer.cpp
+    ${Renderer_SOURCE_DIR}/ScreenPass.h
+    ${Renderer_SOURCE_DIR}/ScreenPass.cpp
+    ${Renderer_SOURCE_DIR}/DistanceFieldAmbientOcclusion.cpp
+    ${Renderer_SOURCE_DIR}/SceneCaptureRendering.cpp
+    ${Renderer_SOURCE_DIR}/LightGridInjection.cpp
+    ${Renderer_SOURCE_DIR}/VolumetricFog.cpp
+    ${Renderer_SOURCE_DIR}/ClusteredDeferredShadingPass.cpp
+    ${Renderer_SOURCE_DIR}/TranslucentLighting.cpp
+    ${Renderer_SOURCE_DIR}/VolumeRendering.h
+    ${Renderer_SOURCE_DIR}/VolumeRendering.cpp
+    ${Renderer_SOURCE_DIR}/IndirectLightRendering.cpp
+    ${Renderer_SOURCE_DIR}/CapsuleShadowRendering.cpp
     )
     
 
@@ -78,8 +92,18 @@ SET(PostProcess_Source
     ${Renderer_SOURCE_DIR}/PostProcess/PostProcessTonemap.cpp 
     ${Renderer_SOURCE_DIR}/PostProcess/PostProcessInput.h 
     ${Renderer_SOURCE_DIR}/PostProcess/PostProcessInput.cpp 
+    ${Renderer_SOURCE_DIR}/PostProcess/PostProcessCombineLUTs.h 
+    ${Renderer_SOURCE_DIR}/PostProcess/PostProcessCombineLUTs.cpp 
     )
 SOURCE_GROUP(PostProcess FILES ${PostProcess_Source})
+
+
+SET(RayTracing_Source
+    ${Renderer_SOURCE_DIR}/RayTracing/RaytracingOptions.h 
+	)
+
+SOURCE_GROUP(RayTracing FILES ${RayTracing_Source})
+
 
 SET(CompositionLighting_Source
 	${Renderer_SOURCE_DIR}/CompositionLighting/CompositionLighting.h
@@ -93,6 +117,7 @@ ADD_LIBRARY(${LIB_NAME} ${AIR_PREFERRED_LIB_TYPE}
     ${SOURCE_FILE}
     ${PostProcess_Source}
     ${CompositionLighting_Source}
+    ${RayTracing_Source}
 )
 SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES FOLDER Engine/Runtime)
 
@@ -101,7 +126,6 @@ target_link_libraries(${LIB_NAME}
     engine
     RenderCore
     RHI
-    ShaderCore
 	UtilityShader
 )
 

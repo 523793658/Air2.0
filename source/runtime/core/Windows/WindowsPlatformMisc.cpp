@@ -7,6 +7,7 @@
 #include "WindowsApplication.h"
 #include "CoreGlobals.h"
 #include <WinBase.h>
+#include "HAL/ThreadHeartBeat.h"
 #include "Misc/Paths.h"
 extern "C"
 {
@@ -250,20 +251,20 @@ MAP_ONE_VK_TO_SCAN(VK_OEM_PERIOD);
 MAP_ONE_VK_TO_SCAN(VK_OEM_102);
 #undef MAP_ONE_VK_TO_SCAN
 
-static const uint32 MAX_KEY_MAPPINGS(256);
-uint32 charCodes[MAX_KEY_MAPPINGS];
+			static const uint32 MAX_KEY_MAPPINGS(256);
+			uint32 charCodes[MAX_KEY_MAPPINGS];
 
-wstring charKeyNames[MAX_KEY_MAPPINGS];
-const int32 charMappings = getCharKeyMap(charCodes, charKeyNames, MAX_KEY_MAPPINGS);
-for (int32 mappingIndex = 0; mappingIndex < charMappings; ++mappingIndex)
-{
-	scanToVKMap.erase(charCodes[mappingIndex]);
-}
+			wstring charKeyNames[MAX_KEY_MAPPINGS];
+			const int32 charMappings = getCharKeyMap(charCodes, charKeyNames, MAX_KEY_MAPPINGS);
+			for (int32 mappingIndex = 0; mappingIndex < charMappings; ++mappingIndex)
+			{
+				scanToVKMap.erase(charCodes[mappingIndex]);
+			}
 
-for (auto it : scanToVKMap)
-{
-	ADDKEYMAP(it.second, wstring(1, (wchar_t)it.first));
-}
+			for (auto it : scanToVKMap)
+			{
+				ADDKEYMAP(it.second, wstring(1, (wchar_t)it.first));
+			}
 		}
 		BOOST_ASSERT(numMappings < maxMappings);
 		return numMappings;
@@ -285,5 +286,89 @@ for (auto it : scanToVKMap)
 		{
 
 		}
+	}
+
+	bool WindowsPlatformMisc::verifyWindowsVersion(uint32 majorVersion, uint32 minorVersion)
+	{
+		OSVERSIONINFOEX version;
+		version.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+		version.dwMajorVersion = majorVersion;
+		version.dwMinorVersion = minorVersion;
+		ULONGLONG conditionMask = 0;
+		conditionMask = VerSetConditionMask(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+		conditionMask = VerSetConditionMask(conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+		return !!VerifyVersionInfo(&version, VER_MAJORVERSION | VER_MINORVERSION, conditionMask);
+	}
+
+	static TCHAR* GMessageBoxText = NULL;
+
+	static TCHAR* GMessageBoxCaption = NULL;
+
+	static bool GCancelButtonEnabled = false;
+
+	int messageBoxExtInternal(EAppMsgType::Type msgType, HWND handleWnd, const TCHAR* text, const TCHAR* caption)
+	{
+		GMessageBoxText = (TCHAR*)text;
+		GMessageBoxCaption = (TCHAR*)caption;
+
+		/*switch (msgType)
+		{
+		case Air::EAppMsgType::YesNoYesAllNoAll:
+			GCancelButtonEnabled = false;
+			return DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_YESNO2ALL))
+			break;
+		case Air::EAppMsgType::YesNoYesAllNoAllCancel:
+			break;
+		case Air::EAppMsgType::YesNoYesAll:
+			break;
+		default:
+			break;
+		}*/
+		return -1;
+	}
+
+	EAppReturnType::Type WindowsPlatformMisc::messageBoxExt(EAppMsgType::Type msgType, const TCHAR* text, const TCHAR* caption)
+	{
+		SlowHeartBeatScope suspendHeartBeat;
+		HWND parentWindow = (HWND)NULL;
+		switch (msgType)
+		{
+		case Air::EAppMsgType::Ok:
+		{
+			MessageBox(parentWindow, text, caption, MB_OK | MB_SYSTEMMODAL);
+			return EAppReturnType::Ok;
+		}
+		case Air::EAppMsgType::YesNo:
+		{
+			int32 ret = MessageBox(parentWindow, text, caption, MB_YESNO | MB_SYSTEMMODAL);
+			return ret == IDYES ? EAppReturnType::Yes : EAppReturnType::No;
+		}
+		case Air::EAppMsgType::OkCancel:
+		{
+			int32 ret = MessageBox(parentWindow, text, caption, MB_OKCANCEL | MB_SYSTEMMODAL);
+			return ret == IDOK ? EAppReturnType::Ok : EAppReturnType::Cancel;
+		}
+		case Air::EAppMsgType::YesNoCancel:
+		{
+			int32 ret = MessageBox(parentWindow, text, caption, MB_YESNOCANCEL | MB_ICONQUESTION | MB_SYSTEMMODAL);
+			return ret == IDYES ? EAppReturnType::Yes : (ret == IDNO ? EAppReturnType::No : EAppReturnType::Cancel);
+		}
+		case Air::EAppMsgType::CancelRetryContinue:
+		{
+			int32 ret = MessageBox(parentWindow, text, caption, MB_CANCELTRYCONTINUE | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SYSTEMMODAL);
+			return ret == IDCANCEL ? EAppReturnType::Cancel : (ret == IDTRYAGAIN ? EAppReturnType::Retry : EAppReturnType::Continue);
+		}
+		case Air::EAppMsgType::YesNoYesAllNoAll:
+		{
+			return (EAppReturnType::Type)messageBoxExtInternal(EAppMsgType::YesNoYesAllNoAll, parentWindow, text, caption);
+		}
+		case Air::EAppMsgType::YesNoYesAllNoAllCancel:
+			return (EAppReturnType::Type)messageBoxExtInternal(EAppMsgType::YesNoYesAllNoAllCancel, parentWindow, text, caption);
+		case Air::EAppMsgType::YesNoYesAll:
+			return (EAppReturnType::Type)messageBoxExtInternal(EAppMsgType::YesNoYesAll, parentWindow, text, caption);
+		default:
+			break;
+		}
+		return EAppReturnType::Cancel;
 	}
 }

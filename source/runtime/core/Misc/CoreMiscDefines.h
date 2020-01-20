@@ -1,4 +1,6 @@
 #pragma once
+#include "../HAL/PreprocessorHelper.h"
+
 #ifndef WITH_EDITORONLY_DATA
 
 #if !PLATFORM_CAN_SUPPORT_EDITORONLY_DATA
@@ -12,6 +14,10 @@
 
 #ifndef USING_CODE_ANALYSIS
 #define USING_CODE_ANALYSIS 0
+#endif
+
+#ifndef USE_SMALL_DELEGATES
+#define USE_SMALL_DELEGATES 1
 #endif
 
 

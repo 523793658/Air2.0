@@ -29,8 +29,8 @@ namespace Air
 			return;
 		}
 
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(RegisterMoviePlayerTickable, DefaultGameMoviePlayer*, mMoviePlayer, this, {
-			mMoviePlayer->registerTickable();
+		ENQUEUE_RENDER_COMMAND(RegisterMoviePlayerTickable)([this](RHICommandListImmediate& RHICmdList){
+			this->registerTickable();
 		});
 		mInitialized = true;
 

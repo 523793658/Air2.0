@@ -40,6 +40,34 @@ namespace Air
 		return &fastVRAMAllocatorSingleton;
 	}
 #endif
+
+	void D3D11DynamicRHI::trackResourceBoundAsVB(D3D11BaseShaderResource* resource, int32 streamIndex)
+	{
+		BOOST_ASSERT(streamIndex >= 0 && streamIndex < D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT);
+
+		if (resource)
+		{
+			mMaxBoundVertexBufferIndex = Math::max(mMaxBoundVertexBufferIndex, streamIndex);
+			mCurrentResourceBoundAsVBs[streamIndex] = resource;
+		}
+		else if(mCurrentResourceBoundAsVBs[streamIndex] != nullptr)
+		{
+			mCurrentResourceBoundAsVBs[streamIndex] = nullptr;
+
+			if (mMaxBoundVertexBufferIndex == streamIndex)
+			{
+				do 
+				{
+					mMaxBoundVertexBufferIndex--;
+				} while (mMaxBoundVertexBufferIndex >= 0 && mCurrentResourceBoundAsVBs[mMaxBoundVertexBufferIndex] == nullptr);
+			}
+		}
+	}
+
+	void D3D11DynamicRHI::trackResourceBoundAsIB(D3D11BaseShaderResource* resource)
+	{
+		mCurrentResourceBoundAsIB = resource;
+	}
 	
 
 	IMPLEMENT_MODULE(D3D11DynamicRHIModule, D3D11RHI);

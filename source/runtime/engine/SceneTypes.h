@@ -119,6 +119,7 @@ namespace Air
 		LightType_Directional = 0,
 		LightType_Point,
 		LightType_Spot,
+		LightType_Rect,
 		LightType_Max,
 		LightType_NumBits = 2
 	};

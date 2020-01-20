@@ -47,17 +47,17 @@ namespace Air
 
 		TArray<CollectionVectorParameter> mVectorParameters;
 	public:
-		const ConstantBufferStruct& getCosntantBufferStruct() const
+		const ShaderParametersMetadata& getCosntantBufferStruct() const
 		{
-			BOOST_ASSERT(mConstantBufferStruct);
-			return *mConstantBufferStruct;
+			BOOST_ASSERT(mShaderParametersMetadata);
+			return *mShaderParametersMetadata;
 		}
 
 		virtual void postLoad() override;
 
 	
 	private:
-		std::unique_ptr<ConstantBufferStruct> mConstantBufferStruct;
+		std::unique_ptr<ShaderParametersMetadata> mShaderParametersMetadata;
 	
 		class MaterialParameterCollectionInstanceResource* mDefaultResource;
 
@@ -65,6 +65,6 @@ namespace Air
 
 		void getDefaultParametrData(TArray<float4>& parameterData) const;
 
-		void updateDefaultResource();
+		void updateDefaultResource(bool bRecreateConstantBuffer);
 	};
 }

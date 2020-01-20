@@ -10,8 +10,10 @@ namespace Air
 		SCS_FinalColorLDR,
 		SCS_SceneColorSceneDepth,
 		SCS_SceneDepth ,
+		SCS_DeviceDepth,
 		SCS_Normal,
-		SCS_BaseColor
+		SCS_BaseColor,
+		SCS_FinalColorHDR,
 	};
 
 	enum ESceneDepthPriorityGroup

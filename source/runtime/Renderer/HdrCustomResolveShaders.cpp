@@ -9,4 +9,8 @@ namespace Air
 
 	IMPLEMENT_SHADER_TYPE(, HdrCustomResolve8xPS, TEXT("HdrCustomResolveShaders"), TEXT("HdrCustomResolve8xPS"), SF_Pixel);
 
+	IMPLEMENT_SHADER_TYPE(, HdrCustomResolveMask2xPS, TEXT("HdrCustomResolveShaders"), TEXT("HdrCustomResolveMaskPS"), SF_Pixel);
+	IMPLEMENT_SHADER_TYPE(, HdrCustomResolveMask4xPS, TEXT("HdrCustomResolveShaders"), TEXT("HdrCustomResolveMaskPS"), SF_Pixel);
+	IMPLEMENT_SHADER_TYPE(, HdrCustomResolveMask8xPS, TEXT("HdrCustomResolveShaders"), TEXT("HdrCustomResolveMaskPS"), SF_Pixel);
+
 }

@@ -208,6 +208,9 @@ namespace Air
 
 		void addMissingProperties(const ConfigFile& inSourceFile);
 
+		CORE_API bool getString(const TCHAR* section, const TCHAR* key, wstring& value) const;
+
+
 	private:
 		TMap<wstring, TMap<wstring, wstring>> mPerObjectConfigArrayOfStructKeys;
 

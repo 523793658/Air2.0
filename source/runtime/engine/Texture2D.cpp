@@ -130,9 +130,8 @@ namespace Air
 
 	Texture2DResource::~Texture2DResource()
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			DeleteResourceMem,
-			Texture2DResourceMem*, resourceMem, mResourceMem,
+		Texture2DResourceMem* resourceMem = mResourceMem;
+		ENQUEUE_RENDER_COMMAND(DeleteResourceMem)([resourceMem](RHICommandListImmediate&)
 			{
 				delete resourceMem;
 			}

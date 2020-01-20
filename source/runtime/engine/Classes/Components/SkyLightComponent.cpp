@@ -55,16 +55,19 @@ namespace Air
 		,mMinOcclusion(inLightComponent->mMinOcclusion)
 		,mOcclusionTint(inLightComponent->mOcclusionTint)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_SIXPARAMETER(
-			InitSkyProxy,
-			const SHVectorRGB3*, inIrradianceEnvironmentMap, &inLightComponent->mIrradianceEnvironmentMap,
-			const SHVectorRGB3*, blendDestinationIrradianceEnvironmentMap, &inLightComponent->mBlendDestinationIrradianceEnvironmentMap,
-			const float*, inAverageBrightness, &inLightComponent->mAverageBrightness,
-			const float*, blendDestinationAverageBrightness, &inLightComponent->mBlendDestinationAverageBrightness,
-			float, inBlendFraction, inLightComponent->mBlendFraction,
-			SkyLightSceneProxy*, lightSceneProxy, this,
+		const SHVectorRGB3* inIrradianceEnvironmentMap = &inLightComponent->mIrradianceEnvironmentMap;
+		const SHVectorRGB3* blendDestinationIrradianceEnvironmentMap = &inLightComponent->mBlendDestinationIrradianceEnvironmentMap;
+		const float* inAverageBrightness = &inLightComponent->mAverageBrightness;
+		const float* blendDestinationAverageBrightness = &inLightComponent->mBlendDestinationAverageBrightness;
+		float inBlendFraction = inLightComponent->mBlendFraction;
+		ENQUEUE_RENDER_COMMAND(
+			InitSkyProxy)([inIrradianceEnvironmentMap, blendDestinationIrradianceEnvironmentMap,
+				inAverageBrightness,
+				blendDestinationAverageBrightness,
+				inBlendFraction,
+				this](RHICommandListImmediate& RHICmdList)
 			{
-				lightSceneProxy->initialize(inBlendFraction, inIrradianceEnvironmentMap, blendDestinationIrradianceEnvironmentMap, inAverageBrightness, blendDestinationAverageBrightness);
+				this->initialize(inBlendFraction, inIrradianceEnvironmentMap, blendDestinationIrradianceEnvironmentMap, inAverageBrightness, blendDestinationAverageBrightness);
 			}
 		);
 	}
@@ -98,11 +101,10 @@ namespace Air
 	{
 		if (mSceneProxy)
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND_THREEPARAMETER(
-				FastUpdateSkyLightCommand,
-				SkyLightSceneProxy*, lightSceneProxy, mSceneProxy,
-				LinearColor, lightColor, LinearColor(mLightColor) * mIntensity,
-				float, indirectLightIntensity, mIndirectLightingIntensity,
+			SkyLightSceneProxy* lightSceneProxy = mSceneProxy;
+			LinearColor lightColor = LinearColor(mLightColor) * mIntensity;
+			float indirectLightIntensity = mIndirectLightingIntensity;
+			ENQUEUE_RENDER_COMMAND(FastUpdateSkyLightCommand)([lightSceneProxy, lightColor, indirectLightIntensity](RHICommandListImmediate& RHICmdList)
 				{
 					lightSceneProxy->mLightColor = lightColor;
 					lightSceneProxy->mIndirectLightingIntensity = indirectLightIntensity;
@@ -164,10 +166,9 @@ namespace Air
 		if (mSceneProxy)
 		{
 			getWorld()->mScene->disableSkyLight(mSceneProxy);
+			SkyLightSceneProxy* lightSceneProxy = mSceneProxy;
 
-			ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-				DestroySkyLightCommand,
-				SkyLightSceneProxy*, lightSceneProxy, mSceneProxy,
+			ENQUEUE_RENDER_COMMAND(DestroySkyLightCommand)([lightSceneProxy](RHICommandListImmediate& RHICmdList)
 				{
 					delete lightSceneProxy;
 				}

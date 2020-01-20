@@ -15,7 +15,7 @@
 #include "Modules/ModuleManager.h"
 #include "Interface/IShaderFormatModule.h"
 #include "HAL/PlatformFileManager.h"
-#include "Materials/MaterialShader.h"
+#include "Classes/Materials/MaterialShader.h"
 #include "EngineModule.h"
 #include "Misc/Paths.h"
 #include "RendererInterface.h"
@@ -33,7 +33,7 @@ namespace Air
 
 	const int32 ShaderCompileWorkerPipelineJobHeader = 'P';
 
-	static void generateConstantBufferStructMemeber(wstring& result, const ConstantBufferStruct::Member& member)
+	static void generateShaderParametersMetadataMemeber(wstring& result, const ShaderParametersMetadata::Member& member)
 	{
 		wstring baseTypeName;
 		switch (member.getBaseType())
@@ -79,8 +79,8 @@ namespace Air
 
 	static void generateInstancedStereoCode(wstring& result)
 	{
-		const ConstantBufferStruct* InstanceView = nullptr;
-		for (TLinkedList<ConstantBufferStruct*>::TIterator structIt(ConstantBufferStruct::getStructList()); structIt; structIt.next())
+		const ShaderParametersMetadata* InstanceView = nullptr;
+		for (TLinkedList<ShaderParametersMetadata*>::TIterator structIt(ShaderParametersMetadata::getStructList()); structIt; structIt.next())
 		{
 			if (CString::strcmp(structIt->getShaderVariableName(), TEXT("InstancedView")) == 0)
 			{
@@ -89,14 +89,14 @@ namespace Air
 			}
 		}
 		BOOST_ASSERT(InstanceView != nullptr);
-		const TArray<ConstantBufferStruct::Member>& structMembers = InstanceView->getMembers();
+		const TArray<ShaderParametersMetadata::Member>& structMembers = InstanceView->getMembers();
 		result = L"struct ViewState\r\n";
 		result += L"{\r\n";
 		for (int32 memberIndex = 0; memberIndex < structMembers.size(); memberIndex++)
 		{
-			const ConstantBufferStruct::Member& member = structMembers[memberIndex];
+			const ShaderParametersMetadata::Member& member = structMembers[memberIndex];
 			wstring memberDecl;
-			generateConstantBufferStructMemeber(memberDecl, member);
+			generateShaderParametersMetadataMemeber(memberDecl, member);
 			result += printf(L"\t%s;\r\n", memberDecl.c_str());
 		}
 		result += L"};\r\n";
@@ -105,7 +105,7 @@ namespace Air
 		result += L"\tViewState Result;\r\n";
 		for (int32 memberIndex = 0; memberIndex < structMembers.size(); ++memberIndex)
 		{
-			const ConstantBufferStruct::Member & member = structMembers[memberIndex];
+			const ShaderParametersMetadata::Member & member = structMembers[memberIndex];
 			result += printf(L"\tResult.%s = View.%s;\r\n", member.getName(), member.getName());
 		}
 		result += L"\treturn Result;\r\n";
@@ -116,12 +116,223 @@ namespace Air
 		result += L"\tViewState Result;\r\n";
 		for (int32 memberIndex = 0; memberIndex < structMembers.size(); ++memberIndex)
 		{
-			const ConstantBufferStruct::Member& member = structMembers[memberIndex];
+			const ShaderParametersMetadata::Member& member = structMembers[memberIndex];
 			result += printf(L"\tResult.%s = InstancedView.%s;\r\n", member.getName(), member.getName());
 		}
 
 		result += L"\treturn Result;\r\n";
 		result += L"}\r\n";
+	}
+
+	static inline Shader* processCompiledJob(ShaderCompileJob* singleJob, const ShaderPipelineType* pipeline, TArray<EShaderPlatform>& shaderPlatformsProcessed, TArray<const ShaderPipelineType*>& outSharedPipelines);
+
+	void processCompiledGlbalShaders(const TArray<ShaderCommonCompileJob*>& compilationResults)
+	{
+		TArray<EShaderPlatform> shaderPlatformsProcessed;
+		TArray<const ShaderPipelineType*> sharedPipelines;
+
+		for (int32 resultIndex = 0; resultIndex < compilationResults.size(); resultIndex++)
+		{
+			const ShaderCommonCompileJob& currentJob = *compilationResults[resultIndex];
+			ShaderCompileJob* singleJob = nullptr;
+			if ((singleJob = (ShaderCompileJob*)currentJob.getSingleShaderJob()) != nullptr)
+			{
+				processCompiledJob(singleJob, nullptr, shaderPlatformsProcessed, sharedPipelines);
+			}
+			else
+			{
+				const auto* pipelineJob = currentJob.getShaderPipelineJob();
+				BOOST_ASSERT(pipelineJob);
+				TArray<Shader*> shaderStages;
+				for (int32 index = 0; index < pipelineJob->mStageJobs.size(); index++)
+				{
+					singleJob = pipelineJob->mStageJobs[index]->getSingleShaderJob();
+					Shader* shader = processCompiledJob(singleJob, pipelineJob->mShaderPipeline, shaderPlatformsProcessed, sharedPipelines);
+					shaderStages.add(shader);
+				}
+				ShaderPipeline* shaderPipeline = new ShaderPipeline(pipelineJob->mShaderPipeline, shaderStages);
+				if (shaderPipeline)
+				{
+					EShaderPlatform platform = (EShaderPlatform)pipelineJob->mStageJobs[0]->getSingleShaderJob()->mInput.mTarget.mPlatform;
+					BOOST_ASSERT(shaderPipeline && !GGlobalShaderMap[platform]->hasShaderPipeline(shaderPipeline->mPipelineType));
+					GGlobalShaderMap[platform]->addShaderPipeline(pipelineJob->mShaderPipeline, shaderPipeline);
+				}
+			}
+		}
+		for (int32 platformIndex = 0; platformIndex < shaderPlatformsProcessed.size(); platformIndex++)
+		{
+			{
+				EShaderPlatform platform = shaderPlatformsProcessed[platformIndex];
+				auto* globalShaderMap = GGlobalShaderMap[platform];
+				for (const ShaderPipelineType* shaderPipelineType : sharedPipelines)
+				{
+					BOOST_ASSERT(shaderPipelineType->isGlobalTypePipeline());
+					if (!globalShaderMap->hasShaderPipeline(shaderPipelineType))
+					{
+						auto& stageTypes = shaderPipelineType->getStages();
+						TArray<Shader*> shaderStages;
+						for (int32 index = 0; index < stageTypes.size(); ++index)
+						{
+							GlobalShaderType* globalShaderType = ((ShaderType*)(stageTypes[index]))->getGlobalShaderType();
+							if (globalShaderType->shouldCompilePermutation(platform, kUniquePermutationId))
+							{
+								Shader* shader = globalShaderMap->getShader(globalShaderType, kUniquePermutationId);
+								BOOST_ASSERT(shader);
+								shaderStages.add(shader);
+							}
+							else
+							{
+								break;
+							}
+						}
+						BOOST_ASSERT(stageTypes.size() == shaderStages.size());
+						ShaderPipeline* shaderPipeline = new ShaderPipeline(shaderPipelineType, shaderStages);
+						globalShaderMap->addShaderPipeline(shaderPipelineType, shaderPipeline);
+					}
+				}
+			}
+			//saveGlobalShaderMapToDerivedDataCache(shaderPlatformsProcessed[platformIndex]);
+		}
+	}
+	void verifyGlobalShaders(EShaderPlatform platform, bool bLoadedFromCacheFile)
+	{
+		BOOST_ASSERT(isInGameThread());
+		BOOST_ASSERT(GGlobalShaderMap[platform]);
+		TShaderMap<GlobalShaderType>* globalShaderMap = getGlobalShaderMap(platform);
+		const bool bEmptyMap = globalShaderMap->isEmpty();
+		if (bEmptyMap)
+		{
+			AIR_LOG(LogShaders, Warning, TEXT("Empty global shader map, recompiling all global shaders\n"));
+		}
+
+
+		bool bErrorOnMissing = bLoadedFromCacheFile;
+		if (PlatformProperties::requiresCookedData())
+		{
+			bErrorOnMissing = true;
+		}
+		TArray<ShaderCommonCompileJob*> globalShaderJobs;
+		TMap<ShaderType*, ShaderCompileJob*> sharedShaderJobs;
+
+		for (TLinkedList<ShaderType*>::TIterator it(ShaderType::getTypeList()); it; it.next())
+		{
+			GlobalShaderType* globalShaderType = it->getGlobalShaderType();
+			if (!globalShaderType)
+			{
+				continue;
+			}
+			int32 permutationCountToCompile = 0;
+			for(int32 permutationId = 0; permutationId < globalShaderType->getPermutationCount(); permutationId++)
+			{
+				if (globalShaderType->shouldCompilePermutation(platform, permutationId) && !globalShaderMap->hasShader(globalShaderType, permutationId))
+				{
+					if (bErrorOnMissing)
+					{
+						AIR_LOG(LogShaders, Fatal, TEXT("Missing global shader %s, please make sure cooking was successful"));
+					}
+					if (!bEmptyMap)
+					{
+						AIR_LOG(LogShaders, Warning, TEXT(" %s"), globalShaderType->getName());
+					}
+					auto* job = GlobalShaderTypeCompiler::beginCompileShader(globalShaderType, permutationId, platform, nullptr, globalShaderJobs);
+					BOOST_ASSERT(sharedShaderJobs.end() == sharedShaderJobs.find(globalShaderType));
+					sharedShaderJobs.emplace(globalShaderType, job);
+				}
+			}
+		}
+
+		for (TLinkedList<ShaderPipelineType*>::TIterator shaderPipelineIt(ShaderPipelineType::getTypeList()); shaderPipelineIt; shaderPipelineIt.next())
+		{
+			const ShaderPipelineType* pipeline = *shaderPipelineIt;
+			if (pipeline->isGlobalTypePipeline())
+			{
+				if (!globalShaderMap->getShaderPipeline(pipeline))
+				{
+					auto& stageTypes = pipeline->getStages();
+					TArray<GlobalShaderType*> shaderStages;
+					for (int32 index = 0; index < stageTypes.size(); ++index)
+					{
+						GlobalShaderType* globalShaderType = ((ShaderType*)(stageTypes[index]))->getGlobalShaderType();
+						if (globalShaderType->shouldCompilePermutation(platform, kUniquePermutationId))
+						{
+							shaderStages.add(globalShaderType);
+						}
+						else
+						{
+							break;
+						}
+					}
+					if (shaderStages.size() == stageTypes.size())
+					{
+						if (bErrorOnMissing)
+						{
+							AIR_LOG(logShaders, Fatal, TEXT("Missing global shader pipeline %s", pipeline->getName()));
+						}
+						if (pipeline->shoudlOptimizeUnusedOutputs(platform))
+						{
+							GlobalShaderTypeCompiler::beginCompileShaderPipeline(platform, pipeline, shaderStages, globalShaderJobs);
+						}
+						else
+						{
+							for (const ShaderType* shaderType : stageTypes)
+							{
+								auto jobIt = sharedShaderJobs.find(const_cast<ShaderType*>(shaderType));
+								BOOST_ASSERT(jobIt != sharedShaderJobs.end());
+								auto* singleJob = jobIt->second->getSingleShaderJob();
+								BOOST_ASSERT(singleJob);
+								auto& sharedPipelinesInJob = singleJob->mSharingPipelines.findOrAdd(nullptr);
+								BOOST_ASSERT(!sharedPipelinesInJob.contains(pipeline));
+								sharedPipelinesInJob.add(pipeline);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (globalShaderJobs.size() > 0)
+		{
+			GShaderCompilingManager->addJobs(globalShaderJobs, true, true, true);
+			const bool bAllowAsynchronousGlobalShaderCompiling = !isOpenGLPlatform(GMaxRHIShaderPlatform) && !isVulkanPlatform(GMaxRHIShaderPlatform) && !isMetalPlatform(GMaxRHIShaderPlatform) && GShaderCompilingManager->allowAsynchronousShaderCompiling();
+
+			//if (!bAllowAsynchronousGlobalShaderCompiling)
+			{
+				TArray<int32> shaderMapIds;
+				shaderMapIds.add(mGlobalShaderMapId);
+				GShaderCompilingManager->finishCompilation(TEXT("Global"), shaderMapIds);
+			}
+		}
+	}
+
+	static inline Shader* processCompiledJob(ShaderCompileJob* singleJob, const ShaderPipelineType* pipeline, TArray<EShaderPlatform>& shaderPlatformsProcessed, TArray<const ShaderPipelineType*>& outSharedPipelines)
+	{
+		GlobalShaderType* globalShaderType = singleJob->mShaderType->getGlobalShaderType();
+		Shader* shader = GlobalShaderTypeCompiler::finishCompileShader(globalShaderType, *singleJob, pipeline);
+		if (shader)
+		{
+			EShaderPlatform platform = (EShaderPlatform)singleJob->mInput.mTarget.mPlatform;
+			if (!pipeline || !pipeline->shoudlOptimizeUnusedOutputs(platform))
+			{
+				GGlobalShaderMap[platform]->addShader(globalShaderType, singleJob->mPermutationId, shader);
+				if (!platform)
+				{
+					auto jobSharedPipelines = singleJob->mSharingPipelines.find(nullptr);
+					if (jobSharedPipelines != singleJob->mSharingPipelines.end())
+					{
+						for (auto* sharedPipeline : jobSharedPipelines->second)
+						{
+							outSharedPipelines.addUnique(sharedPipeline);
+						}
+					}
+				}
+			}
+			shaderPlatformsProcessed.addUnique(platform);
+		}
+		else
+		{
+
+		}
+		return shader;
 	}
 
 	void globalBeginCompileShader(const wstring & debugGroupName, class VertexFactoryType* inVFType, class ShaderType* inShaderType, const class ShaderPipelineType* inShaderPipelineType, const TCHAR* inSourceFilename, const TCHAR* inFunctionName, ShaderTarget inTarget, ShaderCompileJob* inNewJob, TArray<ShaderCommonCompileJob*>& inNewJobs, bool bAllowDevelopmentShaderCompile /* = true */)
@@ -178,7 +389,7 @@ namespace Air
 
 		wstring generatedInstancedStereoCode;
 		generateInstancedStereoCode(generatedInstancedStereoCode);
-		input.mEnvironment.mIncludeFileNameToContentsMap.emplace(TEXT("GeneratedInstancedStereo.hlsl"), stringToArray<ANSICHAR>(generatedInstancedStereoCode.c_str(), generatedInstancedStereoCode.length() + 1));
+		input.mEnvironment.mIncludeVirtualPathToContentsMap.emplace(TEXT("GeneratedInstancedStereo.hlsl"), generatedInstancedStereoCode);
 		{
 
 		}
@@ -1520,4 +1731,91 @@ currentWorkerInfo.mQueuedJobs.empty();
 		}
 		return workerHandle;
 	}
+
+	void GlobalShaderTypeCompiler::beginCompileShaderPipeline(EShaderPlatform platform, const ShaderPipelineType* shaderPipeline, const TArray<GlobalShaderType*>& shaderStages, TArray<ShaderCommonCompileJob*>& newJobs)
+	{
+		BOOST_ASSERT(shaderStages.size() > 0);
+		BOOST_ASSERT(shaderPipeline);
+		AIR_LOG(LogShaders, Verbose, TEXT(" Pipeline: %s"), shaderPipeline->getName());
+
+		auto* newPipelineJob = new ShaderPipelineCompileJob(mGlobalShaderMapId, shaderPipeline, shaderStages.size());
+		for (int32 index = 0; index < shaderStages.size(); ++index)
+		{
+			auto* shaderStage = shaderStages[index];
+			beginCompileShader(shaderStage, kUniquePermutationId, platform, shaderPipeline, newPipelineJob->mStageJobs);
+		}
+		newJobs.add(newPipelineJob);
+	}
+
+	ShaderCompileJob* GlobalShaderTypeCompiler::beginCompileShader(GlobalShaderType* shaderType, int32 permutationId, EShaderPlatform platform, const ShaderPipelineType* shaderPipeline, TArray<ShaderCommonCompileJob*>& newJobs)
+	{
+		ShaderCompileJob* newJob = new ShaderCompileJob(mGlobalShaderMapId, nullptr, shaderType, permutationId);
+		ShaderCompilerEnvironment& shaderEnvironment = newJob->mInput.mEnvironment;
+		AIR_LOG(LogShaders, Verbose, TEXT("  %s"), shaderType->getName());
+
+		shaderType->setupCompileEnvironment(platform, permutationId, shaderEnvironment);
+		static wstring GlobalName(TEXT("Global"));
+
+		Air::globalBeginCompileShader(GlobalName, nullptr, shaderType, shaderPipeline, shaderType->getShaderFilename(), shaderType->getFunctionName(), ShaderTarget(shaderType->getFrequency(), platform), newJob, newJobs);
+		return newJob;
+	}
+
+	Shader* GlobalShaderTypeCompiler::finishCompileShader(GlobalShaderType* shaderType, const ShaderCompileJob& compileJob, const ShaderPipelineType* shaderPipelineType)
+	{
+		Shader* shader = nullptr;
+		if (compileJob.bSucceeded)
+		{
+			ShaderType* specificType = nullptr;
+			int32 specificPermutationId = 0;
+			if (compileJob.mShaderType->limitShaderResourceToThisType())
+			{
+				specificType = compileJob.mShaderType;
+				specificPermutationId = compileJob.mPermutationId;
+			}
+
+			ShaderResource* resource = ShaderResource::findOrCreateShaderResource(compileJob.mOutput, specificType, specificPermutationId);
+
+			BOOST_ASSERT(resource);
+
+			if (shaderPipelineType && !shaderPipelineType->shoudlOptimizeUnusedOutputs(compileJob.mInput.mTarget.getPlatform()))
+			{
+				shaderPipelineType = nullptr;
+			}
+
+			SHAHash globalShaderMapHash;
+			{
+				SHA1 hashState;
+				const TCHAR* globalShaderString = TEXT("GlobalShaderMap");
+				hashState.updateWithString(globalShaderString, CString::strlen(globalShaderString));
+				hashState.finalize();
+				hashState.getHash(&globalShaderMapHash.mHash[0]);
+			}
+
+			shader = compileJob.mShaderType->findShaderById(ShaderId(globalShaderMapHash, shaderPipelineType, nullptr, compileJob.mShaderType, compileJob.mPermutationId, compileJob.mInput.mTarget));
+			if (!shader)
+			{
+				shader = (*(shaderType->mConstructCompiledRef))(GlobalShaderType::CompiledShaderInitializerType(shaderType, compileJob.mPermutationId, compileJob.mOutput, resource, globalShaderMapHash, shaderPipelineType, nullptr));
+				compileJob.mOutput.mParameterMap.verifyBindingAreComplete(shaderType->getName(), compileJob.mOutput.mTarget, compileJob.mVFType);
+			}
+		}
+
+		if (compileJob.mOutput.mErrors.size() > 0)
+		{
+			if (compileJob.bSucceeded == false)
+			{
+				AIR_LOG(LogShaderCompilers, Error, TEXT("Errros compiling global shader %s %s %s:\n"), compileJob.mShaderType->getName(), shaderPipelineType ? TEXT("ShaderPipeline") : TEXT(""), shaderPipelineType ? shaderPipelineType->getName() : TEXT(""));
+				for (int32 errorIndex = 0; errorIndex < compileJob.mOutput.mErrors.size(); errorIndex++)
+				{
+					AIR_LOG(LogShaderCompilers, Error, TEXT("		%s"), compileJob.mOutput.mErrors[errorIndex].getErrorString().c_str());
+				}
+			}
+			else if(false)
+			{
+
+			}
+		}
+
+		return shader;
+	}
+
 }

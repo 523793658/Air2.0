@@ -8,6 +8,12 @@ static bool GUseReversedIndexBuffer = false;
 static bool GUsePreCulledIndexBuffer = true;
 namespace Air
 {
+	size_t StaticMeshSceneProxy::getTypeHash() const
+	{
+		static size_t uniquePointer;
+		return reinterpret_cast<size_t>(&uniquePointer);
+	}
+
 	PrimitiveSceneProxy* StaticMeshComponent::createSceneProxy()
 	{
 		if (getStaticMesh() == nullptr || getStaticMesh()->mRenderData == nullptr || getStaticMesh()->mRenderData->mLODResources.size() == 0 || getStaticMesh()->mRenderData->mLODResources[0].mVertexBuffer.getNumVertices() == 0)

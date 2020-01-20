@@ -3,6 +3,7 @@
 #include "Misc/ScopedEvent.h"
 #include "RHI.h"
 #include "Misc/App.h"
+#include "Containers/IndirectArray.h"
 #include "RHICommandList.h"
 namespace Air
 {
@@ -59,9 +60,8 @@ namespace Air
 
 	void beginReleaseResource(RenderResource* resource)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			releaseCommand,
-			RenderResource*, resource, resource,
+		ENQUEUE_RENDER_COMMAND(
+			releaseCommand)([resource](RHICommandListImmediate& RHICmdList)
 			{
 				resource->releaseResource();
 			});
@@ -69,9 +69,8 @@ namespace Air
 
 	void beginInitResource(RenderResource* resource)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			initCommand,
-			RenderResource*, resource, resource,
+		ENQUEUE_RENDER_COMMAND(
+			initCommand)([resource](RHICommandListImmediate& RHICmdList)
 			{
 				resource->initResource();
 			});
@@ -97,7 +96,7 @@ namespace Air
 				{}
 				static FORCEINLINE ENamedThreads::Type getDesiredThread()
 				{
-					return ENamedThreads::RenderThread_Local;
+					return ENamedThreads::getRenderThread_Local();
 				}
 				static FORCEINLINE ESubsequentsMode::Type getSubsequentsMode()
 				{
@@ -112,7 +111,7 @@ namespace Air
 			};
 			{
 				ScopedEvent e;
-				GraphTask<InitResourceRenderThreadTask>::createTask().constructAndDispatchWhenReady(*this, e);
+				TGraphTask<InitResourceRenderThreadTask>::createTask().constructAndDispatchWhenReady(*this, e);
 			}
 		}
 	}
@@ -131,9 +130,8 @@ namespace Air
 
 	void releaseResourceAndFlush(RenderResource* resource)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			releaseCommand,
-			RenderResource*, resource, resource,
+		ENQUEUE_RENDER_COMMAND(
+			releaseCommand)([resource](RHICommandListImmediate&  RHICmdList)
 			{
 				resource->releaseResource();
 			});
@@ -212,4 +210,219 @@ namespace Air
 	{
 		mTextureReferenceRHI.safeRelease();
 	}
+
+	class DynamicVertexBuffer : public VertexBuffer
+	{
+	public:
+		enum { ALIGNMENT = (1 << 16) };
+
+		uint8* mMappedBuffer;
+
+		uint32 mBufferSize;
+
+		uint32 mAllocatedByteCount;
+
+		explicit DynamicVertexBuffer(uint32 inMinBufferSize)
+			:mMappedBuffer(nullptr)
+			,mBufferSize(Math::max<uint32>(align(inMinBufferSize, ALIGNMENT), ALIGNMENT))
+			,mAllocatedByteCount(0)
+		{}
+
+		void lock()
+		{
+			BOOST_ASSERT(mMappedBuffer == nullptr);
+			BOOST_ASSERT(mAllocatedByteCount == 0);
+			BOOST_ASSERT(isValidRef(mVertexBufferRHI));
+			mMappedBuffer = (uint8*)RHILockVertexBuffer(mVertexBufferRHI, 0, mBufferSize, RLM_WriteOnly);
+		}
+
+		void unlock()
+		{
+			BOOST_ASSERT(mMappedBuffer != nullptr);
+			BOOST_ASSERT(isValidRef(mVertexBufferRHI));
+			RHIUnlockVertexBuffer(mVertexBufferRHI);
+			mMappedBuffer = nullptr;
+			mAllocatedByteCount = 0;
+		}
+
+		virtual void initRHI() override
+		{
+			BOOST_ASSERT(!isValidRef(mVertexBufferRHI));
+			RHIResourceCreateInfo createInfo;
+			mVertexBufferRHI = RHICreateVertexBuffer(mBufferSize, BUF_Volatile, createInfo);
+			mMappedBuffer = nullptr;
+			mAllocatedByteCount = 0;
+		}
+
+		virtual void releaseRHI() override
+		{
+			VertexBuffer::releaseRHI();
+			mMappedBuffer = nullptr;
+			mAllocatedByteCount = 0;
+		}
+
+		virtual wstring getFriendlyName() const override
+		{
+			return TEXT("DynamicVertexBuffer");
+		}
+	};
+
+	struct DynamicVertexBufferPool
+	{
+		TindirectArray<DynamicVertexBuffer> mVertexBuffers;
+		DynamicVertexBuffer* mCurrentVertexBuffer;
+
+		DynamicVertexBufferPool()
+			:mCurrentVertexBuffer(nullptr)
+		{}
+
+		~DynamicVertexBufferPool()
+		{
+			int32 numVertexBuffers = mVertexBuffers.size();
+			for (int32 bufferIndex = 0; bufferIndex < numVertexBuffers; ++bufferIndex)
+			{
+				mVertexBuffers[bufferIndex].releaseResource();
+			}
+		}
+
+
+	};
+
+	GlobalDynamicVertexBuffer::GlobalDynamicVertexBuffer()
+		:mTotalAllocatedSincelastCommit(0)
+	{
+		mPool = new DynamicVertexBufferPool();
+	}
+
+	GlobalDynamicVertexBuffer::~GlobalDynamicVertexBuffer()
+	{
+		delete mPool;
+		mPool = nullptr;
+	}
+
+	
+	void GlobalDynamicVertexBuffer::commit()
+	{
+		for (int32 bufferIndex = 0, numBuffers = mPool->mVertexBuffers.size(); bufferIndex < numBuffers; bufferIndex++)
+		{
+			DynamicVertexBuffer& vertexBuffer = mPool->mVertexBuffers[bufferIndex];
+			if (vertexBuffer.mMappedBuffer != nullptr)
+			{
+				vertexBuffer.unlock();
+			}
+		}
+		mPool->mCurrentVertexBuffer = nullptr;
+		mTotalAllocatedSincelastCommit = 0;
+	}
+
+	class DynamicIndexBuffer : public IndexBuffer
+	{
+	public:
+		enum { ALIGNMENT = (1 << 16) };
+		uint8* mMappedBuffer;
+		uint32 mBufferSize;
+		uint32 mAllocatedByteCount;
+		uint32 mStride;
+
+		explicit DynamicIndexBuffer(uint32 inMinBufferSize, uint32 inStride)
+			:mMappedBuffer(nullptr)
+			,mBufferSize(Math::max<uint32>(align(inMinBufferSize, ALIGNMENT), ALIGNMENT))
+			,mAllocatedByteCount(0)
+			, mStride(inStride)
+		{
+
+		}
+
+		void lock()
+		{
+			BOOST_ASSERT(mMappedBuffer == nullptr);
+			BOOST_ASSERT(mAllocatedByteCount == 0);
+			BOOST_ASSERT(isValidRef(mIndexBufferRHI));
+			mMappedBuffer = (uint8*)RHILockIndexBuffer(mIndexBufferRHI, 0, mBufferSize, RLM_WriteOnly);
+		}
+
+		void unlock()
+		{
+			BOOST_ASSERT(mMappedBuffer != nullptr);
+			BOOST_ASSERT(isValidRef(mIndexBufferRHI));
+			RHIUnlockIndexBuffer(mIndexBufferRHI);
+			mMappedBuffer = nullptr;
+			mAllocatedByteCount = 0;
+		}
+		virtual void initRHI() override
+		{
+			BOOST_ASSERT(!isValidRef(mIndexBufferRHI));
+			RHIResourceCreateInfo createInfo;
+			mIndexBufferRHI = RHICreateIndexBuffer(mStride, mBufferSize, BUF_Volatile, createInfo);
+			mMappedBuffer = nullptr;
+			mAllocatedByteCount = 0;
+		}
+
+		virtual void releaseRHI() override
+		{
+			IndexBuffer::releaseRHI();
+			mMappedBuffer = nullptr;
+			mAllocatedByteCount = 0;
+		}
+
+		virtual wstring getFriendlyName() const override
+		{
+			return TEXT("DynamicIndexBuffer");
+		}
+	};
+
+	struct DynamicIndexBufferPool
+	{
+		TindirectArray<DynamicIndexBuffer> mIndexBuffers;
+		DynamicIndexBuffer* mCurrentIndexBuffer;
+		uint32 mBufferStride;
+
+		explicit DynamicIndexBufferPool(uint32 inBufferStride)
+			:mCurrentIndexBuffer(nullptr)
+			,mBufferStride(inBufferStride)
+		{}
+
+		~DynamicIndexBufferPool()
+		{
+			int32 numIndexBuffer = mIndexBuffers.size();
+			for (int32 bufferIndex = 0; bufferIndex < numIndexBuffer; bufferIndex++)
+			{
+				mIndexBuffers[bufferIndex].releaseResource();
+
+			}
+		}
+	};
+
+	GlobalDynamicIndexBuffer::GlobalDynamicIndexBuffer()
+	{
+		mPools[0] = new DynamicIndexBufferPool(sizeof(uint16));
+		mPools[1] = new DynamicIndexBufferPool(sizeof(uint32));
+	}
+
+	GlobalDynamicIndexBuffer::~GlobalDynamicIndexBuffer()
+	{
+		for (int32 i = 0; i < 2; i++)
+		{
+			delete mPools[i];
+			mPools[i] = nullptr;
+		}
+	}
+
+	void GlobalDynamicIndexBuffer::commit()
+	{
+		for (int32 i = 0; i < 2; i++)
+		{
+			DynamicIndexBufferPool* pool = mPools[i];
+			for (int32 bufferIndex = 0, numBuffer = pool->mIndexBuffers.size(); bufferIndex < numBuffer; ++bufferIndex)
+			{
+				DynamicIndexBuffer& indexBuffer = pool->mIndexBuffers[bufferIndex];
+				if (indexBuffer.mMappedBuffer != nullptr)
+				{
+					indexBuffer.unlock();
+				}
+			}
+			pool->mCurrentIndexBuffer = nullptr;
+		}
+	}
+
 }

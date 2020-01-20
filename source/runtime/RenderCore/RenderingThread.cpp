@@ -50,12 +50,20 @@ namespace Air
 		{
 			return;
 		}
-		ENQUEUE_UNIQUE_RENDER_COMMAND(
-			FlushPendingDeleteRHIResources,
+
+		if (!GIsThreadedRendering && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::GameThread) && !!TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::GameThread_Local))
+		{
+			TaskGraphInterface::get().processThreadUntilIdle(ENamedThreads::GameThread);
+			TaskGraphInterface::get().processThreadUntilIdle(ENamedThreads::GameThread_Local);
+		}
+
+		ENQUEUE_RENDER_COMMAND(FlushPendingDeleteRHIResources)(
+			[](RHICommandListImmediate& RHICmdList)
 			{
-				GRHICommandList.getImmediateCommandList().immediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
+				RHICmdList.immediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
 			}
 		);
+
 		advanceFrameRenderPrerequisite();
 		PendingCleanupObjects* pendingCleanupObjects = getPendingCleanupObjects();
 		RenderCommandFence fence;
@@ -206,7 +214,7 @@ namespace Air
 				if (GRHIThread)
 				{
 					static std::mutex Mutex_WaitForRHIThreadFinish;
-					GraphEventRef releaseTask = GraphTask<OwnershipOfRHIThreadTask>::createTask(NULL, ENamedThreads::GameThread).constructAndDispatchWhenReady(false);
+					GraphEventRef releaseTask = TGraphTask<OwnershipOfRHIThreadTask>::createTask(NULL, ENamedThreads::GameThread).constructAndDispatchWhenReady(false);
 
 					TaskGraphInterface::get().waitUntilTaskCompletes(releaseTask, ENamedThreads::GameThread_Local);
 					GRHIThread = nullptr;
@@ -214,7 +222,7 @@ namespace Air
 				}
 				GIsThreadedRendering = false;
 				{
-					GraphEventRef  quitTask = GraphTask<ReturnGraphTask>::createTask(NULL, ENamedThreads::GameThread).constructAndDispatchWhenReady(ENamedThreads::RenderThread);
+					GraphEventRef  quitTask = TGraphTask<ReturnGraphTask>::createTask(NULL, ENamedThreads::GameThread).constructAndDispatchWhenReady(ENamedThreads::getRenderThread());
 
 					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::GameThread))
 					{
@@ -272,7 +280,7 @@ namespace Air
 				flushRenderingCommands();
 				if (GIsThreadedRendering)
 				{
-					GraphEventRef completeHandle = SimpleDelegateGraphTask::createAndDispatchWhenReady(std::bind(suspendRendering), NULL, ENamedThreads::RenderThread);
+					GraphEventRef completeHandle = SimpleDelegateGraphTask::createAndDispatchWhenReady(std::bind(suspendRendering), NULL, ENamedThreads::getRenderThread());
 
 					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::GameThread))
 					{
@@ -286,7 +294,7 @@ namespace Air
 						TaskGraphInterface::get().waitUntilTaskCompletes(completeHandle, ENamedThreads::GameThread);
 					}
 
-					SimpleDelegateGraphTask::createAndDispatchWhenReady(std::bind(waitAndResumeRendering), nullptr, ENamedThreads::RenderThread);
+					SimpleDelegateGraphTask::createAndDispatchWhenReady(std::bind(waitAndResumeRendering), nullptr, ENamedThreads::getRenderThread());
 				}
 				else
 				{
@@ -309,7 +317,7 @@ namespace Air
 			if (bUseRenderingThread && bWasRenderingThreadRunning)
 			{
 				startRenderingThread();
-				SimpleDelegateGraphTask::createAndDispatchWhenReady(std::bind(PlatformProcess::SetRealTimeMode), NULL, ENamedThreads::RenderThread);
+				SimpleDelegateGraphTask::createAndDispatchWhenReady(std::bind(PlatformProcess::SetRealTimeMode), NULL, ENamedThreads::getRenderThread());
 			}
 		}
 		else
@@ -324,15 +332,15 @@ namespace Air
 
 	void renderingThreadMain(Event* taskGrapthBoundSyncEvent)
 	{
-		ENamedThreads::RenderThread = ENamedThreads::Type(ENamedThreads::ActualRenderingThread);
-		ENamedThreads::RenderThread_Local = ENamedThreads::Type(ENamedThreads::ActualRenderingThread_Local);
-		TaskGraphInterface::get().attachToThread(ENamedThreads::RenderThread);
+		ENamedThreads::setRenderThread(ENamedThreads::Type(ENamedThreads::ActualRenderingThread));
+		ENamedThreads::setRenderThread_Local(ENamedThreads::Type(ENamedThreads::ActualRenderingThread_Local));
+		TaskGraphInterface::get().attachToThread(ENamedThreads::getRenderThread());
 		if (taskGrapthBoundSyncEvent != nullptr)
 		{
 			taskGrapthBoundSyncEvent->trigger();
 		}
 		PlatformProcess::SetRealTimeMode();
-		TaskGraphInterface::get().processThreadUntilRequestReturn(ENamedThreads::RenderThread);
+		TaskGraphInterface::get().processThreadUntilRequestReturn(ENamedThreads::getRenderThread());
 
 
 	}
@@ -372,7 +380,7 @@ namespace Air
 				if (!GIsRenderingThreadSuspended && mOutstandingHeartbeats.getValue() < 4)
 				{
 					mOutstandingHeartbeats.increment();
-					ENQUEUE_UNIQUE_RENDER_COMMAND(HeartbeatTickTickables, {
+					ENQUEUE_RENDER_COMMAND(HeartbeatTickTickables)([](RHICommandListImmediate& RHICmdList) {
 						mOutstandingHeartbeats.decrement();
 						if (!GIsRenderingThreadSuspended)
 						{

@@ -43,5 +43,12 @@ namespace Air
 		{
 			return int2(max.x - min.x, max.y - min.y);
 		}
+
+		FORCEINLINE IntRect& operator -=(const int2& point)
+		{
+			min -= point;
+			max -= point;
+			return *this;
+		}
 	};
 }

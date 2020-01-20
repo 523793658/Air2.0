@@ -51,6 +51,10 @@ namespace Air
 
 		void heartBeat();
 
+		void suspendHeartBeat(bool bAllThreads = false);
+
+		void resumeHeartBeat(bool bAllThread = false);
+
 		uint32 checkHeartBeat();
 
 		void killHeartBeat();
@@ -64,5 +68,29 @@ namespace Air
 		bool isBeating();
 
 		virtual ~ThreadHeartBeat();
+	};
+
+	struct SlowHeartBeatScope
+	{
+	private:
+		bool bSuspendedAllThreads;
+
+	public:
+		FORCEINLINE SlowHeartBeatScope(bool bAllThread = false)
+			:bSuspendedAllThreads(bAllThread)
+		{
+			if (ThreadHeartBeat * hb = ThreadHeartBeat::getNoInit())
+			{
+				hb->suspendHeartBeat(bSuspendedAllThreads);
+			}
+		}
+
+		FORCEINLINE ~SlowHeartBeatScope()
+		{
+			if (ThreadHeartBeat * hb = ThreadHeartBeat::getNoInit())
+			{
+				hb->resumeHeartBeat(bSuspendedAllThreads);
+			}
+		}
 	};
 }

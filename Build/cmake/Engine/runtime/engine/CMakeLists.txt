@@ -110,10 +110,6 @@ SET(SOURCE_FILE
     ${engine_SOURCE_DIR}/FinalPostProcessSettings.h
     )
 SET(Materials_Source
-    ${engine_SOURCE_DIR}/Materials/MeshMaterialShader.h
-    ${engine_SOURCE_DIR}/Materials/MeshMaterialShader.cpp
-    ${engine_SOURCE_DIR}/Materials/MaterialShader.h
-    ${engine_SOURCE_DIR}/Materials/MaterialShader.cpp
     ${engine_SOURCE_DIR}/Materials/MaterialInstanceSupport.h
     ${engine_SOURCE_DIR}/Materials/MaterialInstanceSupport.cpp
     ${engine_SOURCE_DIR}/Materials/MaterialConstantExpressions.h
@@ -124,6 +120,8 @@ SOURCE_GROUP(Materials FILES ${Materials_Source})
 SET(Rendering_Source
     ${engine_SOURCE_DIR}/Rendering/ColorVertexBuffer.h
     ${engine_SOURCE_DIR}/Rendering/ColorVertexBuffer.cpp
+    ${engine_SOURCE_DIR}/Rendering/SceneRenderTargetParameters.h
+    ${engine_SOURCE_DIR}/Rendering/SceneRenderTargetParameters.cpp
     )
 SOURCE_GROUP(Rendering FILES ${Rendering_Source})
 
@@ -316,6 +314,11 @@ SET(Classes_Materials_Source
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialExpressionTextureSampleParameter2D.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollectionInstance.h
     ${engine_SOURCE_DIR}/Classes/Materials/MaterialParameterCollectionInstance.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialLayersFunctions.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MeshMaterialShader.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MeshMaterialShader.cpp
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialShader.h
+    ${engine_SOURCE_DIR}/Classes/Materials/MaterialShader.cpp
     )
 SOURCE_GROUP(Classes\\Materials FILES ${Classes_Materials_Source})
 
@@ -354,7 +357,6 @@ target_link_libraries(${LIB_NAME}
     RenderCore
     CoreObject
     EngineSetting
-    ShaderCore
     InputCore
     MovieSceneCapture
     )

@@ -13,7 +13,7 @@ namespace Air
 			GRenderTargetPool.findFreeElement(RHICmdList, desc, mWhiteDummy, TEXT("WhiteDummy"));
 
 			setRenderTarget(RHICmdList, mWhiteDummy->getRenderTargetItem().mTargetableTexture, TextureRHIRef(), ESimpleRenderTargetMode::EClearColorExistingDepth);
-			RHICmdList.copyToResolveTarget(mWhiteDummy->getRenderTargetItem().mTargetableTexture, mWhiteDummy->getRenderTargetItem().mShaderResourceTexture, true, ResolveParams());
+			RHICmdList.copyToResolveTarget(mWhiteDummy->getRenderTargetItem().mTargetableTexture, mWhiteDummy->getRenderTargetItem().mShaderResourceTexture, ResolveParams());
 		}
 
 		{
@@ -22,7 +22,7 @@ namespace Air
 			GRenderTargetPool.findFreeElement(RHICmdList, desc, mBlackDummy, TEXT("BlackDummy"));
 
 			setRenderTarget(RHICmdList, mWhiteDummy->getRenderTargetItem().mTargetableTexture, TextureRHIRef(), ESimpleRenderTargetMode::EClearColorExistingDepth);
-			RHICmdList.copyToResolveTarget(mWhiteDummy->getRenderTargetItem().mTargetableTexture, mWhiteDummy->getRenderTargetItem().mShaderResourceTexture, true, ResolveParams());
+			RHICmdList.copyToResolveTarget(mWhiteDummy->getRenderTargetItem().mTargetableTexture, mWhiteDummy->getRenderTargetItem().mShaderResourceTexture, ResolveParams());
 		}
 	}
 

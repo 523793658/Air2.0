@@ -12,14 +12,7 @@ namespace Air
 		return view.mFinalPostProcessSettings.mContributingCubemaps.size() != 0 && !isAnyForwardShadingEnabled(view.getShaderPlatform());
 	}
 
-	static void addPostProcessingAmbientCubemap(PostProcessContext& context, RenderingCompositeOutputRef ambientOcclusion)
-	{
-		RenderingCompositePass* pass = context.mGraph.registerPass(new(MemStack::get())RCPassPostProcessAmbient());
-		pass->setInput(ePId_Input0, context.mFinalOutput);
-		pass->setInput(ePId_Input1, ambientOcclusion);
 
-		context.mFinalOutput = RenderingCompositeOutputRef(pass);
-	}
 
 	void CompositionLighting::processAfterBasePass(RHICommandListImmediate& RHICmdList, ViewInfo& view)
 	{
@@ -33,15 +26,19 @@ namespace Air
 
 
 
-			if (isAmbientCubmapPassRequired(context.mView))
-			{
-				addPostProcessingAmbientCubemap(context, nullptr);
-			}
-
 			TRefCountPtr<IPooledRenderTarget>& sceneColor = sceneContext.getSceneColor();
 			context.mFinalOutput.getOutput()->mRenderTargetDesc = sceneColor->getDesc();
 			context.mFinalOutput.getOutput()->mPooledRenderTarget = sceneColor;
 			compositeContext.process(context.mFinalOutput.getPass(), TEXT("CompositionLighting_AfterBasePass"));
+		}
+	}
+
+	void CompositionLighting::gfxWaitForAsyncSSAO(RHICommandListImmediate& RHICmdList)
+	{
+		if (mAsyncSSAOFence)
+		{
+			RHICmdList.waitComputeFence(mAsyncSSAOFence);
+			mAsyncSSAOFence = nullptr;
 		}
 	}
 }

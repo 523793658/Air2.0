@@ -310,19 +310,19 @@ namespace Air
 		return depthStencilState;
 	}
 
-	void D3D11DynamicRHI::RHISetBlendState(BlendStateRHIParamRef newStateRHI, const LinearColor& blendFactory)
+	void D3D11DynamicRHI::RHISetBlendState(RHIBlendState* newStateRHI, const LinearColor& blendFactory)
 	{
 		D3D11BlendState* newState = ResourceCast(newStateRHI);
 		mStateCache.setBlendState(newState->mResource, (const float*)&blendFactory, 0xffffffff);
 	}
 
-	void D3D11DynamicRHI::RHISetDepthStencilState(DepthStencilStateRHIParamRef newStateRHI, uint32 inStencilRef)
+	void D3D11DynamicRHI::RHISetDepthStencilState(RHIDepthStencilState* newStateRHI, uint32 inStencilRef)
 	{
 		D3D11DepthStencilState* newState = ResourceCast(newStateRHI);
 		mStateCache.setDepthStencilState(newState->mResource, inStencilRef);
 	}
 
-	void D3D11DynamicRHI::RHISetRasterizerState(RasterizerStateRHIParamRef newStateRHI)
+	void D3D11DynamicRHI::RHISetRasterizerState(RHIRasterizerState* newStateRHI)
 	{
 		D3D11RasterizerState* newState = ResourceCast(newStateRHI);
 		mStateCache.setRasterizerState(newState->mResource);

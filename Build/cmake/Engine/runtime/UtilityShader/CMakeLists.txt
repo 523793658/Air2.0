@@ -6,6 +6,8 @@ SET(SOURCE_FILE
     ${UtilityShader_SOURCE_DIR}/ResolveShader.cpp
     ${UtilityShader_SOURCE_DIR}/ResolveShader.h
     ${UtilityShader_SOURCE_DIR}/UtilityShaderConfig.h
+    ${UtilityShader_SOURCE_DIR}/ClearQuad.h
+    ${UtilityShader_SOURCE_DIR}/ClearQuad.cpp
 )
 
 ADD_LIBRARY(${LIB_NAME} ${AIR_PREFERRED_LIB_TYPE} 
@@ -20,5 +22,4 @@ target_link_libraries(${LIB_NAME}
     engine 
     RenderCore 
     RHI
-    ShaderCore
 )

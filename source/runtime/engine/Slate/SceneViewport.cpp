@@ -112,7 +112,10 @@ namespace Air
 		}
 		else
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(DeleteSlateRenderTarget, TArray<SlateRenderTargetRHI*>&, mBufferedSlateHandles, mBufferedSlateHandles, SlateRenderTargetRHI*&, mRenderThreadSlateTexture, mRenderThreadSlateTexture,
+			TArray<SlateRenderTargetRHI*>& mBufferedSlateHandles = mBufferedSlateHandles;
+
+			SlateRenderTargetRHI*& mRenderThreadSlateTexture = mRenderThreadSlateTexture;
+			ENQUEUE_RENDER_COMMAND(DeleteSlateRenderTarget)([&mBufferedSlateHandles, &mRenderThreadSlateTexture](RHICommandListImmediate& RHICmdList)
 				{
 					for (int32 i = 0; i < mBufferedSlateHandles.size(); ++i)
 					{

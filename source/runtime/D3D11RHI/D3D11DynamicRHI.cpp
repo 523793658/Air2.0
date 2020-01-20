@@ -32,34 +32,14 @@
 #include "D3D11UniformBuffer.h"
 #include "StaticBoundShaderState.h"
 #include "ScreenRendering.h"
+#include "PipelineStateCache.h"
 namespace Air
 {
 	int32 GDX11ForcedGPUs = -1;
 
-#define DECLARE_ISBOUNDSHADER(ShaderType) inline void validateBoundShader(D3D11StateCache& inStateCache, ShaderType##RHIParamRef ShaderType##RHI)	  \
-{	\
-	ID3D11##ShaderType*	cachedShader;\
-	inStateCache.get##ShaderType(&cachedShader);	\
-	D3D11##ShaderType* ShaderType = D3D11DynamicRHI::ResourceCast(ShaderType##RHI);\
-	BOOST_ASSERT(cachedShader == ShaderType->mResource);	\
-	if (cachedShader)	\
-	{	\
-		cachedShader->Release();	\
-	}\
-}
 
-	DECLARE_ISBOUNDSHADER(VertexShader);
-	DECLARE_ISBOUNDSHADER(PixelShader);
-	DECLARE_ISBOUNDSHADER(GeometryShader);
-	DECLARE_ISBOUNDSHADER(HullShader);
-	DECLARE_ISBOUNDSHADER(DomainShader);
-	DECLARE_ISBOUNDSHADER(ComputeShader);
 
-#if DO_CHECK
-#define VALIDATE_BOUND_SHADER(s) validateBoundShader(mStateCache, s)
-#else 
-#define VALIDATE_BOUND_SHADER(s)
-#endif
+
 
 	bool D3D11RHI_ShouldCreateWithD3DDebug()
 	{
@@ -441,102 +421,7 @@ namespace Air
 		return numSetCalls;
 	}
 
-	template<typename TPixelShader>
-	void D3D11DynamicRHI::resolveTextureUsingShader(RHICommandList_RecursiveHazardous& RHICmdList, D3D11Texture2D* sourceTexture, D3D11Texture2D* destTexture, ID3D11RenderTargetView* destSurfaceRTV, ID3D11DepthStencilView* DestSurfaceDSV, const D3D11_TEXTURE2D_DESC& resolveTargetDesc, const ResolveRect& sourceRect, ResolveRect& destRect, ID3D11DeviceContext* direct3DDeviceContext, typename TPixelShader::Parameter pixelShaderParameter)
-	{
-		D3D11_VIEWPORT savedViewport;
-		uint32 numSavedViewports = 1;
-		mStateCache.getViewports(&numSavedViewports, &savedViewport);
-		RHICmdList.setBlendState(TStaticBlendState<>::getRHI(), LinearColor::White);
-		RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-		RHICmdList.flush();
-		if (destTexture)
-		{
-			conditionalClearShaderResource(destTexture);
-		}
-		const bool bClearDestTexture = destRect.X1 == 0 && destRect.Y1 == 0 && destRect.X2 == resolveTargetDesc.Width && destRect.Y2 == resolveTargetDesc.Height;
-
-		FExclusiveDepthStencil originalDSVAccessType = mCurrentDSVAccessType;
-		if (resolveTargetDesc.BindFlags & D3D11_BIND_DEPTH_STENCIL)
-		{
-			if (bClearDestTexture)
-			{
-				mD3D11Context->ClearDepthStencilView(DestSurfaceDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 0, 0);
-			}
-			mCurrentDSVAccessType = FExclusiveDepthStencil::DepthWrite_StencilWrite;
-			RHICmdList.setDepthStencilState(TStaticDepthStencilState<true, CF_Always>::getRHI(), 0);
-			RHICmdList.flush();
-			ID3D11RenderTargetView* nullRTV = nullptr;
-			direct3DDeviceContext->OMSetRenderTargets(1, &nullRTV, DestSurfaceDSV);
-		}
-		else
-		{
-			if (bClearDestTexture)
-			{
-				LinearColor clearColor(0, 0, 0, 0);
-				direct3DDeviceContext->ClearRenderTargetView(destSurfaceRTV, (float*)&clearColor);
-			}
-			RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI(), 0);
-			RHICmdList.flush();
-			direct3DDeviceContext->OMSetRenderTargets(1, &destSurfaceRTV, NULL);
-		}
-		RHICmdList.setViewport(0.0f, 0.0f, 0.0f, resolveTargetDesc.Width, resolveTargetDesc.Height, 1.0f);
-
-		const float minU = sourceRect.X1;
-		const float minV = sourceRect.Y1;
-		const float maxU = sourceRect.X2;
-		const float maxV = sourceRect.Y2;
-
-		const float minX = -1.f + destRect.X1 / ((float)resolveTargetDesc.Width * 0.5f);
-		const float minY = 1.f - destRect.Y1 / ((float)resolveTargetDesc.Height * 0.5f);
-		const float maxX = -1.f + destRect.X2 / ((float)resolveTargetDesc.Width * 0.5f);
-		const float maxY = 1.f - destRect.Y2 / ((float)resolveTargetDesc.Height*0.5f);
-
-		static GlobalBoundShaderState resolveBoundShaderState;
-		auto shaderMap = getGlobalShaderMap(GMaxRHIFeatureLevel);
-		TShaderMapRef<ResolveVS> resolveVertexShader(shaderMap);
-		TShaderMapRef<TPixelShader> ResolvePixelShader(shaderMap);
-		setGlobalBoundShaderState(RHICmdList, GMaxRHIFeatureLevel, resolveBoundShaderState, GScreenVertexDeclaration.mVertexDeclarationRHI, *resolveVertexShader, *ResolvePixelShader);
-
-		ResolvePixelShader->setParameters(RHICmdList, pixelShaderParameter);
-		RHICmdList.flush();
-		const uint32 textureIndex = ResolvePixelShader->mUnresolvedSurface.getBaseIndex();
-		if (sourceTexture)
-		{
-			setShaderResourceView<SF_Pixel>(sourceTexture, sourceTexture->getShaderResourceView(), textureIndex, sourceTexture->getName());
-		}
-
-		ScreenVertex vertices[4];
-		vertices[0].mPosition.x = maxX;
-		vertices[0].mPosition.y = minY;
-		vertices[0].mUV.x = maxU;
-		vertices[0].mUV.y = minV;
-
-		vertices[1].mPosition.x = maxX;
-		vertices[1].mPosition.y = maxY;
-		vertices[1].mUV.x = maxU;
-		vertices[1].mUV.y = maxV;
-
-		vertices[2].mPosition.x = minX;
-		vertices[2].mPosition.y = minY;
-		vertices[2].mUV.x = minU;
-		vertices[2].mUV.y = minV;
-
-		vertices[3].mPosition.x = minX;
-		vertices[3].mPosition.y = maxY;
-		vertices[3].mUV.x = minU;
-		vertices[3].mUV.y = maxV;
-
-		drawPrimitiveUP(RHICmdList, PT_TriangleStrip, 2, vertices, sizeof(vertices[0]));
-		RHICmdList.flush();
-		if (sourceTexture)
-		{
-			conditionalClearShaderResource(sourceTexture);
-		}
-		commitRenderTargetsAndUAVs();
-		RHISetMultipleViewports(1, (ViewportBounds*)&savedViewport);
-		mCurrentDSVAccessType = originalDSVAccessType;
-	}
+	
 
 
 	void D3D11DynamicRHI::RHISetMultipleViewports(uint32 count, const ViewportBounds* data)
@@ -547,11 +432,11 @@ namespace Air
 		mStateCache.setViewports(count, d3dData);
 	}
 
-	void D3D11DynamicRHI::RHITransitionResources(EResourceTransitionAccess transitionType, TextureRHIParamRef* inTexture, int32 numTextures)
+	void D3D11DynamicRHI::RHITransitionResources(EResourceTransitionAccess transitionType, RHITexture** inTexture, int32 numTextures)
 	{
 		for (int32 i = 0; i < numTextures; i++)
 		{
-			TextureRHIParamRef renderTarget = inTexture[i];
+			RHITexture* renderTarget = inTexture[i];
 			if (renderTarget)
 			{
 				D3D11BaseShaderResource* resource = nullptr;
@@ -701,7 +586,7 @@ namespace Air
 		if (mFeatureLevel >= D3D_FEATURE_LEVEL_11_0)
 		{
 			GSupportsSeparateRenderTargetBlendState = true;
-			GMaxTexture2DDemensions = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+			GMaxTextureDemensions = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
 			GMaxTextureCubeDemensions = D3D11_REQ_TEXTURECUBE_DIMENSION;
 			GMaxTextureDepth = D3D11_REQ_TEXTURE3D_U_V_OR_W_DIMENSION;
 			GMaxTextureArrayLayers = D3D11_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
@@ -709,12 +594,12 @@ namespace Air
 		}
 		else if (mFeatureLevel >= D3D_FEATURE_LEVEL_10_0)
 		{
-			GMaxTexture2DDemensions = D3D10_REQ_TEXTURE2D_U_OR_V_DIMENSION;
+			GMaxTextureDemensions = D3D10_REQ_TEXTURE2D_U_OR_V_DIMENSION;
 			GMaxTextureCubeDemensions = D3D10_REQ_TEXTURECUBE_DIMENSION;
 			GMaxTextureDepth = D3D10_REQ_TEXTURE3D_U_V_OR_W_DIMENSION;
 			GMaxTextureArrayLayers = D3D10_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION;
 		}
-		GMaxTextureMipCount = Math::ceilLogTwo(GMaxTexture2DDemensions) + 1;
+		GMaxTextureMipCount = Math::ceilLogTwo(GMaxTextureDemensions) + 1;
 		GMaxTextureMipCount = Math::min<int32>(MAX_TEXTURE_MIP_COUNT, GMaxTextureMipCount);
 		GMaxShadowDepthBufferSizeX = 4096;
 		GMaxShadowDepthBufferSizeY = 4096;
@@ -808,7 +693,7 @@ namespace Air
 		}
 	}
 
-	void D3D11DynamicRHI::RHIBeginDrawingViewport(ViewportRHIParamRef viewportRHI, TextureRHIParamRef renderTargetRHI)
+	void D3D11DynamicRHI::RHIBeginDrawingViewport(RHIViewport* viewportRHI, RHITexture* renderTargetRHI)
 	{
 		D3D11Viewport* viewport = ResourceCast(viewportRHI);
 		mDrawingViewport = viewport;
@@ -937,7 +822,7 @@ namespace Air
 
 	}
 
-	void D3D11DynamicRHI::RHIEndDrawingViewport(ViewportRHIParamRef viewportRHI, bool bPresent, bool bLockToVsync)
+	void D3D11DynamicRHI::RHIEndDrawingViewport(RHIViewport* viewportRHI, bool bPresent, bool bLockToVsync)
 	{
 		++mPresentCounter;
 		D3D11Viewport* viewport = ResourceCast(viewportRHI);
@@ -974,7 +859,7 @@ namespace Air
 	}
 
 
-	void D3D11DynamicRHI::RHISetRenderTargets(uint32 NumSimultaneousRenderTargets, const RHIRenderTargetView* newRenderTargets, const RHIDepthRenderTargetView* depthStencilTarget, uint32 numUAVs, const UnorderedAccessViewRHIParamRef* UAVs)
+	void D3D11DynamicRHI::RHISetRenderTargets(uint32 NumSimultaneousRenderTargets, const RHIRenderTargetView* newRenderTargets, const RHIDepthRenderTargetView* depthStencilTarget, uint32 numUAVs, RHIUnorderedAccessView* const* UAVs)
 	{
 		D3D11TextureBase* newDepthStencilTarget = getD3D11TextureFromRHITexture(depthStencilTarget ? depthStencilTarget->mTexture : nullptr);
 		BOOST_ASSERT(NumSimultaneousRenderTargets + numUAVs <= MaxSimultaneousRenderTargets);
@@ -984,7 +869,7 @@ namespace Air
 		{
 			mCurrentDSVAccessType = depthStencilTarget->getDepthStencilAccess();
 			depthStencilView = newDepthStencilTarget->getDepthStencilView(mCurrentDSVAccessType);
-			conditionalClearShaderResource(newDepthStencilTarget);
+			conditionalClearShaderResource(newDepthStencilTarget, false);
 		}
 		if (mCurrentDepthStencilTarget != depthStencilView)
 		{
@@ -1033,7 +918,7 @@ namespace Air
 					}
 					newRenderTarget->setDirty(true, currentFrame);
 				}
-				conditionalClearShaderResource(newRenderTarget);
+				conditionalClearShaderResource(newRenderTarget, false);
 			}
 			newRenderTargetViews[index] = renderTargetView;
 			if (mCurrentRenderTargets[index] != renderTargetView)
@@ -1061,7 +946,7 @@ namespace Air
 					const bool accessPass = (currentAccess == EResourceTransitionAccess::ERWBarrier && !uavDirty) || (currentAccess == EResourceTransitionAccess::ERWNoBarrier);
 					RHIUAV->mResource->setDirty(true, mPresentCounter);
 				}
-				conditionalClearShaderResource(RHIUAV->mResource);
+				conditionalClearShaderResource(RHIUAV->mResource, true);
 			}
 			if (mCurrentUAVs[index] != uav)
 			{
@@ -1107,7 +992,7 @@ namespace Air
 	}
 
 
-	void D3D11DynamicRHI::conditionalClearShaderResource(D3D11BaseShaderResource* resource)
+	void D3D11DynamicRHI::conditionalClearShaderResource(D3D11BaseShaderResource* resource, bool bCheckBoundInputAssembler)
 	{
 		clearShaderResourceViews<SF_Vertex>(resource);
 		clearShaderResourceViews<SF_Hull>(resource);
@@ -1116,6 +1001,22 @@ namespace Air
 		clearShaderResourceViews<SF_Pixel>(resource);
 		clearShaderResourceViews<SF_Compute>(resource);
 
+		if (bCheckBoundInputAssembler)
+		{
+			for (int32 resourceIndex = mMaxBoundVertexBufferIndex; resourceIndex >= 0; --resourceIndex)
+			{
+				if (mCurrentResourceBoundAsVBs[resourceIndex] == resource)
+				{
+					trackResourceBoundAsVB(nullptr, resourceIndex);
+					mStateCache.setStreamSource(nullptr, resourceIndex, 0);
+				}
+			}
+			if (resource == mCurrentResourceBoundAsIB)
+			{
+				trackResourceBoundAsIB(nullptr);
+				mStateCache.setIndexBuffer(nullptr, DXGI_FORMAT_R16_UINT, 0);
+			}
+		}
 	}
 	
 	void D3D11DynamicRHI::initD3DDevice()
@@ -1307,101 +1208,24 @@ namespace Air
 	}
 
 
-	void D3D11DynamicRHI::RHICopyToResolveTarget(TextureRHIParamRef sourceTextureRHI, TextureRHIParamRef destTextureRHI, bool keepOriginalSurface, const ResolveParams& resolveParams)
+	
+	void D3D11DynamicRHI::RHIResizeViewport(RHIViewport* viewportRHI, uint32 sizeX, uint32 sizeY, bool isFullscreen)
 	{
-		if (!sourceTextureRHI || !destTextureRHI)
-		{
-			return;
-		}
-		RHITransitionResources(EResourceTransitionAccess::EReadable, &sourceTextureRHI, 1);
-		RHICommandList_RecursiveHazardous RHICmdList(this);
-		D3D11Texture2D* sourceTexture2D = static_cast<D3D11Texture2D*>(sourceTextureRHI->getTexture2D());
-		D3D11Texture2D* destTexture2D = static_cast<D3D11Texture2D*>(destTextureRHI->getTexture2D());
-		D3D11TextureCube* sourceTextureCube = static_cast<D3D11TextureCube*>(sourceTextureRHI->getTextureCube());
-		D3D11TextureCube* destTextureCube = static_cast<D3D11TextureCube*>(destTextureRHI->getTextureCube());
-
-		if (sourceTexture2D && destTexture2D)
-		{
-			BOOST_ASSERT(!sourceTextureCube && !destTextureCube);
-			if (sourceTexture2D != destTexture2D)
-			{
-				if (mFeatureLevel == D3D_FEATURE_LEVEL_11_0 && destTexture2D->getDepthStencilView(FExclusiveDepthStencil::DepthWrite_StencilWrite) && sourceTextureRHI->isMultisampled() && !destTextureRHI->isMultisampled())
-				{
-					D3D11_TEXTURE2D_DESC resolveTargetDesc;
-					destTexture2D->getResource()->GetDesc(&resolveTargetDesc);
-					resolveTextureUsingShader<ResolveDepthPS>(
-						RHICmdList,
-						sourceTexture2D,
-						destTexture2D,
-						destTexture2D->getRenderTargetView(0, -1),
-						destTexture2D->getDepthStencilView(FExclusiveDepthStencil::DepthWrite_StencilWrite),
-						resolveTargetDesc,
-						getDefaultRect(resolveParams.mRect, destTexture2D->getWidth(), destTexture2D->getHeight()),
-						getDefaultRect(resolveParams.mRect, destTexture2D->getWidth(), destTexture2D->getHeight()),
-						mD3D11Context, DummyResolveParameter());
-				}
-				else if (mFeatureLevel == D3D_FEATURE_LEVEL_10_0 && destTexture2D->getDepthStencilView(FExclusiveDepthStencil::DepthWrite_StencilWrite))
-				{
-					D3D11_TEXTURE2D_DESC resolveTargetDesc;
-					destTexture2D->getResource()->GetDesc(&resolveTargetDesc);
-					resolveTextureUsingShader<ResolveDepthNonMSPS>(
-						RHICmdList,
-						sourceTexture2D,
-						destTexture2D,
-						NULL,
-						destTexture2D->getDepthStencilView(FExclusiveDepthStencil::DepthWrite_StencilWrite),
-						resolveTargetDesc,
-						getDefaultRect(resolveParams.mRect, destTexture2D->getWidth(), destTexture2D->getHeight()),
-						getDefaultRect(resolveParams.mRect, destTexture2D->getWidth(), destTexture2D->getHeight()),
-						mD3D11Context,
-						DummyResolveParameter()
-						);
-
-				}
-				else
-				{
-					DXGI_FORMAT srcFmt = (DXGI_FORMAT)GPixelFormats[sourceTextureRHI->getFormat()].PlatformFormat;
-					DXGI_FORMAT dstFmt = (DXGI_FORMAT)GPixelFormats[destTextureRHI->getFormat()].PlatformFormat;
-
-					DXGI_FORMAT fmt = convertTypelessToUnorm((DXGI_FORMAT)GPixelFormats[destTexture2D->getFormat()].PlatformFormat);
-					if (sourceTextureRHI->isMultisampled() && !destTexture2D->isMultisampled())
-					{
-						mD3D11Context->ResolveSubresource(destTexture2D->getResource(), 0, sourceTexture2D->getResource(), 0, fmt);
-					}
-					else
-					{
-						if (resolveParams.mRect.isValid())
-						{
-							D3D11_BOX srcBox;
-							srcBox.left = resolveParams.mRect.X1;
-							srcBox.top = resolveParams.mRect.Y1;
-							srcBox.front = 0;
-							srcBox.right = resolveParams.mRect.X2;
-							srcBox.bottom = resolveParams.mRect.Y2;
-							srcBox.back = 1;
-							mD3D11Context->CopySubresourceRegion(destTexture2D->getResource(), 0, resolveParams.mRect.X1, resolveParams.mRect.Y1, 0, sourceTexture2D->getResource(), 0, &srcBox);
-						}
-						else
-						{
-							mD3D11Context->CopyResource(destTexture2D->getResource(), sourceTexture2D->getResource());
-						}
-					}
-				}
-			}
-		}
-		
+		D3D11Viewport* viewport = ResourceCast(viewportRHI);
+		BOOST_ASSERT(isInGameThread());
+		viewport->resize(sizeX, sizeX, isFullscreen, PF_Unknown);
 	}
 
 
 
-	void D3D11DynamicRHI::RHIResizeViewport(ViewportRHIParamRef viewportRHI, uint32 sizeX, uint32 sizeY, bool isFullscreen, EPixelFormat preferredPixelFormat)
+	void D3D11DynamicRHI::RHIResizeViewport(RHIViewport* viewportRHI, uint32 sizeX, uint32 sizeY, bool isFullscreen, EPixelFormat preferredPixelFormat)
 	{
 		D3D11Viewport* viewport = ResourceCast(viewportRHI);
 		BOOST_ASSERT(isInGameThread());
 		viewport->resize(sizeX, sizeY, isFullscreen, PF_Unknown);
 	}
 
-	RHIViewport* D3D11DynamicRHI::RHICreateViewport(void* windowHandle, uint32 sizeX, uint32 sizeY, bool isFullscree, EPixelFormat preferredPixelFormat)
+	ViewportRHIRef D3D11DynamicRHI::RHICreateViewport(void* windowHandle, uint32 sizeX, uint32 sizeY, bool isFullscree, EPixelFormat preferredPixelFormat)
 	{
 		BOOST_ASSERT(isInGameThread());
 		if (preferredPixelFormat == EPixelFormat::PF_Unknown)
@@ -1513,30 +1337,8 @@ namespace Air
 		dxgiFactory1->Release();
 	}
 
-	void D3D11DynamicRHI::RHIBeginDrawIndexedPrimitiveUP(uint32 primitiveType, uint32 numPrimitives, uint32 numVertices, uint32 vertexDataStride, void*& outVertexData, uint32 minVertexIndex, uint32 numIndices, uint32 indexDataStride, void*& outIndexData)
-	{
-		BOOST_ASSERT((sizeof(uint16) == indexDataStride) || (sizeof(uint32) == indexDataStride));
-		mPendingPrimitiveType = primitiveType;
-		mPendingNumPrimitives = numPrimitives;
-		mPendingNumVertices = numVertices;
-		mPendingVertexDataStride = vertexDataStride;
-		mPendingMinVertexIndex = minVertexIndex;
-		mPendingNumIndices = numIndices;
-		mPendingIndexDataStride = indexDataStride;
+	
 
-		outVertexData = mDynamicVB->lock(numVertices * vertexDataStride);
-		outIndexData = mDynamicIB->lock(numIndices * indexDataStride);
-	}
-
-	void D3D11DynamicRHI::RHIEndDrawIndexedPrimitiveUP()
-	{
-		BOOST_ASSERT(!bUsingTessellation || mPendingNumPrimitives == PT_TriangleList);
-		ID3D11Buffer* vertexBuffer = mDynamicIB->unlock();
-		ID3D11Buffer* indexBuffer = mDynamicIB->unlock();
-		uint32 VBOffset = 0;
-		commitGraphicsResourceTables();
-		commitNonComputeShaderConstants();
-	}
 
 	void D3D11DynamicRHI::commitNonComputeShaderConstants()
 	{
@@ -1656,19 +1458,19 @@ namespace Air
 		setResourcesFromTables(computeShader);
 	}
 
-	void D3D11DynamicRHI::RHISetStreamSource(uint32 streamIndex, VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint32 offset)
+	void D3D11DynamicRHI::RHISetStreamSource(uint32 streamIndex, RHIVertexBuffer* vertexBuffer, uint32 offset)
 	{
 		D3D11VertexBuffer* buffer = ResourceCast(vertexBuffer);
 		ID3D11Buffer* d3dBuffer = buffer ? buffer->mResource : NULL;
-		mStateCache.setStreamSource(d3dBuffer, streamIndex, stride, offset);
+		mStateCache.setStreamSource(d3dBuffer, streamIndex, offset);
 	}
 
-	void D3D11DynamicRHI::RHIDrawPrimitive(uint32 primitiveType, int32 baseVertexIndex, uint32 numPrimitives, uint32 numInstances)
+	void D3D11DynamicRHI::RHIDrawPrimitive(int32 baseVertexIndex, uint32 numPrimitives, uint32 numInstances)
 	{
 		commitGraphicsResourceTables();
 		commitNonComputeShaderConstants();
-		uint32 vertexCount = getVertexCountForPrimitiveCount(numPrimitives, primitiveType);
-		mStateCache.setPrimitiveTopology(getD3D11PrimitiveType(primitiveType, bUsingTessellation));
+		uint32 vertexCount = getVertexCountForPrimitiveCount(numPrimitives, mPrimitiveType);
+		mStateCache.setPrimitiveTopology(getD3D11PrimitiveType(mPrimitiveType, bUsingTessellation));
 		if (numInstances > 1)
 		{
 			mD3D11Context->DrawInstanced(vertexCount, numInstances, baseVertexIndex, 0);
@@ -1679,7 +1481,7 @@ namespace Air
 		}
 	}
 
-	void D3D11DynamicRHI::RHIDrawIndexedPrimitive(IndexBufferRHIParamRef indexBuffer, uint32 primitiveType, int32 baseVertexIndex, uint32 firstInstance, uint32 numVertex, uint32 startIndex, uint32 numPrimitives, uint32 numInstances)
+	void D3D11DynamicRHI::RHIDrawIndexedPrimitive(RHIIndexBuffer* indexBuffer, uint32 primitiveType, int32 baseVertexIndex, uint32 firstInstance, uint32 numVertex, uint32 startIndex, uint32 numPrimitives, uint32 numInstances)
 	{
 		D3D11IndexBuffer* buffer = ResourceCast(indexBuffer);
 		BOOST_ASSERT(numPrimitives > 0);
@@ -1701,95 +1503,12 @@ namespace Air
 		}
 	}
 
-	void D3D11DynamicRHI::RHIEndDrawPrimitiveUP()
-	{
-		BOOST_ASSERT(!bUsingTessellation || mPendingPrimitiveType == PT_TriangleList);
-		ID3D11Buffer* d3dBuffer = mDynamicVB->unlock();
-		uint32 VBOffset = 0;
-		commitGraphicsResourceTables();
-		commitNonComputeShaderConstants();
-		mStateCache.setStreamSource(d3dBuffer, 0, mPendingVertexDataStride, VBOffset);
-		mStateCache.setPrimitiveTopology(getD3D11PrimitiveType(mPendingPrimitiveType, bUsingTessellation));
-		mD3D11Context->Draw(mPendingNumVertices, 0);
-		mPendingNumVertices = 0;
-		mPendingNumPrimitives = 0;
-		mPendingPrimitiveType = 0;
-		mPendingVertexDataStride = 0;
-	}
 
-	void D3D11DynamicRHI::RHIBeginDrawPrimitiveUP(uint32 primitiveType, uint32 numPrimitives, uint32 numVertices, uint32 vertexDataStride, void*& outVertexData)
-	{
-		mPendingPrimitiveType = primitiveType;
-		mPendingNumPrimitives = numPrimitives;
-		mPendingNumVertices = numVertices;
-		mPendingVertexDataStride = vertexDataStride;
-		outVertexData = mDynamicVB->lock(numVertices * vertexDataStride);
-	}
+	
 
+	
 
-	template<typename ShaderType, EShaderFrequency Frequency>
-	void D3D11DynamicRHI::_RHISetShaderTexture(ShaderType* ShaderRHI, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		VALIDATE_BOUND_SHADER(ShaderRHI);
-		D3D11TextureBase* newTexture = getD3D11TextureFromRHITexture(newTextureRHI);
-		ID3D11ShaderResourceView* shaderResourceView = newTexture ? newTexture->getShaderResourceView() : NULL;
-		if ((newTexture == NULL) || (newTexture->getRenderTargetView(0, 0) != NULL) || (newTexture->hasDepthStencilView()))
-		{
-			setShaderResourceView<Frequency>(newTexture, shaderResourceView, textureIndex, newTextureRHI ? newTextureRHI->getName() : TEXT(""), D3D11StateCache::SRV_Dynamic);
-		}
-		else
-		{
-			setShaderResourceView<Frequency>(newTexture, shaderResourceView, textureIndex, newTextureRHI->getName(), D3D11StateCache::SRV_Static);
-		}
-	}
-
-
-	void D3D11DynamicRHI::RHISetShaderSampler(VertexShaderRHIParamRef vertexShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler)
-	{
-		VALIDATE_BOUND_SHADER(vertexShader);
-		D3D11VertexShader* shader = ResourceCast(vertexShader);
-		D3D11SamplerState* sampler = ResourceCast(newSampler);
-		ID3D11SamplerState* stateResource = sampler->mResource;
-		mStateCache.setSamplerState<SF_Vertex>(stateResource, samplerIndex);
-	}
-
-	void D3D11DynamicRHI::RHISetShaderSampler(HullShaderRHIParamRef hullShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler)
-	{
-		VALIDATE_BOUND_SHADER(hullShader);
-		D3D11HullShader* shader = ResourceCast(hullShader);
-		D3D11SamplerState* sampler = ResourceCast(newSampler);
-		ID3D11SamplerState* stateResource = sampler->mResource;
-		mStateCache.setSamplerState<SF_Hull>(stateResource, samplerIndex);
-	}
-
-	void D3D11DynamicRHI::RHISetShaderSampler(DomainShaderRHIParamRef domainShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler)
-	{
-		VALIDATE_BOUND_SHADER(domainShader);
-		D3D11DomainShader* shader = ResourceCast(domainShader);
-		D3D11SamplerState* sampler = ResourceCast(newSampler);
-		ID3D11SamplerState* stateResource = sampler->mResource;
-		mStateCache.setSamplerState<SF_Domain>(stateResource, samplerIndex);
-	}
-
-	void D3D11DynamicRHI::RHISetShaderSampler(GeometryShaderRHIParamRef geometryShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler)
-	{
-		VALIDATE_BOUND_SHADER(geometryShader);
-		D3D11GeometryShader* shader = ResourceCast(geometryShader);
-		D3D11SamplerState* sampler = ResourceCast(newSampler);
-		ID3D11SamplerState* stateResource = sampler->mResource;
-		mStateCache.setSamplerState<SF_Geometry>(stateResource, samplerIndex);
-	}
-
-	void D3D11DynamicRHI::RHISetShaderSampler(PixelShaderRHIParamRef pixelShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler)
-	{
-		VALIDATE_BOUND_SHADER(pixelShader);
-		D3D11PixelShader* shader = ResourceCast(pixelShader);
-		D3D11SamplerState* sampler = ResourceCast(newSampler);
-		ID3D11SamplerState* stateResource = sampler->mResource;
-		mStateCache.setSamplerState<SF_Pixel>(stateResource, samplerIndex);
-	}
-
-	void D3D11DynamicRHI::RHISetShaderSampler(ComputeShaderRHIParamRef computeShader, uint32 samplerIndex, SamplerStateRHIParamRef newSampler)
+	void D3D11DynamicRHI::RHISetShaderSampler(RHIComputeShader* computeShader, uint32 samplerIndex, RHISamplerState* newSampler)
 	{
 		//VALIDATE_BOUND_SHADER(computeShader);
 		D3D11ComputeShader* shader = ResourceCast(computeShader);
@@ -1798,42 +1517,7 @@ namespace Air
 		mStateCache.setSamplerState<SF_Compute>(stateResource, samplerIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderTexture(VertexShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		_RHISetShaderTexture<RHIVertexShader, SF_Vertex>(vertexShader, textureIndex, newTextureRHI);
-	}
-
-	void D3D11DynamicRHI::RHISetShaderTexture(HullShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		_RHISetShaderTexture<RHIHullShader, SF_Hull>(vertexShader, textureIndex, newTextureRHI);
-	}
-
-
-	void D3D11DynamicRHI::RHISetShaderTexture(DomainShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		_RHISetShaderTexture<RHIDomainShader, SF_Domain>(vertexShader, textureIndex, newTextureRHI);
-	}
-
-
-	void D3D11DynamicRHI::RHISetShaderTexture(GeometryShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		_RHISetShaderTexture<RHIGeometryShader, SF_Domain>(vertexShader, textureIndex, newTextureRHI);
-	}
-
-
-	void D3D11DynamicRHI::RHISetShaderTexture(PixelShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		_RHISetShaderTexture<RHIPixelShader, SF_Pixel>(vertexShader, textureIndex, newTextureRHI);
-	}
-
-
-
-
-	void D3D11DynamicRHI::RHISetShaderTexture(ComputeShaderRHIParamRef vertexShader, uint32 textureIndex, TextureRHIParamRef newTextureRHI)
-	{
-		_RHISetShaderTexture<RHIComputeShader, SF_Compute>(vertexShader, textureIndex, newTextureRHI);
-	}
-
+	
 
 
 	DynamicRHI* D3D11DynamicRHIModule::createRHI(ERHIFeatureLevel::Type requestedFeatureLevel /* = ERHIFeatureLevel::Num */)
@@ -1851,7 +1535,12 @@ namespace Air
 		return 0xFFFFFFFF;
 	}
 
-	uint32 D3D11DynamicRHI::RHIComputeMemorySize(TextureRHIParamRef textureRHI)
+	void D3D11DynamicRHI::RHISubmitCommandsHint()
+	{
+
+	}
+
+	uint32 D3D11DynamicRHI::RHIComputeMemorySize(RHITexture* textureRHI)
 	{
 		if (!textureRHI)
 		{
@@ -1861,38 +1550,8 @@ namespace Air
 		return texture->getMemorySize();
 	}
 
-	ShaderResourceViewRHIRef D3D11DynamicRHI::RHICreateShaderResourceView(VertexBufferRHIParamRef vertexBufferRHI, uint32 stride, uint8 format)
-	{
-		D3D11VertexBuffer* vertexBuffer = ResourceCast(vertexBufferRHI);
-		BOOST_ASSERT(vertexBuffer);
-		BOOST_ASSERT(vertexBuffer->mResource);
-		D3D11_BUFFER_DESC bufferDesc;
-		vertexBuffer->mResource->GetDesc(&bufferDesc);
-		D3D11_SHADER_RESOURCE_VIEW_DESC desc;
-		Memory::memzero(&desc, sizeof(desc));
-		desc.Buffer.ElementOffset = 0;
-		desc.Buffer.FirstElement = 0;
-		desc.Buffer.NumElements = bufferDesc.ByteWidth / stride;
-
-		desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-		desc.Format = findShaderResourceDXGIFormat((DXGI_FORMAT)GPixelFormats[format].PlatformFormat, false);
-		TRefCountPtr<ID3D11ShaderResourceView> shaderResourceView;
-		HRESULT hr = mD3D11Device->CreateShaderResourceView(vertexBuffer->mResource, &desc, shaderResourceView.getInitReference());
-		if (FAILED(hr))
-		{
-			if (hr = E_OUTOFMEMORY)
-			{
-				hr = mD3D11Device->CreateShaderResourceView(vertexBuffer->mResource, &desc, shaderResourceView.getInitReference());
-			}
-			if (FAILED(hr))
-			{
-				verifyD3D11Result(hr, "direct3DDevice->CreateShaderResourceView", __FILE__, __LINE__, mD3D11Device);
-			}
-		}
-		return new D3D11ShaderResourceView(shaderResourceView, vertexBuffer);
-	}
-
-	void D3D11DynamicRHI::RHIReadSurfaceFloatData(TextureRHIParamRef textureRHI, IntRect inRect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex)
+	
+	void D3D11DynamicRHI::RHIReadSurfaceFloatData(RHITexture* textureRHI, IntRect inRect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex)
 	{
 		D3D11TextureBase* texture = getD3D11TextureFromRHITexture(textureRHI);
 		uint32 width = inRect.width();
@@ -1959,49 +1618,59 @@ namespace Air
 	
 
 
-	ShaderResourceViewRHIRef D3D11DynamicRHI::RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint32 mipLevel)
+	ShaderResourceViewRHIRef D3D11DynamicRHI::RHICreateShaderResourceView(RHITexture* textureRHI, const RHITextureSRVCreateInfo& createInfo)
 	{
-		D3D11Texture2D* texture2D = ResourceCast(texture2DRHI);
-		D3D11_TEXTURE2D_DESC textureDesc;
-		texture2D->getResource()->GetDesc(&textureDesc);
-		bool bSRGB = (texture2D->getFlags() & TexCreate_SRGB) != 0;
-		const DXGI_FORMAT platformShaderResourceFormat = findShaderResourceDXGIFormat(textureDesc.Format, bSRGB);
+		D3D11TextureBase* texture = getD3D11TextureFromRHITexture(textureRHI);
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		srvDesc.Texture2D.MostDetailedMip = mipLevel;
-		srvDesc.Format = platformShaderResourceFormat;
-		TRefCountPtr<ID3D11ShaderResourceView> shaderResourceView;
-		VERIFYD3D11RESULT_EX(mD3D11Device->CreateShaderResourceView(texture2D->getResource(), &srvDesc, (ID3D11ShaderResourceView**)shaderResourceView.getInitReference()), mD3D11Device);
-		return new D3D11ShaderResourceView(shaderResourceView, texture2D);
-	}
-	ShaderResourceViewRHIRef D3D11DynamicRHI::RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint32 mipLevel, uint8 numMipLevels, uint8 format)
-	{
-		D3D11Texture2D* texture2D = ResourceCast(texture2DRHI);
-		D3D11_TEXTURE2D_DESC textureDesc;
-		texture2D->getResource()->GetDesc(&textureDesc);
-		bool bSRGB = (texture2D->getFlags() & TexCreate_SRGB) != 0;
-		const DXGI_FORMAT platformResourceFormat = findShaderResourceDXGIFormat((DXGI_FORMAT)GPixelFormats[format].PlatformFormat, texture2D->getFlags());
-		const DXGI_FORMAT platformShaderResourceFormat = findShaderResourceDXGIFormat(platformResourceFormat, bSRGB);
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		if (textureDesc.SampleDesc.Count > 1)
+		DXGI_FORMAT baseTextureFormat = DXGI_FORMAT_UNKNOWN;
+		if (textureRHI->getTexture3D() != nullptr)
 		{
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
+			
+		}
+		else if (textureRHI->getTextureCube() != nullptr)
+		{
+			D3D11TextureCube* textureCube = static_cast<D3D11TextureCube*>(texture);
+			D3D11_TEXTURE2D_DESC textureDesc;
+			textureCube->getResource()->GetDesc(&textureDesc);
+			baseTextureFormat = textureDesc.Format;
+			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+			srvDesc.TextureCube.MipLevels = createInfo.mNumMipLevels;
 		}
 		else
 		{
-			srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-			srvDesc.Texture2D.MipLevels = numMipLevels;
-			srvDesc.Texture3D.MostDetailedMip = mipLevel;
+			D3D11Texture2D* texture2D = static_cast<D3D11Texture2D*>(texture);
+			D3D11_TEXTURE2D_DESC texDesc;
+			texture2D->getResource()->GetDesc(&texDesc);
+			baseTextureFormat = texDesc.Format;
+			if (texDesc.SampleDesc.Count > 1)
+			{
+				srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DMS;
+			}
+			else
+			{
+				srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+				srvDesc.Texture2D.MipLevels = createInfo.mNumMipLevels;
+				srvDesc.Texture2D.MostDetailedMip = createInfo.mMipLevel;
+			}
 		}
-
-
-		srvDesc.Format = platformShaderResourceFormat;
+		const bool bBaseSRGB = (textureRHI->getFlags() & TexCreate_SRGB) != 0;
+		const bool bSRGB = (createInfo.mSRGBOverride == SRGBO_ForceEnable) || (createInfo.mSRGBOverride == SRGBO_Default && bBaseSRGB);
+		if (createInfo.mFormat != PF_Unknown)
+		{
+			baseTextureFormat = (DXGI_FORMAT)GPixelFormats[createInfo.mFormat].PlatformFormat;
+		}
+		srvDesc.Format = findShaderResourceDXGIFormat(baseTextureFormat, bSRGB);
 		TRefCountPtr<ID3D11ShaderResourceView> shaderResourceView;
-		VERIFYD3D11RESULT_EX(mD3D11Device->CreateShaderResourceView(texture2D->getResource(), &srvDesc, (ID3D11ShaderResourceView**)shaderResourceView.getInitReference()), mD3D11Device);
-		return new D3D11ShaderResourceView(shaderResourceView, texture2D);
+		VERIFYD3D11RESULT_EX(mD3D11Device->CreateShaderResourceView(texture->getResource(), &srvDesc, shaderResourceView.getInitReference()), mD3D11Device);
+		return new D3D11ShaderResourceView(shaderResourceView, texture);
 	}
+
+
+
+	
+
+
+	
 	
 	void D3D11DynamicRHI::validateExclusiveDepthStencilAccess(FExclusiveDepthStencil src) const
 	{
@@ -2032,7 +1701,7 @@ namespace Air
 
 	void D3D11DynamicRHI::RHISetRenderTargetsAndClear(const RHISetRenderTargetsInfo& renderTargetsInfo)
 	{
-		UnorderedAccessViewRHIParamRef uavs[MaxSimultaneousUAVs] = {};
+		RHIUnorderedAccessView* uavs[MaxSimultaneousUAVs] = {};
 		for (int32 index = 0; index < renderTargetsInfo.mNumUAVs; ++index)
 		{
 			uavs[index] = renderTargetsInfo.mUnorderedAccessView[index].getReference();
@@ -2060,56 +1729,14 @@ namespace Air
 				clearValue.getDepthStencil(depthClear, stencilClear);
 			}
 
-			this->RHIClearMRTImpl(renderTargetsInfo.bClearColor, renderTargetsInfo.mNumColorRenderTargets, clearColors, renderTargetsInfo.bClearDepth, depthClear, renderTargetsInfo.bClearStencil, stencilClear, IntRect(), false, EForceFullScreenClear::EForce);
+			this->RHIClearMRTImpl(renderTargetsInfo.bClearColor, renderTargetsInfo.mNumColorRenderTargets, clearColors, renderTargetsInfo.bClearDepth, depthClear, renderTargetsInfo.bClearStencil, stencilClear);
 		}
 	}
 
 
-	void D3D11DynamicRHI::RHIClearColorTextures(int32 numTextures, TextureRHIParamRef* textures, const LinearColor* colorArray, IntRect excludeRect)
-	{
-#if 1
-		for (int32 index = 0; index < numTextures; ++index)
-		{
-			auto verifyHandle = [index](ID3D11RenderTargetView* source, ID3D11Resource* destResource)
-			{
-				ID3D11Resource* sourceResource;
-				source->GetResource(&sourceResource);
-				BOOST_ASSERT(sourceResource == destResource);
-				sourceResource->Release();
-			};
+	
 
-			RHITexture* texture = textures[index];
-			BOOST_ASSERT(texture);
-			if (RHITexture2D* texture2D = texture->getTexture2D())
-			{
-				verifyHandle(mCurrentRenderTargets[index], ResourceCast(texture2D)->getResource());
-			}
-			else if (RHITextureCube * textureCube = texture->getTextureCube())
-			{
-				verifyHandle(mCurrentRenderTargets[index], ResourceCast(textureCube)->getResource());
-			}
-			else if (RHITexture3D * texture3D = texture->getTexture3D())
-			{
-				/*verifyHandle(mCurrentRenderTargets[index], ResourceCast(texture3D)->getResource());*/
-				BOOST_ASSERT(false);
-			}
-			else
-			{
-				BOOST_ASSERT(false);
-			}
-		}
-#endif
-		D3D11DynamicRHI::RHIClearMRTImpl(true, numTextures, colorArray, false, 0, false, 0, excludeRect, true, EForceFullScreenClear::EDoNotForce);
-	}
-
-	void D3D11DynamicRHI::RHIClearDepthStencilTexture(TextureRHIParamRef texture, EClearDepthStencil clearDepthStencil, float depth, uint32 stencil, IntRect& excludeRect)
-	{
-		BOOST_ASSERT(texture && texture->getTexture2D());
-		D3D11Texture2D* texture2D = ResourceCast(texture->getTexture2D());
-		{
-			D3D11DynamicRHI::RHIClearMRTImpl(false, 0, nullptr, clearDepthStencil != EClearDepthStencil::Stencil, depth, clearDepthStencil != EClearDepthStencil::Depth, stencil, excludeRect, true, EForceFullScreenClear::EDoNotForce);
-		}
-	}
+	
 
 	void D3D11DynamicRHI::RHIBindClearMRTValues(bool bClearColor, bool bClearDepth, bool bClearStencil)
 	{
@@ -2117,113 +1744,8 @@ namespace Air
 	}
 
 
-	void D3D11DynamicRHI::RHIClearMRTImpl(bool bClearColor, int32 numClearColor, const LinearColor* colorArray, bool bClearDepth, float depth, bool bClearStencil, uint32 stencil, IntRect excludeRect, bool bForceShaderClear, EForceFullScreenClear bForceFullScreen)
+	void D3D11DynamicRHI::RHIClearMRTImpl(bool bClearColor, int32 numClearColor, const LinearColor* colorArray, bool bClearDepth, float depth, bool bClearStencil, uint32 stencil)
 	{
-		bForceShaderClear = false;
-
-		class DeviceStateHelper
-		{
-			ID3D11DeviceContextPtr mDirect3DDeviceIMContext;
-			enum {ResourceCount = D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT};
-			enum { ConstantBufferCount = D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT };
-
-			ID3D11ShaderResourceView* mVertResource[ResourceCount];
-			ID3D11Buffer* mVertextConstantBuffers[ConstantBufferCount];
-			ID3D11Buffer* mPixelConstantBuffers[ConstantBufferCount];
-			ID3D11VertexShader* mVSOld;
-			ID3D11PixelShader* mPSOld;
-			ID3D11DepthStencilState* mOldDepthStencilState;
-			ID3D11RasterizerState* mOldRasterizerState;
-			ID3D11BlendState* mOldBlendState;
-			ID3D11InputLayout* mOldInputLayout;
-			uint32 mStencilRef;
-			float mBlendFactor[4];
-			uint32 mSamplerMask;
-			BoundShaderStateRHIParamRef mLastBoundShaderStateRHI;
-
-			void releaseResource()
-			{
-				SAFE_RELEASE(mVSOld);
-				SAFE_RELEASE(mPSOld);
-				ID3D11ShaderResourceView** resources = mVertResource;
-				for (int32 i = 0; i < ResourceCount; i++, resources++)
-				{
-					SAFE_RELEASE(*resources);
-				}
-				for (int32 i = 0; i < ConstantBufferCount; ++i)
-				{
-					SAFE_RELEASE(mVertextConstantBuffers[i]);
-					SAFE_RELEASE(mPixelConstantBuffers[i]);
-				}
-				SAFE_RELEASE(mOldInputLayout);
-				SAFE_RELEASE(mOldDepthStencilState);
-				SAFE_RELEASE(mOldBlendState);
-				SAFE_RELEASE(mOldRasterizerState);
-				mLastBoundShaderStateRHI = nullptr;
-			}
-		public:
-			DeviceStateHelper(ID3D11DeviceContextPtr inDirect3DDeviceIMContext):mDirect3DDeviceIMContext(inDirect3DDeviceIMContext){}
-			void captureDeviceState(D3D11StateCache& stateCacheRef, TGlobalResource<TBoundShaderStateHistory<10000>>& BSSHistory)
-			{
-				stateCacheRef.getVertexShader(&mVSOld);
-				stateCacheRef.getPixelShader(&mPSOld);
-				stateCacheRef.getShaderResourceViews<SF_Vertex>(0, ResourceCount, &mVertResource[0]);
-				stateCacheRef.getConstantBuffers<SF_Pixel>(0, ConstantBufferCount, &(mPixelConstantBuffers[0]));
-				stateCacheRef.getConstantBuffers<SF_Vertex>(0, ConstantBufferCount, &(mVertextConstantBuffers[0]));
-				stateCacheRef.getDepthStencilState(&mOldDepthStencilState, &mStencilRef);
-				stateCacheRef.getBlendState(&mOldBlendState, mBlendFactor, &mSamplerMask);
-				stateCacheRef.getRasterizerState(&mOldRasterizerState);
-				stateCacheRef.getInputLayout(&mOldInputLayout);
-				mLastBoundShaderStateRHI = BSSHistory.getLast();
-			}
-			void clearCurrentVertexResource(D3D11StateCache& stateCacheRef)
-			{
-				static ID3D11ShaderResourceView* nullResources[ResourceCount] = {};
-				for (int resourceLoop = 0; resourceLoop < ResourceCount; resourceLoop++)
-				{
-					stateCacheRef.setShaderResourceView<SF_Vertex>(nullResources[0], resourceLoop);
-				}
-			}
-
-			void restoreDeviceState(D3D11StateCache& stateCacheRef, TGlobalResource<TBoundShaderStateHistory<1000>>& BSSHistory)
-			{
-				stateCacheRef.setVertexShader(mVSOld);
-				stateCacheRef.setPixelShader(mPSOld);
-				for (int resourceLoop = 0; resourceLoop < ResourceCount; resourceLoop++)
-				{
-					stateCacheRef.setShaderResourceView<SF_Vertex>(mVertResource[resourceLoop], resourceLoop);
-				}
-				for (int bufferIndex = 0; bufferIndex < ConstantBufferCount; bufferIndex++)
-				{
-					stateCacheRef.setConstantBuffer<SF_Pixel>(mPixelConstantBuffers[bufferIndex], bufferIndex);
-					stateCacheRef.setConstantBuffer<SF_Vertex>(mVertextConstantBuffers[bufferIndex], bufferIndex);
-				}
-				stateCacheRef.setDepthStencilState(mOldDepthStencilState, mStencilRef);
-				stateCacheRef.setBlendState(mOldBlendState, mBlendFactor, mSamplerMask);
-				stateCacheRef.setRasterizerState(mOldRasterizerState);
-				stateCacheRef.setInputLayout(mOldInputLayout);
-
-				BSSHistory.add(mLastBoundShaderStateRHI);
-				releaseResource();
-			}
-		};
-		{
-			int32 clearWithExcludeRects = 2;
-			if (clearWithExcludeRects >= 2)
-			{
-				clearWithExcludeRects = 1;
-				if (isRHIDeviceIntel())
-				{
-					clearWithExcludeRects = 0;
-				}
-			}
-
-			if (!clearWithExcludeRects)
-			{
-				excludeRect = IntRect();
-			}
-		}
-
 		D3D11BoundRenderTargets boundRenderTargets(mD3D11Context);
 		BOOST_ASSERT(!bClearColor || numClearColor >= boundRenderTargets.getNumActiveTargets());
 		if (mCurrentDepthTexture)
@@ -2232,153 +1754,41 @@ namespace Air
 			requestedAccess.SetDepthStencilWrite(bClearDepth, bClearStencil);
 			BOOST_ASSERT(requestedAccess.IsValid(mCurrentDSVAccessType));
 		}
+
+
 		ID3D11DepthStencilView* depthStencilView = boundRenderTargets.getDepthStencilView();
-		bool useDrawClear = bForceShaderClear;
-		uint32 numViews = 1;
-		D3D11_VIEWPORT viewport;
-		mStateCache.getViewports(&numViews, &viewport);
-		if (viewport.TopLeftX > 0 || viewport.TopLeftY > 0)
+		if (bClearColor && boundRenderTargets.getNumActiveTargets() > 0)
 		{
-			useDrawClear = true;
-		}
-		if (excludeRect.min.x == 0 && excludeRect.width() == viewport.Width && excludeRect.min.y == 0 && excludeRect.height() == viewport.Height)
-		{
-			if (bForceFullScreen == EForceFullScreenClear::EDoNotForce)
+			for (int32 targetIndex = 0; targetIndex < boundRenderTargets.getNumActiveTargets(); targetIndex++)
 			{
-				return;
-			}
-			else
-			{
-
-			}
-		}
-		D3D11_RECT scissorRect;
-		uint32 numRects = 1;
-		mD3D11Context->RSGetScissorRects(&numRects, &scissorRect);
-		if (scissorRect.left > 0 || scissorRect.right < viewport.TopLeftX + viewport.Width || scissorRect.top > 0 || scissorRect.bottom < viewport.TopLeftY + viewport.Height)
-		{
-			useDrawClear = true;
-		}
-		if (!useDrawClear)
-		{
-			uint32 width = 0;
-			uint32 height = 0;
-			if (boundRenderTargets.getRenderTargetView(0))
-			{
-				RTVDesc rtvDesc = getRenderTargetViewDesc(boundRenderTargets.getRenderTargetView(0));
-				width = rtvDesc.width;
-				height = rtvDesc.height;
-			}
-			else if(depthStencilView)
-			{
-				ID3D11Texture2D* baseTexture = nullptr;
-				depthStencilView->GetResource((ID3D11Resource**)&baseTexture);
-				D3D11_TEXTURE2D_DESC desc;
-				baseTexture->GetDesc(&desc);
-				width = desc.Width;
-				height = desc.Height;
-				baseTexture->Release();
-				D3D11_DEPTH_STENCIL_VIEW_DESC dsvDesc;
-				depthStencilView->GetDesc(&dsvDesc);
-				if (dsvDesc.ViewDimension == D3D11_DSV_DIMENSION_TEXTURE1D || D3D11_DSV_DIMENSION_TEXTURE1DARRAY || D3D11_DSV_DIMENSION_TEXTURE2D || D3D11_DSV_DIMENSION_TEXTURE2DARRAY)
+				ID3D11RenderTargetView* renderTargetView = boundRenderTargets.getRenderTargetView(targetIndex);
+				if (renderTargetView != nullptr)
 				{
-					uint32 mipIndex = dsvDesc.Texture2D.MipSlice;
-					width >>= mipIndex;
-					height >>= mipIndex;
+					mD3D11Context->ClearRenderTargetView(renderTargetView, (float*)&colorArray[targetIndex]);
 				}
 			}
-			if ((viewport.Width < width || viewport.Height < height)
-				&& (viewport.Width > 1 && viewport.Height > 1))
-			{
-				useDrawClear = true;
-			}
 		}
 
-		if (bForceFullScreen == EForceFullScreenClear::EForce)
+		if ((bClearDepth || bClearStencil) && depthStencilView)
 		{
-			useDrawClear = false;
+			uint32 clearFlags = 0;
+			if (bClearDepth)
+			{
+				clearFlags |= D3D11_CLEAR_DEPTH;
+			}
+			if (bClearStencil)
+			{
+				clearFlags |= D3D11_CLEAR_STENCIL;
+			}
+
+			mD3D11Context->ClearDepthStencilView(depthStencilView, clearFlags, depth, stencil);
 		}
-		if (useDrawClear)
-		{
-			BOOST_ASSERT(GIsRHIInitialized);
-			if (mCurrentDepthTexture)
-			{
-				conditionalClearShaderResource(mCurrentDepthTexture);
-			}
 
-			BlendStateRHIParamRef blendStateRHI;
-			if (boundRenderTargets.getNumActiveTargets() <= 1)
-			{
-				blendStateRHI = (bClearColor && boundRenderTargets.getRenderTargetView(0)) ?
-					TStaticBlendState<>::getRHI() : TStaticBlendState<CW_NONE>::getRHI();
-			}
-			else
-			{
-				blendStateRHI = (bClearColor && boundRenderTargets.getRenderTargetView(0)) ? TStaticBlendState<>::getRHI() :
-					TStaticBlendStateWriteMask<CW_NONE, CW_NONE, CW_NONE, CW_NONE, CW_NONE, CW_NONE, CW_NONE, CW_NONE>::getRHI();
-			}
-			RasterizerStateRHIParamRef rasterizerStateRHI = TStaticRasterizerState<FM_Solid, CM_None>::getRHI();
-			float BF[4] = { 0, 0, 0, 0 };
-			const DepthStencilStateRHIParamRef depthStencilStateRHI = (bClearDepth && bClearStencil) ? TStaticDepthStencilState<true, CF_Always, true, CF_Always, SO_Replace, SO_Replace, SO_Replace, false, CF_Always, SO_Replace, SO_Replace, SO_Replace, 0xff, 0xff>::getRHI() :
-				bClearDepth ? TStaticDepthStencilState<false, CF_Always, true, CF_Always, SO_Replace, SO_Replace, SO_Replace,
-				false, CF_Always, SO_Replace, SO_Replace, SO_Replace, 0xff, 0xff>::getRHI() : TStaticDepthStencilState<false, CF_Always>::getRHI();
-
-			{
-				FExclusiveDepthStencil requestedAccess;
-				requestedAccess.SetDepthStencilWrite(bClearDepth, bClearStencil);
-				validateExclusiveDepthStencilAccess(requestedAccess);
-			}
-			D3D11BlendState* blendState = ResourceCast(blendStateRHI);
-			
-			D3D11RasterizerState* rasterizerState = ResourceCast(rasterizerStateRHI);
-			D3D11DepthStencilState* depthStencilState = ResourceCast(depthStencilStateRHI);
-
-			DeviceStateHelper originalResourceState(mD3D11Context);
-			originalResourceState.captureDeviceState(mStateCache, mBoundShaderStateHistory);
-			mStateCache.setBlendState(blendState->mResource, BF, 0xffffffff);
-
-			mStateCache.setDepthStencilState(depthStencilState->mResource, stencil);
-			mStateCache.setRasterizerState(rasterizerState->mResource);
-
-			originalResourceState.clearCurrentVertexResource(mStateCache);
-
-			auto shaderMap = getGlobalShaderMap(GMaxRHIFeatureLevel);
-			TShaderMapRef<TOneColorVS<true>> vertexShader(shaderMap);
-			
-		}
-		else
-		{
-			if (bClearColor && boundRenderTargets.getNumActiveTargets() > 0)
-			{
-				for (int32 targetIndex = 0; targetIndex < boundRenderTargets.getNumActiveTargets(); targetIndex++)
-				{
-					ID3D11RenderTargetView* renderTargetView = boundRenderTargets.getRenderTargetView(targetIndex);
-					if (renderTargetView != nullptr)
-					{
-						mD3D11Context->ClearRenderTargetView(renderTargetView, (float*)&colorArray[targetIndex]);
-					}
-				}
-			}
-			if ((bClearDepth || bClearStencil) && depthStencilView)
-			{
-				uint32 clearFlags = 0;
-				if (bClearDepth)
-				{
-					clearFlags |= D3D11_CLEAR_DEPTH;
-				}
-				if (bClearStencil)
-				{
-					clearFlags |= D3D11_CLEAR_STENCIL;
-				}
-				mD3D11Context->ClearDepthStencilView(depthStencilView, clearFlags, depth, stencil);
-			}
-		}
-		
 	}
 
 	int32 GUnbindResourcesBetweenDrawsInDX11 = 0;
 
-	void D3D11DynamicRHI::RHISetBoundShaderState(BoundShaderStateRHIParamRef boundShaderState)
+	void D3D11DynamicRHI::RHISetBoundShaderState(RHIBoundShaderState* boundShaderState)
 	{
 		D3D11BoundShaderState * boundState = ResourceCast(boundShaderState);
 		mStateCache.setInputLayout(boundState->mInputLayout);
@@ -2479,10 +1889,10 @@ namespace Air
 	}
 
 
-	void* D3D11DynamicRHI::RHILockVertexBuffer(VertexBufferRHIParamRef inVertexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode)
+	void* D3D11DynamicRHI::RHILockVertexBuffer(RHIVertexBuffer* inVertexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode)
 	{
 		D3D11VertexBuffer* vertexBuffer = ResourceCast(inVertexBuffer);
-		conditionalClearShaderResource(vertexBuffer);
+		conditionalClearShaderResource(vertexBuffer, true);
 		D3D11_BUFFER_DESC desc;
 		vertexBuffer->mResource->GetDesc(&desc);
 		const bool bIsDynamic = (desc.Usage == D3D11_USAGE_DYNAMIC);
@@ -2532,7 +1942,7 @@ namespace Air
 		return (void*)((uint8*)lockedData.getData() + offset);
 	}
 
-	void D3D11DynamicRHI::RHIUnlockVertexBuffer(VertexBufferRHIParamRef inVertexBuffer)
+	void D3D11DynamicRHI::RHIUnlockVertexBuffer(RHIVertexBuffer* inVertexBuffer)
 	{
 		D3D11VertexBuffer* vertexBuffer = ResourceCast(inVertexBuffer);
 
@@ -2609,10 +2019,10 @@ namespace Air
 
 	}
 
-	void* D3D11DynamicRHI::RHILockIndexBuffer(IndexBufferRHIParamRef inIndexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode)
+	void* D3D11DynamicRHI::RHILockIndexBuffer(RHIIndexBuffer* inIndexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode)
 	{
 		D3D11IndexBuffer* indexBuffer = ResourceCast(inIndexBuffer);
-		conditionalClearShaderResource(indexBuffer);
+		conditionalClearShaderResource(indexBuffer, true);
 		D3D11_BUFFER_DESC desc;
 		indexBuffer->mResource->GetDesc(&desc);
 		const bool bIsDynamic = (desc.Usage == D3D11_USAGE_DYNAMIC);
@@ -2658,7 +2068,7 @@ namespace Air
 	}
 	
 
-	void D3D11DynamicRHI::RHIUnlockIndexBuffer(IndexBufferRHIParamRef inIndexBuffer)
+	void D3D11DynamicRHI::RHIUnlockIndexBuffer(RHIIndexBuffer* inIndexBuffer)
 	{
 		D3D11IndexBuffer* indexBuffer = ResourceCast(inIndexBuffer);
 

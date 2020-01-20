@@ -28,5 +28,7 @@ namespace Air
 			}
 			return result;
 		}
+
+		static bool param(const TCHAR* stream, const TCHAR* param);
 	};
 }

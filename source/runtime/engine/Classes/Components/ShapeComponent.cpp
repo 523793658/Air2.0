@@ -34,6 +34,13 @@ namespace Air
 		CustomMesh* mMesh;
 
 	public:
+		size_t getTypeHash() const override
+		{
+			static size_t uniquePointer;
+			return reinterpret_cast<size_t>(&uniquePointer);
+		}
+
+
 		CustomMeshSceneProxy(const ShapeComponent* inComponent)
 			:PrimitiveSceneProxy(inComponent)
 			,mMesh(inComponent->mMesh)

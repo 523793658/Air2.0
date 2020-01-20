@@ -42,6 +42,10 @@ namespace Air
 		static void getEnvironmentVariable(const TCHAR* variableName, TCHAR* result, int32 resultLength);
 
 		static void setEnvironmentVar(const TCHAR* variableName, const TCHAR* value);
+
+		static bool verifyWindowsVersion(uint32 majorVersion, uint32 minorVersion);
+
+		static EAppReturnType::Type WindowsPlatformMisc::messageBoxExt(EAppMsgType::Type msgType, const TCHAR* text, const TCHAR* caption);
 	};
 
 	typedef WindowsPlatformMisc PlatformMisc;

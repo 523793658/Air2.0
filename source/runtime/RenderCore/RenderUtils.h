@@ -47,7 +47,13 @@ namespace Air
 
 	RENDER_CORE_API SIZE_T calcTextureSize(uint32 sizeX, uint32 sizeY, EPixelFormat format, uint32 MipCount);
 
-	RENDER_CORE_API bool isForwardShadingEnabled(ERHIFeatureLevel::Type  featureLevel);
+	RENDER_CORE_API SIZE_T calcTextureSize3D(uint32 width, uint32 height, uint32 depth, EPixelFormat format, uint32 mipCount);
+
+	inline bool isForwardShadingEnabled(EShaderPlatform platform)
+	{
+		extern RENDER_CORE_API uint64 GForwardShadingPlatformMask;
+		return !!(GForwardShadingPlatformMask & (1ull << platform)) && getMaxSupportedFeatureLevel(platform) >= ERHIFeatureLevel::SM5;
+	}
 
 	RENDER_CORE_API bool isSimpleForwardShadingEnable(EShaderPlatform platform);
 
@@ -62,7 +68,13 @@ namespace Air
 
 	inline bool isAnyForwardShadingEnabled(EShaderPlatform platform)
 	{
-		return isForwardShadingEnabled(getMaxSupportedFeatureLevel(platform)) || isSimpleForwardShadingEnable(platform);
+		return isForwardShadingEnabled(platform) || isSimpleForwardShadingEnable(platform);
+	}
+
+	inline bool isUsingSelectiveBasePassOutputs(EShaderPlatform platform)
+	{
+		extern RENDER_CORE_API uint64 GSelectiveBasePassOutputsPlatformMask;
+		return !!(GSelectiveBasePassOutputsPlatformMask & (1ull << platform));
 	}
 
 	inline bool isUsingGBuffers(EShaderPlatform platform)
@@ -81,13 +93,27 @@ namespace Air
 	}
 
 
-	RENDER_CORE_API void quantizeSceneBufferSize(int32& inOutBufferSizeX, int32& inOutBufferSizeY);
+	RENDER_CORE_API void quantizeSceneBufferSize(const int2& inOutBufferSizeX, int2& inOutBufferSizeY);
 
 	RENDER_CORE_API VertexDeclarationRHIRef& getVertexDeclarationVector4();
 
 	RENDER_CORE_API int2 calcMipMapExtent(uint32 textureWidth, uint32 textureHeight, EPixelFormat format, uint32 mipIndex);
 
 	RENDER_CORE_API void copyTextureData2D(const void* source, void* dest, uint32 height, EPixelFormat format, uint32 sourceStirde, uint32 destStride);
+
+	RENDER_CORE_API bool mobileSupportsGPUScene(EShaderPlatform platform);
+
+	inline bool useGPUScene(EShaderPlatform platform, ERHIFeatureLevel::Type featureLevel)
+	{
+		if (featureLevel == ERHIFeatureLevel::ES3_1)
+		{
+			return mobileSupportsGPUScene(platform);
+		}
+
+		return featureLevel >= ERHIFeatureLevel::SM5 && !isOpenGLPlatform(platform) && !isSwitchPlatform(platform);
+	}
+
+	RENDER_CORE_API bool useVirtualTexturing(ERHIFeatureLevel::Type inFeatureLevel, const class ITargetPlatform* targetPlatform = nullptr);
 
 #define NUM_DEBUG_UTIL_COLORS (32)
 }

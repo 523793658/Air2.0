@@ -2,10 +2,12 @@
 #include "GenericPlatform/genericPlatformDriver.h"
 #include "RHIResource.h"
 #include "RHICommandList.h"
+#include "RHIShaderFormatDefinitions.inl"
 namespace Air
 {
 	bool GRHISupportsRHIThread = false;
 	bool GUsingNullRHI = false;
+	bool GRHISupportsRayTracing = false;
 
 	wstring FeatureLevelNames[] =
 	{
@@ -34,6 +36,8 @@ namespace Air
 
 	bool GRHISupportsAsyncTextureCreation = false;
 
+	bool GSupportsEfficientAsyncCompute = false;
+
 	bool GRHIDeviceIsAMDPreGCNArchitecture = false;
 
 	bool GRHINeedsExtraDeletionLatency = false;
@@ -49,6 +53,10 @@ namespace Air
 	bool GSupportsSeparateRenderTargetBlendState = false;
 
 	bool GSupportsDepthFetchDuringDepthTest = true;
+
+	bool GSupportsTransientResourceAliasing = false;
+
+	bool GSupportsResourceView = true;
 
 	float GMinClipZ = 0.0f;
 
@@ -74,7 +82,7 @@ namespace Air
 
 	int32 GMaxShadowDepthBufferSizeY = 2048;
 
-	int32 GMaxTexture2DDemensions = 2048;
+	int32 GMaxTextureDemensions = 2048;
 
 	int32 GMaxTextureDepth = 2048;
 
@@ -124,7 +132,7 @@ namespace Air
 	{
 		if (isFeatureLevelSupported(platform, ERHIFeatureLevel::SM5) && !isMetalPlatform(platform))
 		{
-			return (platform == SP_PCD3D_SM5) || (platform == SP_XBOXONE) || (platform == SP_OPENGL_SM5) || (platform == SP_OPENGL_ES31_EXT) || (platform == SP_VULKAN_SM5);
+			return (platform == SP_PCD3D_SM5) || (platform == SP_XBOXONE_D3D12) || (platform == SP_OPENGL_SM5) || (platform == SP_OPENGL_ES31_EXT) || (platform == SP_VULKAN_SM5);
 		}
 	}
 
@@ -138,38 +146,12 @@ namespace Air
 		GNumPrimitivesDrawnRHI = 0;
 	}
 
-	static wstring NAME_PCD3D_SM5(TEXT("PCD3D_SM5"));
-	static wstring NAME_PCD3D_SM4(TEXT("PCD3D_SM4"));
-	static wstring NAME_PCD3D_ES3_1(TEXT("PCD3D_ES31"));
-	static wstring NAME_PCD3D_ES2(TEXT("PCD3D_ES2"));
-	static wstring NAME_GLSL_150(TEXT("GLSL_150"));
-	static wstring NAME_GLSL_150_MAC(TEXT("GLSL_150_MAC"));
-	static wstring NAME_SF_PS4(TEXT("SF_PS4"));
-	static wstring NAME_SF_XBOXONE(TEXT("SF_XBOXONE"));
-	static wstring NAME_GLSL_430(TEXT("GLSL_430"));
-	static wstring NAME_GLSL_150_ES2(TEXT("GLSL_150_ES2"));
-	static wstring NAME_GLSL_150_ES2_NOUB(TEXT("GLSL_150_ES2_NOUB"));
-	static wstring NAME_GLSL_150_ES31(TEXT("GLSL_150_ES31"));
-	static wstring NAME_GLSL_ES2(TEXT("GLSL_ES2"));
-	static wstring NAME_GLSL_ES2_WEBGL(TEXT("GLSL_ES2_WEBGL"));
-	static wstring NAME_GLSL_ES2_IOS(TEXT("GLSL_ES2_IOS"));
-	static wstring NAME_SF_METAL(TEXT("SF_MATAL"));
-	static wstring NAME_SF_MATAL_MRT(TEXT("SF_MATAL_MRT"));
-	static wstring NAME_GLSL_310_ES_EXT(TEXT("GLSL_310_ES_EXT"));
-	static wstring NAME_GLSL_ES3_1_ANDROID(TEXT("GLSL_310_ES3_1_ANDROID"));
-	static wstring NAME_SF_MATAL_SM5(TEXT("SF_MATAL_SM5"));
-	static wstring NAME_VULKAN_ES3_1_ANDROID(TEXT("SF_VULKAN_ES31_ANDROID"));
-	static wstring NAME_VULKAN_ES3_1(TEXT("SF_VULKAN_ES31"));
-	static wstring NAME_VULKAN_SM4_UB(TEXT("SF_VULKAN_SM4_UB"));
-	static wstring NAME_VULKAN_SM4(TEXT("SF_VULKAN_SM4"));
-	static wstring NAME_VULKAN_SM5(TEXT("SF_VULKAN_SM5"));
-	static wstring NAME_SF_METAL_SM4(TEXT("SF_METAL_SM4"));
-	static wstring NAME_SF_METAL_MACES3_1(TEXT("SF_METAL_MACES3_1"));
-	static wstring NAME_SF_METAL_MACES2(TEXT("SF_METAL_MACES2"));
-	static wstring NAME_GLSL_SWITCH(TEXT("GLSL_SWITCH"));
-	static wstring NAME_GLSL_SWITCH_FORWARD(TEXT("GLSL_SWITCH_FORWARD"));
+	
 
-
+	EShaderPlatform shaderFormatToLegacyShaderPlatform(wstring shaderFormat)
+	{
+		return shaderFormatNameToShaderPlatform(shaderFormat);
+	}
 
 	wstring legacyShaderPlatformToShaderFormat(EShaderPlatform platform)
 	{
@@ -185,8 +167,8 @@ namespace Air
 		{
 			return NAME_GLSL_150_ES2;
 		}
-		case Air::SP_XBOXONE:
-			return NAME_SF_XBOXONE;
+		case Air::SP_XBOXONE_D3D12:
+			return NAME_SF_XBOXONE_D3D12;
 		case Air::SP_PCD3D_SM4:
 			return NAME_PCD3D_SM4;
 		case Air::SP_OPENGL_SM5:

@@ -8,6 +8,9 @@
 #define PLATFORM_LINUX 0
 #endif
 
+#include "PreprocessorHelper.h"
+#include COMPILED_PLATFORM_HEADER(PlatformCompilerPreSetup.h)
+
 #ifndef PLATFORM_COMPILER_HAS_DEFAULTED_FUNCTIONS 
 #define PLATFORM_COMPILER_HAS_DEFAULTED_FUNCTIONS 1
 #endif
@@ -15,6 +18,15 @@
 #ifndef RESTRICT
 #define RESTRICT	__restrict
 #endif
+
+#ifndef UNLIKELY
+#if (defined(__clang__) || defined(__GNUC__)) && (PLATFORM_UNIX)
+#define UNLIKELY(x)		__builtin_expect(!!(x), 0)
+#else
+#define UNLIKELY(x)		(x)
+#endif
+#endif
+
 
 #if PLATFORM_WINDOWS
 #include "Windows/WindowsPlatformCompilerPreSetup.h"
@@ -42,6 +54,18 @@
 
 #ifndef PLATFORM_CAN_SUPPORT_EDITORONLY_DATA
 #define PLATFORM_CAN_SUPPORT_EDITORONLY_DATA 0
+#endif
+
+#ifndef PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+#define PLATFORM_SUPPORTS_GEOMETRY_SHADERS	1
+#endif
+
+#ifndef PLATFORM_SUPPORTS_TESSELLATION_SHADERS
+#define PLATFORM_SUPPORTS_TESSELLATION_SHADERS	1
+#endif
+
+#if PLATFORM_SUPPORTS_TESSELLATION_SHADERS && !PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+#error Geometry shader support is required by tessellation
 #endif
 
 

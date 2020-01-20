@@ -212,13 +212,13 @@ namespace Air
 			redrawViewports();
 		}
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-				TickRenderingTimer,
-				bool, bPauseRenderingRealtimeClock, GPauseRenderingRealtimeClock, float, deltaTime, deltaSeconds,
+			bool bPauseRenderingRealtimeClock = GPauseRenderingRealtimeClock;
+			ENQUEUE_RENDER_COMMAND(
+				TickRenderingTimer)([bPauseRenderingRealtimeClock, deltaSeconds](RHICommandListImmediate& cmd)
 				{
 					if (!bPauseRenderingRealtimeClock)
 					{
-						GRenderingRealtimeClock.tick(deltaTime);
+						GRenderingRealtimeClock.tick(deltaSeconds);
 					}
 					getRendererModule().tickRenderTargetPool();
 				}

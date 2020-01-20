@@ -55,6 +55,16 @@ namespace Air
 		void findAdapter();
 	};
 
+	inline DXGI_FORMAT findUnorderedAccessDXGIFormat(DXGI_FORMAT inFormat)
+	{
+		switch (inFormat)
+		{
+		case DXGI_FORMAT_B8G8R8A8_TYPELESS: return DXGI_FORMAT_B8G8R8A8_UNORM;
+		case DXGI_FORMAT_R8G8B8A8_TYPELESS: return DXGI_FORMAT_R8G8B8A8_UNORM;
+		}
+		return inFormat;
+	}
+
 	inline DXGI_FORMAT findShaderResourceDXGIFormat(DXGI_FORMAT inFormat, bool bSRGB)
 	{
 		if (bSRGB)

@@ -5,6 +5,7 @@
 namespace Air
 {
 
+	bool CORE_API stringHasBadDashes(const TCHAR* str);
 
 	class CORE_API SelfRegisteringExec
 	{

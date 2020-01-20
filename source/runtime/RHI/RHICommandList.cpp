@@ -66,7 +66,7 @@ namespace Air
 		ENamedThreads::Type getDesiredThread()
 		{
 			BOOST_ASSERT(GRHIThread);
-			return bRHIThread ? ENamedThreads::RHIThread : ENamedThreads::RenderThread_Local;
+			return bRHIThread ? ENamedThreads::RHIThread : ENamedThreads::getRenderThread_Local();
 		}
 		static ESubsequentsMode::Type getSubsequentsMode() { return ESubsequentsMode::TrackSubsequents; }
 		void doTask(ENamedThreads::Type currentThread, const GraphEventRef& myCompletionGraphEvent)
@@ -77,7 +77,7 @@ namespace Air
 			{
 				prereq.add(RHIThreadTask);
 			}
-			RHIThreadTask = GraphTask<ExecuteRHIThreadTask>::createTask(&prereq, currentThread).constructAndDispatchWhenReady(RHICmdList);
+			RHIThreadTask = TGraphTask<ExecuteRHIThreadTask>::createTask(&prereq, currentThread).constructAndDispatchWhenReady(RHICmdList);
 		}
 	};
 
@@ -93,6 +93,14 @@ namespace Air
 	{
 		flush();
 		GRHICommandList.mOutstandingCmdListCount.decrement();
+	}
+
+	void RHICommandListBase::addDispatchPrerequisite(const GraphEventRef& prereq)
+	{
+		if (prereq.getReference())
+		{
+			mRTTasks.addUnique(prereq);
+		}
 	}
 
 	struct RHICommandWaitForAndSubmitRTSubList : public RHICommand<RHICommandWaitForAndSubmitRTSubList>
@@ -111,11 +119,11 @@ namespace Air
 				BOOST_ASSERT(!GRHIThread || !isInRHIThread());
 				if (isInRenderingThread())
 				{
-					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 					{
 
 					}
-					TaskGraphInterface::get().waitUntilTaskCompletes(mEventToWaitFor, ENamedThreads::RenderThread_Local);
+					TaskGraphInterface::get().waitUntilTaskCompletes(mEventToWaitFor, ENamedThreads::getRenderThread_Local());
 				}
 				else
 				{
@@ -188,11 +196,11 @@ namespace Air
 		}
 		while (RenderThreadSublistDispatchTask.getReference())
 		{
-			if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+			if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 			{
 
 			}
-			TaskGraphInterface::get().waitUntilTaskCompletes(RenderThreadSublistDispatchTask, ENamedThreads::RenderThread_Local);
+			TaskGraphInterface::get().waitUntilTaskCompletes(RenderThreadSublistDispatchTask, ENamedThreads::getRenderThread_Local());
 			if (RenderThreadSublistDispatchTask.getReference() && RenderThreadSublistDispatchTask->isComplete())
 			{
 				RenderThreadSublistDispatchTask = nullptr;
@@ -209,7 +217,7 @@ namespace Air
 		}
 		while (RHIThreadTask.getReference())
 		{
-			if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+			if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 			{
 				while (!RHIThreadTask->isComplete())
 				{
@@ -218,7 +226,7 @@ namespace Air
 			}
 			else
 			{
-				TaskGraphInterface::get().waitUntilTaskCompletes(RHIThreadTask, ENamedThreads::RenderThread_Local);
+				TaskGraphInterface::get().waitUntilTaskCompletes(RHIThreadTask, ENamedThreads::getRenderThread_Local());
 			}
 			if (RHIThreadTask.getReference() && RHIThreadTask->isComplete())
 			{
@@ -242,7 +250,7 @@ namespace Air
 			}
 			if (bAny)
 			{
-				TaskGraphInterface::get().waitUntilTaskComplete(WaitOutstandingTasks, ENamedThreads::RenderThread_Local);
+				TaskGraphInterface::get().waitUntilTaskComplete(WaitOutstandingTasks, ENamedThreads::getRenderThread_Local());
 			}
 			WaitOutstandingTasks.clear();
 		}
@@ -271,14 +279,16 @@ namespace Air
 	void RHICommandListExecutor::executeInner_DoExecute(RHICommandListBase& cmdList)
 	{
 		cmdList.mExecuting = true;
+		BOOST_ASSERT(cmdList.mContext || cmdList.mComputeContext);
+
+		RHICommandListDebugContext debugContext;
 		RHICommandListIterator iter(cmdList);
+
+		while (iter.hasCommandsLeft())
 		{
-			while (iter.hasCommandsLeft())
-			{
-				RHICommandBase* cmd = iter.nextCommand();
-				GCurrentCommand = cmd;
-				cmd->CallExecuteAndDestruct(cmdList);
-			}
+			RHICommandBase* cmd = iter.nextCommand();
+			GCurrentCommand = cmd;
+			cmd->executeAndDestruct(cmdList, debugContext);
 		}
 		cmdList.reset();
 	}
@@ -313,9 +323,9 @@ namespace Air
 			bool bAsyncSubmit = false;
 			if (bIsInRenderingThread)
 			{
-				if (!bIsInGameThread && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+				if (!bIsInGameThread && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 				{
-					TaskGraphInterface::get().processThreadUntilIdle(ENamedThreads::RenderThread_Local);
+					TaskGraphInterface::get().processThreadUntilIdle(ENamedThreads::getRenderThread_Local());
 				}
 				bAsyncSubmit = false;
 				if (!bAsyncSubmit&& RHIThreadTask.getReference() && RHIThreadTask->isComplete())
@@ -339,7 +349,7 @@ namespace Air
 					{
 						prereq.add(RenderThreadSublistDispatchTask);
 					}
-					RenderThreadSublistDispatchTask = GraphTask<DispatchRHIThreadTask>::createTask(&prereq, ENamedThreads::RenderThread).constructAndDispatchWhenReady(swapCmdList, bAsyncSubmit);
+					RenderThreadSublistDispatchTask = TGraphTask<DispatchRHIThreadTask>::createTask(&prereq, ENamedThreads::getRenderThread()).constructAndDispatchWhenReady(swapCmdList, bAsyncSubmit);
 
 				}
 				else
@@ -350,7 +360,7 @@ namespace Air
 					{
 						prereq.add(RHIThreadTask);
 					}
-					RHIThreadTask = GraphTask<ExecuteRHIThreadTask>::createTask(&prereq, ENamedThreads::RenderThread).constructAndDispatchWhenReady(swapCmdList);
+					RHIThreadTask = TGraphTask<ExecuteRHIThreadTask>::createTask(&prereq, ENamedThreads::getRenderThread()).constructAndDispatchWhenReady(swapCmdList);
 				}
 				return;
 			}
@@ -358,20 +368,20 @@ namespace Air
 			{
 				if (RenderThreadSublistDispatchTask.getReference())
 				{
-					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 					{
 
 					}
-					TaskGraphInterface::get().waitUntilTaskCompletes(RenderThreadSublistDispatchTask, ENamedThreads::RenderThread_Local);
+					TaskGraphInterface::get().waitUntilTaskCompletes(RenderThreadSublistDispatchTask, ENamedThreads::getRenderThread_Local());
 					RenderThreadSublistDispatchTask = nullptr;
 				}
 				while (RHIThreadTask.getReference())
 				{
-					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+					if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 					{
 
 					}
-					TaskGraphInterface::get().waitUntilTaskCompletes(RHIThreadTask, ENamedThreads::RenderThread_Local);
+					TaskGraphInterface::get().waitUntilTaskCompletes(RHIThreadTask, ENamedThreads::getRenderThread_Local());
 					if (RHIThreadTask.getReference() && RHIThreadTask->isComplete())
 					{
 						RHIThreadTask = nullptr;
@@ -401,15 +411,15 @@ namespace Air
 				getImmediateCommandList().immediateFlush(EImmediateFlushType::DispatchToRHIThread);
 			}
 			BOOST_ASSERT(GRHIThread);
-			if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local))
+			if (TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()))
 			{
 
 			}
-			TaskGraphInterface::get().waitUntilTaskCompletes(fence, ENamedThreads::RenderThread_Local);
+			TaskGraphInterface::get().waitUntilTaskCompletes(fence, ENamedThreads::getRenderThread_Local());
 		}
 	}
 
-	void RHICommandList::beginDrawingViewport(ViewportRHIParamRef viewport, TextureRHIParamRef renderTargetRHI)
+	void RHICommandList::beginDrawingViewport(RHIViewport* viewport, RHITexture* renderTargetRHI)
 	{
 		BOOST_ASSERT(isImmediate() && isInRenderingThread());
 		if (bypass())
@@ -424,9 +434,9 @@ namespace Air
 		}
 	}
 
-	void endDrawingViewport(ViewportRHIParamRef viewport, bool bPreset, bool bLockToVsync);
+	void endDrawingViewport(RHIViewport* viewport, bool bPreset, bool bLockToVsync);
 
-	void RHICommandList::endDrawingViewport(ViewportRHIParamRef viewport, bool bPreset, bool bLockToVsync)
+	void RHICommandList::endDrawingViewport(RHIViewport* viewport, bool bPreset, bool bLockToVsync)
 	{
 		BOOST_ASSERT(isImmediate() && isInRenderingThread());
 		if(bypass())
@@ -574,7 +584,7 @@ namespace Air
 		PlatformAtomics::interLockedDecrement(&StallCount);
 	}
 	
-	void RHICommandListImmediate::updateTextureReference(TextureReferenceRHIParamRef textureRef, TextureRHIParamRef newTexture)
+	void RHICommandListImmediate::updateTextureReference(RHITextureReference* textureRef, RHITexture* newTexture)
 	{
 		if (bypass() || !GRHIThread)
 		{
@@ -590,6 +600,51 @@ namespace Air
 		if (getUsedMemory() > 256 > 1024)
 		{
 			immediateFlush(EImmediateFlushType::DispatchToRHIThread);
+		}
+	}
+
+	struct RHIAsyncComputeSubmitList final : public RHICommand<RHIAsyncComputeSubmitList>
+	{
+		RHIAsyncComputeCommandList* mRHICmdList;
+		FORCEINLINE_DEBUGGABLE RHIAsyncComputeSubmitList(RHIAsyncComputeCommandList* inRHICmdList)
+			:mRHICmdList(inRHICmdList)
+		{}
+
+		void execute(RHICommandListBase& cmdList)
+		{
+			delete mRHICmdList;
+		}
+	};
+
+	void RHICommandListImmediate::queueAsyncCompute(RHIAsyncComputeCommandList& RHIComputeList)
+	{
+		if (bypass())
+		{
+			delete& RHIComputeList;
+			return;
+		}
+		ALLOC_COMMAND(RHIAsyncComputeSubmitList)(&RHIComputeList);
+	}
+
+	void RHIAsyncComputeCommandListImmediate::immediateDispatch(RHIAsyncComputeCommandListImmediate& RHIComputeCmdList)
+	{
+		BOOST_ASSERT(isInRenderingThread());
+		RHIComputeCmdList.submitCommandsHint();
+
+		if (!RHIComputeCmdList.bypass())
+		{
+			RHIAsyncComputeCommandListImmediate* swapCmdList;
+			{
+				swapCmdList = new RHIAsyncComputeCommandListImmediate();
+				static_assert(sizeof(RHICommandList) == sizeof(RHIAsyncComputeCommandListImmediate), "we are memswapping RHICommandList and RHICommandListImmediate; they need to be swappable.");
+				BOOST_ASSERT(RHIComputeCmdList.isImmediateAsyncCompute());
+				swapCmdList->exchangeCmdList(RHIComputeCmdList);
+				RHIComputeCmdList.mPSOContext = swapCmdList->mPSOContext;
+
+				RHICommandListImmediate& RHIImmCmdList = RHICommandListExecutor::getImmediateCommandList();
+				RHIImmCmdList.queueAsyncCompute(*swapCmdList);
+				RHIImmCmdList.immediateFlush(EImmediateFlushType::DispatchToRHIThread);
+			}
 		}
 	}
 }

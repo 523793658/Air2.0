@@ -102,11 +102,11 @@ namespace Air
 	void SlateRHIRenderer::drawWindows_Private(SlateDrawBuffer& windowDrawBuffer)
 	{
 		BOOST_ASSERT(isThreadSafeForSlateRendering());
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			slateBeginDrawingWindowsCommand,
-			SlateRHIRenderingPolicy&, policy, *mRenderingPolicy, 
+		SlateRHIRenderingPolicy* policy = mRenderingPolicy.get();
+		ENQUEUE_RENDER_COMMAND(
+			slateBeginDrawingWindowsCommand)([policy](RHICommandListImmediate&)
 			{
-				policy.beginDrawingWindows();
+				policy->beginDrawingWindows();
 			});
 
 		TArray<std::shared_ptr<SlateWindowElementList>>& windowElementLists = windowDrawBuffer.getWindowElementLists();
@@ -163,8 +163,8 @@ namespace Air
 						Params.slateWindow = window.get();
 						if (GIsClient)
 						{
-							ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-								slateDrawWindowsCommand, SlateDrawWindowCommandParams, Params, Params,
+							ENQUEUE_RENDER_COMMAND(
+								slateDrawWindowsCommand)([Params](RHICommandListImmediate& RHICmdList)
 								{
 									Params.renderer->drawWindow_RenderThread(RHICmdList, *Params.viewportInfo, *Params.windowElementList, Params.lockToVsync, Params.clear);
 								});
@@ -173,17 +173,11 @@ namespace Air
 				}
 			}
 		}
-
 		int x = 0;
-
-
-
-		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-			slateEndDrawingWindowsCommand,
-			SlateDrawBuffer*, drawBuffer, &windowDrawBuffer,
-			SlateRHIRenderingPolicy&, policy, *mRenderingPolicy,
+		ENQUEUE_RENDER_COMMAND(
+			slateEndDrawingWindowsCommand)([&windowDrawBuffer, policy](RHICommandListImmediate& RHICmdList)			
 			{
-				SlateEndDrawingWindowsCommand::endDrwingWindows(RHICmdList, drawBuffer, policy);
+				SlateEndDrawingWindowsCommand::endDrwingWindows(RHICmdList, &windowDrawBuffer, *policy);
 			});
 
 	}

@@ -16,6 +16,7 @@
 #include "boost/lexical_cast.hpp"
 #include <iostream>
 #include "boost/algorithm/string.hpp"
+#include "Containers/StringConv.h"
 namespace Air
 {
 
@@ -397,9 +398,9 @@ namespace Air
 		::FreeLibrary((HMODULE)dllHandle);
 	}
 
-	void* WindowsPlatformProcess::getDllExport(void* dllHandle, const char* ProcName)
+	void* WindowsPlatformProcess::getDllExport(void* dllHandle, const TCHAR* ProcName)
 	{
-		return (void*)::GetProcAddress((HMODULE)dllHandle, ProcName);
+		return (void*)::GetProcAddress((HMODULE)dllHandle, TCHAR_TO_ANSI(ProcName));
 	}
 
 	void WindowsPlatformProcess::resolveImportsRecursive(const wstring& fileName, const TArray<wstring>& searchPaths, TArray<wstring>& importFileNames, TArray<string>& visitedImportNames)

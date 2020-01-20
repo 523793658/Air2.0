@@ -73,4 +73,14 @@ namespace Air
 		}
 		return *singletonInterface;
 	}
+
+	bool CORE_API stringHasBadDashes(const TCHAR* str)
+	{
+		while (TCHAR ch = *str++)
+		{
+			if ((UCS2CHAR)ch == 0x2013)
+				return true;
+		}
+		return false;
+	}
 }

@@ -25,7 +25,7 @@ namespace Air
 
 
 
-	CachedBoundShaderStateLink::CachedBoundShaderStateLink(VertexDeclarationRHIParamRef vertexDeclaration, VertexShaderRHIParamRef vertexShader, PixelShaderRHIParamRef pixelShader, HullShaderRHIParamRef hullShader, DomainShaderRHIParamRef domainShader, GeometryShaderRHIParamRef geometryShader, BoundShaderStateRHIParamRef inBoundShaderState, bool bAddToSingleThreadedCached /* = true */)
+	CachedBoundShaderStateLink::CachedBoundShaderStateLink(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShader, RHIPixelShader* pixelShader, RHIHullShader* hullShader, RHIDomainShader* domainShader, RHIGeometryShader* geometryShader, RHIBoundShaderState* inBoundShaderState, bool bAddToSingleThreadedCached /* = true */)
 		:mBoundShaderState(inBoundShaderState),
 		mKey(vertexDeclaration, vertexShader, pixelShader),
 		bAddedToSingleThreadedCache(bAddToSingleThreadedCached)
@@ -36,7 +36,7 @@ namespace Air
 		}
 	}
 
-	CachedBoundShaderStateLink::CachedBoundShaderStateLink(VertexDeclarationRHIParamRef vertexDeclaration, VertexShaderRHIParamRef vertexShader, PixelShaderRHIParamRef pixelShader, BoundShaderStateRHIParamRef inBoundShaderState, bool bAddToSingleThreadedCache /* = true */)
+	CachedBoundShaderStateLink::CachedBoundShaderStateLink(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShader, RHIPixelShader* pixelShader, RHIBoundShaderState* inBoundShaderState, bool bAddToSingleThreadedCache /* = true */)
 		:mBoundShaderState(inBoundShaderState),
 		mKey(vertexDeclaration, vertexShader, pixelShader),
 		bAddedToSingleThreadedCache(bAddToSingleThreadedCache)
@@ -57,12 +57,12 @@ namespace Air
 	}
 
 	CachedBoundShaderStateLink* getCachedBoundShaderState(
-		VertexDeclarationRHIParamRef vertexDeclaration,
-		VertexShaderRHIParamRef vertexShader,
-		PixelShaderRHIParamRef pixelShader,
-		HullShaderRHIParamRef hullShader,
-		DomainShaderRHIParamRef domainShader,
-		GeometryShaderRHIParamRef geometryShader
+		RHIVertexDeclaration* vertexDeclaration,
+		RHIVertexShader* vertexShader,
+		RHIPixelShader* pixelShader,
+		RHIHullShader* hullShader,
+		RHIDomainShader* domainShader,
+		RHIGeometryShader* geometryShader
 	)
 	{
 		auto it = getBoundShaderStateCache().find(BoundShaderStateKey(vertexDeclaration, vertexShader, pixelShader, hullShader, domainShader, geometryShader));
@@ -85,12 +85,12 @@ namespace Air
 		getBoundShaderStateCache_ThreadSafe().erase(mKey);
 	}
 
-	BoundShaderStateRHIRef getCachedBoundShaderState_ThreadSafe(VertexDeclarationRHIParamRef vertexDeclaration,
-		VertexShaderRHIParamRef vertexShader,
-		PixelShaderRHIParamRef pixelShader,
-		HullShaderRHIParamRef hullShader,
-		DomainShaderRHIParamRef domainShader,
-		GeometryShaderRHIParamRef geometryShader)
+	BoundShaderStateRHIRef getCachedBoundShaderState_ThreadSafe(RHIVertexDeclaration* vertexDeclaration,
+		RHIVertexShader* vertexShader,
+		RHIPixelShader* pixelShader,
+		RHIHullShader* hullShader,
+		RHIDomainShader* domainShader,
+		RHIGeometryShader* geometryShader)
 	{
 		ScopeLock lock(&BoundShaderStateCacheLock);
 		auto it = getBoundShaderStateCache_ThreadSafe().find(BoundShaderStateKey(vertexDeclaration, vertexShader, pixelShader, hullShader, domainShader, geometryShader));

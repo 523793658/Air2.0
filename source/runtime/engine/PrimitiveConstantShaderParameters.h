@@ -7,18 +7,18 @@
 #include "Math/Matrix.hpp"
 namespace Air
 {
-	BEGIN_CONSTANT_BUFFER_STRUCT(PrimitiveConstantShaderParameters, ENGINE_API)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(Matrix, LocalToWorld)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(Matrix, WorldToLocal)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, ObjectWorldPositionAndRadius)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, ObjectBounds)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(float, LocalToWorldDeterminantSign, EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3 ,ActorWorldPosition)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, DecalReceiverMask, EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(float4, ObjectOrientation, EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(float4, NonUniformScale, EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(float4, InvNonUniformScale, EShaderPrecisionModifier::Half)
-	END_CONSTANT_BUFFER_STRUCT(PrimitiveConstantShaderParameters)
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(PrimitiveConstantShaderParameters, ENGINE_API)
+		SHADER_PARAMETER(Matrix, LocalToWorld)
+		SHADER_PARAMETER(Matrix, WorldToLocal)
+		SHADER_PARAMETER_EX(float, LocalToWorldDeterminantSign, EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER(float4, ObjectWorldPositionAndRadius)
+		SHADER_PARAMETER(float3, ObjectBounds)
+		SHADER_PARAMETER(float3 ,ActorWorldPosition)
+		SHADER_PARAMETER_EX(float, DecalReceiverMask, EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER(float4, ObjectOrientation, EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER(float4, NonUniformScale, EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER(float4, InvNonUniformScale, EShaderPrecisionModifier::Half)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT(PrimitiveConstantShaderParameters)
 
 		inline PrimitiveConstantShaderParameters getPrimitiveConstantShaderParameters(
 			const Matrix& localToWorld,
@@ -62,4 +62,36 @@ namespace Air
 		BOOST_ASSERT(isInRenderingThread());
 		return TConstantBufferRef<PrimitiveConstantShaderParameters>::createConstantBufferImmediate(getPrimitiveConstantShaderParameters(localToWorld, worldBounds.mOrigin, worldBounds, localBounds, bReceivesDecals), ConstantBuffer_MultiFrame);
 	}
+
+	inline PrimitiveConstantShaderParameters getIdentityPrimitiveParameters()
+	{
+		return getPrimitiveConstantShaderParameters(
+			Matrix(Plane(1, 0, 0, 0), Plane(0, 1, 0, 0), Plane(0, 0, 1, 0), Plane(0, 0, 0, 1)),
+			float3(0.0f, 0.0f, 0.0f),
+			BoxSphereBounds(EForceInit::ForceInit),
+			BoxSphereBounds(EForceInit::ForceInit),
+			false);
+	}
+
+	struct PrimitiveSceneShaderData
+	{
+		enum {PrimitiveDataStrideInFloat4s = 35};
+
+		float4 mData[PrimitiveDataStrideInFloat4s];
+
+		PrimitiveSceneShaderData()
+		{
+			setup(getIdentityPrimitiveParameters());
+		}
+
+		explicit PrimitiveSceneShaderData(const PrimitiveConstantShaderParameters& primitiveConstantShaderParameters)
+		{
+			setup(primitiveConstantShaderParameters);
+		}
+
+
+		ENGINE_API void setup(const PrimitiveConstantShaderParameters& primitiveConstantShaderParameters);
+
+		ENGINE_API PrimitiveSceneShaderData(const class PrimitiveSceneProxy* RESTRICT proxy);
+	};
 }

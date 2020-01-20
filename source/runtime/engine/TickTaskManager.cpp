@@ -164,8 +164,8 @@ namespace Air
 		};
 		ETickingGroup mWaitForTickGroup;
 		TArrayWithThreadsafeAdd<GraphEventRef, TInlineAllocator<4>> mTickCompletionEvents[TG_MAX];
-		TArrayWithThreadsafeAdd<GraphTask<TickFunctionTask>*> mHiPriTickTasks[TG_MAX][TG_MAX];
-		TArrayWithThreadsafeAdd<GraphTask<TickFunctionTask>*> mTickTasks[TG_MAX][TG_MAX];
+		TArrayWithThreadsafeAdd<TGraphTask<TickFunctionTask>*> mHiPriTickTasks[TG_MAX][TG_MAX];
+		TArrayWithThreadsafeAdd<TGraphTask<TickFunctionTask>*> mTickTasks[TG_MAX][TG_MAX];
 
 		GraphEventArray mCleanupTasks;
 		bool bAllowConcurrentTicks;
@@ -192,7 +192,7 @@ namespace Air
 		{
 			for (int32 indexInner = 0; indexInner < TG_MAX; indexInner++)
 			{
-				TArray<GraphTask<TickFunctionTask>*>& tickArray = mHiPriTickTasks[worldTickGroup][indexInner];
+				TArray<TGraphTask<TickFunctionTask>*>& tickArray = mHiPriTickTasks[worldTickGroup][indexInner];
 				if (indexInner < worldTickGroup)
 				{
 					BOOST_ASSERT(tickArray.size() == 0);
@@ -208,7 +208,7 @@ namespace Air
 			}
 			for (int32 indexInner = 0; indexInner < TG_MAX; indexInner++)
 			{
-				TArray<GraphTask<TickFunctionTask>*>& tickArray = mTickTasks[worldTickGroup][indexInner];
+				TArray<TGraphTask<TickFunctionTask>*>& tickArray = mTickTasks[worldTickGroup][indexInner];
 				if (indexInner < worldTickGroup)
 				{
 					BOOST_ASSERT(tickArray.size() == 0);
@@ -240,7 +240,7 @@ namespace Air
 				}
 				else
 				{
-					TaskGraphInterface::get().waitUntilTaskCompletes(GraphTask<DispatchTickGroupTask>::createTask(nullptr, ENamedThreads::GameThread).constructAndDispatchWhenReady(*this, worldTickGroup));
+					TaskGraphInterface::get().waitUntilTaskCompletes(TGraphTask<DispatchTickGroupTask>::createTask(nullptr, ENamedThreads::GameThread).constructAndDispatchWhenReady(*this, worldTickGroup));
 				}
 			}
 			if (bBlackTillComplete || singleThreadedMode())
@@ -256,7 +256,7 @@ namespace Air
 						}
 						else
 						{
-							mCleanupTasks.add(GraphTask<ResetTickGroupTask>::createTask(nullptr, ENamedThreads::GameThread).constructAndDispatchWhenReady(*this, block));
+							mCleanupTasks.add(TGraphTask<ResetTickGroupTask>::createTask(nullptr, ENamedThreads::GameThread).constructAndDispatchWhenReady(*this, block));
 						}
 					}
 				}
@@ -334,10 +334,10 @@ namespace Air
 			{
 				useContext.mThread = ENamedThreads::GameThread;
 			}
-			tickFunction->mTaskPointer = GraphTask<TickFunctionTask>::createTask(prerequisites, tickContext.mThread).constructAndHold(tickFunction, &useContext, bLogTicks, bLogTicksShowPrerequistes);
+			tickFunction->mTaskPointer = TGraphTask<TickFunctionTask>::createTask(prerequisites, tickContext.mThread).constructAndHold(tickFunction, &useContext, bLogTicks, bLogTicksShowPrerequistes);
 		}
 
-		FORCEINLINE void addTickCompletion(ETickingGroup startTickGroup, ETickingGroup endTickGroup, GraphTask<TickFunctionTask>* task, bool bHiPri)
+		FORCEINLINE void addTickCompletion(ETickingGroup startTickGroup, ETickingGroup endTickGroup, TGraphTask<TickFunctionTask>* task, bool bHiPri)
 		{
 			BOOST_ASSERT(startTickGroup >= 0 && startTickGroup < TG_MAX && endTickGroup >= 0 && endTickGroup < TG_MAX && startTickGroup <= endTickGroup);
 			if (bHiPri)
@@ -355,7 +355,7 @@ namespace Air
 		{
 			BOOST_ASSERT(tickContext.mThread == ENamedThreads::GameThread);
 			startTickTask(prerequisites, tickFunction, tickContext);
-			GraphTask<TickFunctionTask>* task = (GraphTask<TickFunctionTask>*)tickFunction->mTaskPointer;
+			TGraphTask<TickFunctionTask>* task = (TGraphTask<TickFunctionTask>*)tickFunction->mTaskPointer;
 			addTickCompletion(tickFunction->mActualStartTickGroup, tickFunction->mActualEndTickGroup, task, tickFunction->bHighPriority);
 		}
 	};
@@ -1063,7 +1063,7 @@ namespace Air
 	GraphEventRef TickFunction::getCompletionHandle() const
 	{
 		BOOST_ASSERT(mTaskPointer);
-		GraphTask<TickFunctionTask>* task = (GraphTask<TickFunctionTask>*)mTaskPointer;
+		TGraphTask<TickFunctionTask>* task = (TGraphTask<TickFunctionTask>*)mTaskPointer;
 		return task->getCompletionEvent();
 	}
 

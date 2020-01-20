@@ -9,9 +9,8 @@ namespace Air
 	TDrawEvent<RHICommandList>* beginTickDrawEvent()
 	{
 		TDrawEvent<RHICommandList>* tickDrawEvent = new TDrawEvent<RHICommandList>();
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			BeginDrawEventCommand,
-			TDrawEvent<RHICommandList>*, tickDrawEvent, tickDrawEvent,
+		ENQUEUE_RENDER_COMMAND(
+			BeginDrawEventCommand)([tickDrawEvent](RHICommandListImmediate& RHICmdList)
 			{
 				BEGIN_DRAW_EVENTF(RHICmdList, WorldTick, (*tickDrawEvent), TEXT("WorldTick"));
 			}
@@ -21,9 +20,8 @@ namespace Air
 
 	void endTickDrawEvent(TDrawEvent<RHICommandList>* tickDrawEvent)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			EndDrawEventCommand,
-			TDrawEvent<RHICommandList>*, tickDrawEvent, tickDrawEvent,
+		ENQUEUE_RENDER_COMMAND(
+			EndDrawEventCommand)([tickDrawEvent](RHICommandListImmediate& RHICmdList)
 			{
 				STOP_DRAW_EVENT((*tickDrawEvent));
 			delete tickDrawEvent;
@@ -188,5 +186,10 @@ namespace Air
 	wstring EndPhysicsTickFunction::diagnosticMessage()
 	{
 		return TEXT("EndPhysicsTickFunction");
+	}
+
+	void World::setMaterialParameterCollectionInstanceNeedsUpdate()
+	{
+		//bMaterialPara
 	}
 }

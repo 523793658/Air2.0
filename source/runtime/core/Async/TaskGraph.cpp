@@ -14,13 +14,16 @@
 #include "CoreGlobals.h"
 #include "Misc/ScopedEvent.h"
 #include "Template/AirTemplate.h"
+#include "boost/algorithm/string.hpp"
+#include "Logging/LogMacros.h"
 namespace Air
 {
 
 #if 0
-#else
-#define CREATE_HIPRI_TASK_THREADS (0)
 #define CREATE_BACKGROUND_TASK_THREADS (0)
+#else
+#define CREATE_BACKGROUND_TASK_THREADS (0)
+#define CREATE_HIPRI_TASK_THREADS (0)
 #endif
 
 #define PLATFORM_OK_TO_BURN_CPU (0)
@@ -45,10 +48,27 @@ namespace Air
 
 	namespace ENamedThreads
 	{
-		CORE_API Type RenderThread = ENamedThreads::GameThread;
-		CORE_API Type RenderThread_Local = ENamedThreads::GameThread_Local;
+		CORE_API std::atomic_int32_t RenderThreadStatics::mRenderThread(ENamedThreads::GameThread);
+		CORE_API std::atomic_int32_t RenderThreadStatics::mRenderThread_Local(ENamedThreads::GameThread_Local);
 		CORE_API int32 bHasBackgroundThreads = CREATE_BACKGROUND_TASK_THREADS;
 		CORE_API int32 bHasHighPriorityThreads = CREATE_HIPRI_TASK_THREADS;
+	}
+
+	static wstring threadPriorityToName(ENamedThreads::Type priority)
+	{
+		if (priority == ENamedThreads::NormalThreadPriority)
+		{
+			return TEXT("Normal");
+		}
+		if (priority == ENamedThreads::HighThreadPriority)
+		{
+			return TEXT("High");
+		}
+		if (priority == ENamedThreads::BackgroundThreadPriority)
+		{
+			return TEXT("Background");
+		}
+		return TEXT("??Unknown");
 	}
 
 	class TaskQueue
@@ -895,7 +915,7 @@ namespace Air
 				inEvent->trigger();
 				return;
 			}
-			GraphTask<TriggerEventGraphTask>::createTask(&tasks, currentThreadIdKnown).constructAndDispatchWhenReady(inEvent);
+			TGraphTask<TriggerEventGraphTask>::createTask(&tasks, currentThreadIdKnown).constructAndDispatchWhenReady(inEvent);
 		}
 
 		virtual void requestReturn(ENamedThreads::Type currentThread) override
@@ -954,7 +974,7 @@ namespace Air
 					}
 				}
 
-				GraphTask<ReturnGraphTask>::createTask(&tasks, currentThread).constructAndDispatchWhenReady(currentThread);
+				TGraphTask<ReturnGraphTask>::createTask(&tasks, currentThread).constructAndDispatchWhenReady(currentThread);
 				processThreadUntilRequestReturn(currentThread);
 			}
 			else
@@ -1212,7 +1232,7 @@ namespace Air
 		{
 			GraphEventArray temEventsToWaitFor;
 			exchange(mEventsToWaitFor, temEventsToWaitFor);
-			GraphTask<NullGraphTask>::createTask(GraphEventRef(this), &temEventsToWaitFor, currentThreadIfKnown).constructAndDispatchWhenReady(ENamedThreads::AnyHiPriThreadHiPriTask);
+			TGraphTask<NullGraphTask>::createTask(GraphEventRef(this), &temEventsToWaitFor, currentThreadIfKnown).constructAndDispatchWhenReady(ENamedThreads::AnyHiPriThreadHiPriTask);
 			return;
 		}
 		mSubSequentList.popAllAndClose(newTasks);
@@ -1233,5 +1253,28 @@ namespace Air
 	void TaskThreadAnyThread::notifyStalling()
 	{
 		return TaskGraphImplementation::get().notifyStalling(mThreadId);
+	}
+
+	void AutoConsoleTaskPriority::commandExecute(const TArray<wstring>& args)
+	{
+		if (args.size() > 0)
+		{
+			if(boost::iequals(args[0], threadPriorityToName(ENamedThreads::NormalThreadPriority)))
+			{
+				mThreadPriority = ENamedThreads::NormalThreadPriority;
+			}
+			else if (boost::iequals(args[0], threadPriorityToName(ENamedThreads::HighThreadPriority)))
+			{
+				mThreadPriority = ENamedThreads::HighThreadPriority;
+			}
+			if (boost::iequals(args[0], threadPriorityToName(ENamedThreads::BackgroundThreadPriority)))
+			{
+				mThreadPriority = ENamedThreads::BackgroundThreadPriority;
+			}
+			else
+			{
+				AIR_LOG(LogConsoleRespones, Display, TEXT("Could not parse thread priority %s"), args[0].c_str());
+			}
+		}
 	}
 }

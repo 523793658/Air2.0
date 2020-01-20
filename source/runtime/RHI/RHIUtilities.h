@@ -84,10 +84,10 @@ namespace Air
 		}
 	}
 
-	inline void transitionSetRenderTargetsHelper(RHICommandList& RHICmdList, TextureRHIParamRef newRenderTarget, TextureRHIParamRef newDepthStencilTarget, FExclusiveDepthStencil depthStencilAccess)
+	inline void transitionSetRenderTargetsHelper(RHICommandList& RHICmdList, RHITexture* newRenderTarget, RHITexture* newDepthStencilTarget, FExclusiveDepthStencil depthStencilAccess)
 	{
 		int32 transitionIndex = 0;
-		TextureRHIParamRef transitions[2];
+		RHITexture* transitions[2];
 		if (newRenderTarget)
 		{
 			transitions[transitionIndex] = newRenderTarget;
@@ -101,7 +101,7 @@ namespace Air
 		RHICmdList.transitionResources(EResourceTransitionAccess::EWritable, transitions, transitionIndex);
 	}
 
-	inline void setRenderTarget(RHICommandList& RHICmdList, TextureRHIParamRef newRenderTarget, TextureRHIParamRef newDepthStencilTarget, ESimpleRenderTargetMode mode, FExclusiveDepthStencil depthStencilAccess = FExclusiveDepthStencil::DepthWrite_StencilWrite, bool bWritableBarrier = false)
+	inline void setRenderTarget(RHICommandList& RHICmdList, RHITexture* newRenderTarget, RHITexture* newDepthStencilTarget, ESimpleRenderTargetMode mode, FExclusiveDepthStencil depthStencilAccess = FExclusiveDepthStencil::DepthWrite_StencilWrite, bool bWritableBarrier = false)
 	{
 		ERenderTargetLoadAction colorLoadAction, depthLoadAction;
 		ERenderTargetStoreAction colorStoreAction, depthStoreAction;
@@ -116,7 +116,7 @@ namespace Air
 		RHICmdList.setRenderTargetAndClear(info);
 	}
 
-	inline void setRenderTarget(RHICommandList& RHICmdList, TextureRHIParamRef newRenderTarget, TextureRHIParamRef newDepthStencilTarget, bool bWritableBarrier = false)
+	inline void setRenderTarget(RHICommandList& RHICmdList, RHITexture* newRenderTarget, RHITexture* newDepthStencilTarget, bool bWritableBarrier = false)
 	{
 		RHIRenderTargetView RTV(newRenderTarget);
 		RHIDepthRenderTargetView depthRTV(newDepthStencilTarget);
@@ -127,7 +127,7 @@ namespace Air
 		RHICmdList.setRenderTargets(1, &RTV, &depthRTV, 0, nullptr);
 	}
 
-	inline void setRenderTarget(RHICommandList& RHICmdList, TextureRHIParamRef newRenderTarget, int32 mipIndex, int32 arraySliceIndex, TextureRHIParamRef newDepthStencilTarget, bool bWritableBarrier = false)
+	inline void setRenderTarget(RHICommandList& RHICmdList, RHITexture* newRenderTarget, int32 mipIndex, int32 arraySliceIndex, RHITexture* newDepthStencilTarget, bool bWritableBarrier = false)
 	{
 		RHIRenderTargetView rtv(newRenderTarget, mipIndex, arraySliceIndex);
 		RHIDepthRenderTargetView DepthRTV(newDepthStencilTarget);
@@ -233,31 +233,208 @@ namespace Air
 		return vertexCount;
 	}
 
-	inline void drawIndexedPrimitiveUP(RHICommandList& rhiCmdList,
-		uint32 primitiveType,
-		uint32 minVertexIndex,
-		uint32 numVertices,
-		uint32 numPrimitives,
-		const void* indexData,
-		uint32 indexDataStride,
-		const void* vertexData,
-		uint32 vertexDataStride)
+	struct ReadBuffer
 	{
-		void* vertexBuffer = nullptr;
-		void * indexBuffer = nullptr;
-		const uint32 numIndices = getVertexCountForPrimitiveCount(numPrimitives, primitiveType);
-		rhiCmdList.beginDrawIndexedPrimitiveUP(primitiveType, numPrimitives, numVertices, vertexDataStride, vertexBuffer, minVertexIndex, numIndices, indexDataStride, indexBuffer);
-		Memory::memcpy(vertexBuffer, vertexData, numVertices * vertexDataStride);
-		Memory::memcpy(indexBuffer, indexData, numIndices * indexDataStride);
-		rhiCmdList.endDrawIndexedPrimitiveUP();
+		VertexBufferRHIRef mBuffer;
+		ShaderResourceViewRHIRef mSRV;
+		uint32 mNumBytes;
+
+		ReadBuffer() :mNumBytes(0) {}
+
+		void initialize(uint32 bytesPerElement, uint32 numElements, EPixelFormat format, uint32 additionalUsage = 0)
+		{
+			BOOST_ASSERT(GSupportsResourceView);
+			mNumBytes = bytesPerElement * numElements;
+			RHIResourceCreateInfo createInfo;
+			mBuffer = RHICreateVertexBuffer(mNumBytes, BUF_ShaderResource | additionalUsage, createInfo);
+			mSRV = RHICreateShaderResourceView(mBuffer, bytesPerElement, format);
+		}
+
+		void release()
+		{
+			mNumBytes = 0;
+			mBuffer.safeRelease();
+			mSRV.safeRelease();
+		}
+	};
+
+	struct RWBufferStructured
+	{
+		StructuredBufferRHIRef mBuffer;
+		UnorderedAccessViewRHIRef mUAV;
+		ShaderResourceViewRHIRef mSRV;
+		uint32 mNumBytes;
+
+		RWBufferStructured() :mNumBytes(0) {
+		}
+
+		~RWBufferStructured()
+		{
+			release();
+		}
+
+		void initialize(uint32 bytesPerElement, uint32 numElements, uint32 additionalUsage = 0, const TCHAR * inDebugName = nullptr, bool bUseUavCounter = false, bool bAppendBuffer = false)
+		{
+			BOOST_ASSERT(GMaxRHIFeatureLevel == ERHIFeatureLevel::SM5 || GMaxRHIFeatureLevel == ERHIFeatureLevel::ES3_1);
+
+			BOOST_ASSERT(!((additionalUsage & BUF_FastVRAM) && !inDebugName));
+
+			mNumBytes = bytesPerElement * numElements;
+
+			RHIResourceCreateInfo createInfo;
+
+			createInfo.mDebugName = inDebugName;
+
+			mBuffer = RHICreateStructuredBuffer(bytesPerElement, mNumBytes, BUF_UnorderedAccess | BUF_ShaderResource | additionalUsage, createInfo);
+			mUAV = RHICreateUnorderedAccessView(mBuffer, bUseUavCounter, bAppendBuffer);
+			mSRV = RHICreateShaderResourceView(mBuffer);
+
+		}
+
+		void release()
+		{
+			int32 bufferRefCount = mBuffer ? mBuffer->GetRefCount() : -1;
+
+			if (bufferRefCount == 1)
+			{
+				discardTransientResource();
+			}
+
+			mNumBytes = 0;
+			mBuffer.safeRelease();
+			mUAV.safeRelease();
+			mSRV.safeRelease();
+		}
+
+		void acquireTransientResource()
+		{
+			RHIAcquireTransientResource(mBuffer);
+		}
+
+		void discardTransientResource()
+		{
+			RHIDiscardTransientResource(mBuffer);
+		}
+
+	};
+
+	struct DynamicReadBuffer : public ReadBuffer
+	{
+		uint8* mMappedBuffer;
+
+		DynamicReadBuffer()
+			: mMappedBuffer(nullptr)
+		{}
+
+		virtual ~DynamicReadBuffer()
+		{
+			release();
+		}
+
+		virtual void initialize(uint32 bytesPerElement, uint32 numElements, EPixelFormat format, uint32 additionalUsage = 0)
+		{
+			BOOST_ASSERT(additionalUsage & (BUF_Dynamic | BUF_Volatile | BUF_Static) && (additionalUsage & (BUF_Dynamic | BUF_Volatile)) ^ (BUF_Dynamic | BUF_Volatile));
+
+			ReadBuffer::initialize(bytesPerElement, numElements, format, additionalUsage);
+		}
+
+		void lock()
+		{
+			BOOST_ASSERT(mMappedBuffer == nullptr);
+			BOOST_ASSERT(isValidRef(mBuffer));
+			mMappedBuffer = (uint8*)RHILockVertexBuffer(mBuffer, 0, mNumBytes, RLM_ReadOnly);
+		}
+
+		void unlock()
+		{
+			BOOST_ASSERT(mMappedBuffer);
+			BOOST_ASSERT(isValidRef(mBuffer));
+			RHIUnlockVertexBuffer(mBuffer);
+			mMappedBuffer = nullptr;
+		}
+	};
+
+	inline void transitionRenderPassTargets(RHICommandList& RHICmdList, const RHIRenderPassInfo& RPInfo)
+	{
+		RHITexture* transitions[MaxSimultaneousRenderTargets + 1];
+		int32 transitionIndex = 0;
+		uint32 numColorRenderTargets = RPInfo.getNumColorRenderTargets();
+		for (uint32 index = 0; index < numColorRenderTargets; index++)
+		{
+			const RHIRenderPassInfo::ColorEntry& colorRenderTarget = RPInfo.mColorRenderTargets[index];
+			if (colorRenderTarget.mRenderTarget != nullptr)
+			{
+				transitions[transitionIndex] = colorRenderTarget.mRenderTarget;
+				transitionIndex++;
+			}
+		}
+
+		const RHIRenderPassInfo::DepthStencilEntry& depthStencilTarget = RPInfo.mDepthStencilRenderTarget;
+		if (depthStencilTarget.mDepthStencilTarget != nullptr && RPInfo.mDepthStencilRenderTarget.mExculusiveDepthStencil.IsDepthWrite())
+		{
+			transitions[transitionIndex] = depthStencilTarget.mDepthStencilTarget;
+			transitionIndex++;
+		}
+
+		RHICmdList.transitionResources(EResourceTransitionAccess::EWritable, transitions, transitionIndex);
 	}
 
-	inline void drawPrimitiveUP(RHICommandList& RHICmdList, uint32 primitiveType, uint32 numPrimitives, const void* vertexData, uint32 vertexDataStride)
+	struct RWBuffer
 	{
-		void * buffer = nullptr;
-		const uint32 vertexCount = getVertexCountForPrimitiveCount(numPrimitives, primitiveType);
-		RHICmdList.beginDrawPrimitiveUP(primitiveType, numPrimitives, numPrimitives, vertexDataStride, buffer);
-		Memory::memcpy(buffer, vertexData, vertexCount * vertexDataStride);
-		RHICmdList.endDrawPrimitiveUP();
-	}
+		VertexBufferRHIRef mBuffer;
+		UnorderedAccessViewRHIRef mUAV;
+		ShaderResourceViewRHIRef mSRV;
+		uint32 mNumBytes;
+
+		RWBuffer()
+			:mNumBytes(0)
+		{}
+
+		~RWBuffer()
+		{
+			release();
+		}
+
+		void initialize(uint32 bytesPerElement, uint32 numElements, EPixelFormat format, uint32 additionalUsage = 0, const TCHAR* inDebugName = nullptr, ResourceArrayInterface* inResourceArray = nullptr)
+		{
+			BOOST_ASSERT(GMaxRHIFeatureLevel == ERHIFeatureLevel::SM5
+				|| isVulkanPlatform(GMaxRHIShaderPlatform)
+				|| isMetalPlatform(GMaxRHIShaderPlatform)
+				|| (GMaxRHIFeatureLevel == ERHIFeatureLevel::ES3_1 && GSupportsResourceView));
+
+			BOOST_ASSERT(!((additionalUsage & BUF_FastVRAM) && !inDebugName));
+			RHIResourceCreateInfo createInfo;
+			createInfo.mResourceArray = inResourceArray;
+			createInfo.mDebugName = inDebugName;
+			mBuffer = RHICreateVertexBuffer(mNumBytes, BUF_UnorderedAccess | BUF_ShaderResource | additionalUsage, createInfo);
+			mUAV = RHICreateUnorderedAccessView(mBuffer, format);
+			mSRV = RHICreateShaderResourceView(mBuffer, bytesPerElement, format);
+		}
+
+		void acquireTransientResource()
+		{
+			RHIAcquireTransientResource(mBuffer);
+		}
+
+		void discardTransientResource()
+		{
+			RHIDiscardTransientResource(mBuffer);
+		}
+		void release()
+		{
+			int32 bufferRefCount = mBuffer ? mBuffer->GetRefCount() : -1;
+			if (bufferRefCount == 1)
+			{
+				discardTransientResource();
+			}
+
+			mNumBytes = 0;
+
+			mBuffer.safeRelease();
+			mUAV.safeRelease();
+			mSRV.safeRelease();
+		}
+	};
+
+	
 }

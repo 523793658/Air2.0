@@ -6,6 +6,8 @@
 #include "ShaderParameters.h"
 namespace Air
 {
+
+
 	TMap<Guid, MaterialParameterCollectionInstanceResource*> GDefaultMaterialParameterCollectionInstances;
 	
 	MaterialParameterCollection::MaterialParameterCollection(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)
@@ -18,22 +20,21 @@ namespace Air
 
 	void MaterialParameterCollection::createBufferStruct()
 	{
-		TArray<ConstantBufferStruct::Member> members;
+		TArray<ShaderParametersMetadata::Member> members;
 		uint32 nextMemberOffset = 0;
 		const uint32 numVectors = Math::divideAndRoundUp(mScalarParameters.size(), 4) + mVectorParameters.size();
-		new(members)ConstantBufferStruct::Member(TEXT("Vectors"), TEXT(""), nextMemberOffset, CBMT_FLOAT32, EShaderPrecisionModifier::Half, 1, 4, numVectors, nullptr);
+		new(members)ShaderParametersMetadata::Member(TEXT("Vectors"), TEXT(""), nextMemberOffset, CBMT_FLOAT32, EShaderPrecisionModifier::Half, 1, 4, numVectors, nullptr);
 		const uint32 vectorArraySize = numVectors * sizeof(float4);
 		nextMemberOffset += vectorArraySize;
 		static wstring layoutName(TEXT("MaterialCollection"));
 		const uint32 structSize = align(nextMemberOffset, CONSTANT_BUFFER_STRUCT_ALIGNMENT);
-		mConstantBufferStruct = makeUniquePtr<ConstantBufferStruct>(
+		mShaderParametersMetadata = makeUniquePtr<ShaderParametersMetadata>(
+			ShaderParametersMetadata::EUseCase::DataDrivenShaderParameterStruct,
 			layoutName,
 			TEXT("MaterialCollection"),
 			TEXT("MaterialCollection"),
-			constructCollectionConstantBufferParameter,
 			structSize,
-			members,
-			false);
+			members);
 	}
 
 	void MaterialParameterCollection::getDefaultParametrData(TArray<float4>& parameterData) const
@@ -56,19 +57,18 @@ namespace Air
 		}
 	}
 
-	void MaterialParameterCollection::updateDefaultResource()
+	void MaterialParameterCollection::updateDefaultResource(bool bRecreateConstantBuffer)
 	{
 		TArray<float4> parameterData;
 		getDefaultParametrData(parameterData);
-		mDefaultResource->GameThread_UpdateContents(mStateId, parameterData);
-		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-			updateDefaultResourceCommand,
-			Guid, id, mStateId,
-			MaterialParameterCollectionInstanceResource*, resource, mDefaultResource,
-			{
+		mDefaultResource->GameThread_UpdateContents(mStateId, parameterData, getName(), bRecreateConstantBuffer);
+		Guid id = mStateId;
+		MaterialParameterCollectionInstanceResource* resource = mDefaultResource;
+
+		ENQUEUE_RENDER_COMMAND(updateDefaultResourceCommand)(
+				[id, resource](RHICommandListImmediate& RHICmdList){
 				GDefaultMaterialParameterCollectionInstances.emplace(id, resource);
-			}
-		);
+			});
 	}
 
 	void MaterialParameterCollection::postLoad()
@@ -85,7 +85,7 @@ namespace Air
 		{
 			world->addParameterCollectionInstances(this, true);
 		}
-		updateDefaultResource();
+		updateDefaultResource(true);
 	}
 
 	static wstring MaterialParameterCollectionInstanceResourceName(TEXT("MaterialParameterCollectionInstanceResource"));
@@ -101,40 +101,46 @@ namespace Air
 		mConstantBuffer.safeRelease();
 	}
 
-	void MaterialParameterCollectionInstanceResource::updateContents(const Guid& inId, const TArray<float4>& indata)
+	void MaterialParameterCollectionInstanceResource::updateContents(const Guid& inId, const TArray<float4>& indata, const wstring& inOwnerName, bool bRecreateConstantBuffer)
 	{
-		mConstantBuffer.safeRelease();
 		mID = inId;
+		mOwnerName = inOwnerName;
+
 		if (inId != Guid() && indata.size() > 0)
 		{
-			mConstantBuffer.safeRelease();
-			mConstantBufferLayout.mConstantBufferSize = indata.getTypeSize() * indata.size();
-			mConstantBufferLayout.mResourceOffset = 0;
-			BOOST_ASSERT(mConstantBufferLayout.mResource.size() == 0);
-			mConstantBuffer = RHICreateConstantBuffer(indata.getData(), mConstantBufferLayout, ConstantBuffer_MultiFrame);
+			const uint32 newSize = indata.getTypeSize() * indata.size();
+			BOOST_ASSERT(mConstantBufferLayout.mResources.size() == 0);
+
+			if (!bRecreateConstantBuffer && isValidRef(mConstantBuffer))
+			{
+				BOOST_ASSERT(newSize == mConstantBufferLayout.mConstantBufferSize);
+				BOOST_ASSERT(mConstantBuffer->getLayout() == mConstantBufferLayout);
+				RHIUpdateConstantBuffer(mConstantBuffer, indata.getData());
+			}
+			else
+			{
+				mConstantBufferLayout.mConstantBufferSize = newSize;
+				mConstantBufferLayout.computeHash();
+				mConstantBuffer = RHICreateConstantBuffer(indata.getData(), mConstantBufferLayout, ConstantBuffer_MultiFrame);
+			}
 		}
 	}
 
 	void MaterialParameterCollectionInstanceResource::GameThread_Destroy()
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			DestroyCollectionCommand,
-			MaterialParameterCollectionInstanceResource*, resource, this,
-			{
-				delete resource;
+		ENQUEUE_RENDER_COMMAND(
+			DestroyCollectionCommand)([this](RHICommandListImmediate& RHICmdList){
+				delete this;
 			}
 		);
 	}
 
-	void MaterialParameterCollectionInstanceResource::GameThread_UpdateContents(const Guid& inId, const TArray<float4>& data)
+	void MaterialParameterCollectionInstanceResource::GameThread_UpdateContents(const Guid& inId, const TArray<float4>& data, const wstring& inOwnerName, bool bRecreateConstantBuffer)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_THREEPARAMETER(
-			UpdateCollectionCommand,
-			Guid, id, inId,
-			TArray<float4>, data, data,
-			MaterialParameterCollectionInstanceResource*, resource, this,
+		ENQUEUE_RENDER_COMMAND(
+			UpdateCollectionCommand)([inId, data, inOwnerName, bRecreateConstantBuffer, this](RHICommandListImmediate& RHICmdList)
 			{
-				resource->updateContents(id, data);
+				this->updateContents(inId, data, inOwnerName, bRecreateConstantBuffer);
 			}
 		);
 	}

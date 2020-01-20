@@ -74,11 +74,16 @@ namespace Air
 		{
 			mIdleTime = seconds;
 		}
+
+		static void setGraphicsRHI(wstring RHIString);
+
+		static wstring getGraphicsRHI();
 	private:
 		static double mCurrentTime;
 		static double mDeltaTime;
 		static double mLastTime;
 		static double mFixedDeltaTime;
 		static double mIdleTime;
+		static wstring mGraphicsRHI;
 	};
 }

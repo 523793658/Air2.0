@@ -10,13 +10,32 @@
 #include "EngineDefines.h"
 #include "Classes/Components/PrimitiveComponent.h"
 #include "Misc/Guid.h"
+#include "ShaderParameterMacros.h"
 #include "Math/SHMath.h"
+#include "ConvexVolume.h"
 namespace Air
 {
 	class LightComponent;
 	class LightMap;
 	class MaterialRenderProxy;
 	static const int32 MAX_NUM_LIGHTMAP_COEF = 2;
+
+	BEGIN_SHADER_PARAMETER_STRUCT(LightShaderParameters, ENGINE_API)
+		SHADER_PARAMETER(float3, Position)
+		SHADER_PARAMETER(float, InvRadius)
+		SHADER_PARAMETER(float3, Color)
+		SHADER_PARAMETER(float, FallofExponent)
+		SHADER_PARAMETER(float3, Direction)
+		SHADER_PARAMETER(float, SpecularScale)
+		SHADER_PARAMETER(float3, Tangent)
+		SHADER_PARAMETER(float, SourceRadius)
+		SHADER_PARAMETER(float2, SpotAngles)
+		SHADER_PARAMETER(float, SoftSourceRadius)
+		SHADER_PARAMETER(float, SourceLength)
+		SHADER_PARAMETER(float, RectLightBarnCosAngle)
+		SHADER_PARAMETER(float, RectLightBranLength)
+		SHADER_PARAMETER_TEXTURE(Texture2D, SourceTexture)
+		END_SHADER_PARAMETER_STRUCT()
 
 
 	class ENGINE_API LightSceneProxy
@@ -50,7 +69,7 @@ namespace Air
 
 		inline const MaterialRenderProxy* getLightFunctionMaterial() const { return mLightFunctionMaterial; }
 
-		virtual void getParameters(float4& lightPositionAndInvRadius, float4& lightColorAndFalloffExponent, float3& normalizedLightDirection, float2& spotAngles, float& lightSourceRadius, float& lightSourceLength, float& lightMinRoughness) const {}
+		virtual void getLightShaderParameters(LightShaderParameters& pathTracingLightParameters) const {}
 
 		virtual float2 getDirectionalLightDistanceFadeParameters(ERHIFeatureLevel::Type inFealtureLevel, bool bPrecomputedLightIsValid) const
 		{
@@ -69,6 +88,10 @@ namespace Air
 		{
 			return bCastDynamicShadow;
 		}
+
+		inline Texture* getIESTextureResource() const { return nullptr; }
+
+		inline bool isTitledDferredLightingSupported() const { return bTiledDeferredLightingSupported; }
 
 		inline bool hasStaticShadowing() const { return bStaticShadowing; }
 
@@ -130,6 +153,8 @@ namespace Air
 
 		const uint32 bMovable : 1;
 
+		uint32 bTiledDeferredLightingSupported : 1;
+
 		int32 mShadowMapChannel;
 
 		uint8 mLightingChannelMask;
@@ -137,6 +162,8 @@ namespace Air
 		float mMinRoughness{ 0.04f };
 
 		float mIndirectLightingScale;
+
+		float mSpecularScale{ 1.0f };
 
 		const MaterialRenderProxy* mLightFunctionMaterial;
 
@@ -230,7 +257,7 @@ namespace Air
 		{
 		}
 
-		ConstantBufferRHIParamRef getPrecomputedLightingBuffer()const
+		RHIConstantBuffer* getPrecomputedLightingBuffer()const
 		{
 			return mPrecomputedLightingConstantBuffer;
 		}
@@ -378,4 +405,32 @@ namespace Air
 
 
 	};
+
+	class ShadowCascadeSettings
+	{
+	public:
+		float mSplitNear{ 0.0f };
+
+		float mSplitFar{ WORLD_MAX };
+
+		float mSplitNearFadeRegion{ 0.0f };
+
+		float mSplitFarFadeRegion{ 0.0f };
+
+		float mFadePlaneOffset{ mSplitFar };
+
+		float mFadePlaneLength{ mSplitFar - mFadePlaneLength };
+
+		ConvexVolume mShadowBoundsAccurate;
+
+		Plane mNearFrustumPlane;
+		Plane mFarFrustumPlane;
+
+		bool bFarShadowCascade{ false };
+
+		int32 mShadowSplitIndex{ INDEX_NONE };
+
+		float mCascadeBiasDistribution{ 1 };
+	};
+
 }

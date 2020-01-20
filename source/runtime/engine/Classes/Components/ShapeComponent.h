@@ -49,13 +49,11 @@ namespace Air
 			}
 			else
 			{
-				ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-					InitShapeMeshVertexFactory,
-					CustomVertexFactory*, vertexFactory, this, const CustomMeshVertexBuffer*, vertexBuffer, vertexBuffer,
-					{
-						vertexFactory->init_RenderThread(vertexBuffer);
-					}
-				)
+				ENQUEUE_RENDER_COMMAND(
+					InitShapeMeshVertexFactory)([this, vertexBuffer](RHICommandListImmediate& RHICmdList)
+						{
+							this->init_RenderThread(vertexBuffer);
+						});
 			}
 		}
 	};

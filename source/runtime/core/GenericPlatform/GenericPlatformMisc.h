@@ -18,6 +18,37 @@ namespace Air
 		};
 	}
 
+	namespace EAppReturnType
+	{
+		enum Type
+		{
+			No,
+			Yes,
+			YesAll,
+			NoAll,
+			Cancel,
+			Ok,
+			Retry,
+			Continue,
+		};
+	}
+
+	namespace EAppMsgType
+	{
+		enum Type
+		{
+			Ok,
+			YesNo,
+			OkCancel,
+			YesNoCancel,
+			CancelRetryContinue,
+			YesNoYesAllNoAll,
+			YesNoYesAllNoAllCancel,
+			YesNoYesAll,
+		};
+	}
+
+
 	struct CORE_API GenericPlatformMisc
 	{
 	public:
@@ -80,5 +111,7 @@ namespace Air
 		FORCEINLINE static void memoryBarrier();
 
 		static uint32 getStandardPrintableKeyMap(uint32* keyCodes, wstring* keyNames, uint32 maxMappings, bool bMapUppercaseKeys, bool bMapLowercaseKeys);
+
+		static EAppReturnType::Type messageBoxExt(EAppMsgType::Type msgType, const TCHAR* text, const TCHAR* caption);
 	};
 }

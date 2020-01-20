@@ -6,6 +6,7 @@ namespace Air
 	class RenderTarget
 	{
 	public:
+		virtual ~RenderTarget();
 
 		virtual int2 getSizeXY() const = 0;
 

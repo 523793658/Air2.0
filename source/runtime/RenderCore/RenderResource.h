@@ -161,7 +161,7 @@ namespace Air
 			}
 		}
 
-		BoundShaderStateRHIParamRef getLast()
+		RHIBoundShaderState* getLast()
 		{
 			BOOST_ASSERT(!GRHISupportsParallelRHIExecute);
 			uint32 lastIndex = mNextBoundShaderStateIndex == 0? Size - 1: mNextBoundShaderStateIndex - 1;
@@ -282,6 +282,80 @@ namespace Air
 		LastRenderTimeContainer mLastRenderTimeRHI;
 	};
 
+	class RENDER_CORE_API GlobalDynamicIndexBuffer
+	{
+	public:
+		struct Allocation
+		{
+			uint8* mBuffer;
+			IndexBuffer* mIndexBuffer;
+			uint32 mFirstIndex;
+
+			Allocation()
+				:mBuffer(nullptr)
+				,mIndexBuffer(nullptr)
+				,mFirstIndex(0)
+			{}
+
+			FORCEINLINE bool isValid() const
+			{
+				return mBuffer != nullptr;
+			}
+		};
+
+		GlobalDynamicIndexBuffer();
+
+		~GlobalDynamicIndexBuffer();
+
+		Allocation allocate(uint32 numIndices, uint32 indexStride);
+
+		template<typename IndexType>
+		inline Allocation allocate(uint32 numIndices)
+		{
+			return allocate(numIndices, sizeof(IndexType));
+		}
+
+		void commit();
+
+	private:  
+		struct DynamicIndexBufferPool* mPools[2];
+	};
+
+	class RENDER_CORE_API GlobalDynamicVertexBuffer
+	{
+	public:
+		struct Allocation
+		{
+			uint8* mBuffer;
+			VertexBuffer* mVertexBuffer;
+			uint32 mVertexOffset;
+
+			Allocation()
+				:mBuffer(nullptr)
+				,mVertexBuffer(nullptr)
+				,mVertexOffset(0)
+			{}
+
+			FORCEINLINE bool isValid() const
+			{
+				return mVertexBuffer != nullptr;
+			}
+		};
+
+		GlobalDynamicVertexBuffer();
+		~GlobalDynamicVertexBuffer();
+		Allocation allocate(uint32 sizeInBytes);
+
+		void commit();
+
+		bool isRenderAlarmLoggingEnabled() const;
+
+	private:
+		struct DynamicVertexBufferPool* mPool;
+
+		size_t mTotalAllocatedSincelastCommit;
+	};
+
 
 	extern RENDER_CORE_API void beginInitResource(RenderResource* resource);
 
@@ -290,5 +364,15 @@ namespace Air
 	extern RENDER_CORE_API void releaseResourceAndFlush(RenderResource* resource);
 
 
-
+	FORCEINLINE bool isRayTracingEnabled()
+	{
+		if (GRHISupportsRayTracing)
+		{
+			return false;
+		}
+		else
+		{
+			return false;
+		}
+	}
 }

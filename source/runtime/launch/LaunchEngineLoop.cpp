@@ -19,6 +19,7 @@
 #include "ShaderCompiler.h"
 #include "GlobalShader.h"
 #include "core/DemoEngine.h"
+#include "Misc/CommandLine.h"
 #include "Classes/Factories/Factory.h"
 namespace Air
 {
@@ -34,15 +35,15 @@ namespace Air
 		ThreadHeartBeat::get().heartBeat();
 
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND(
-				BeginFrame,
-				{
-					GRHICommandList.latchBypass();
-					GFrameNumberRenderThread++;
-					//RHICmdList.pushEvent
-					RHICmdList.beginFrame();
-				}
-			)
+			ENQUEUE_RENDER_COMMAND(
+				BeginFrame)([](RHICommandListImmediate& cmdList)
+					{
+						GRHICommandList.latchBypass();
+						GFrameNumberRenderThread++;
+						//RHICmdList.pushEvent
+						cmdList.beginFrame();
+					}
+			);
 			{
 				GEngine->updateTimeAndHandleMaxTickRate();
 			}
@@ -128,6 +129,10 @@ namespace Air
 
 	int32 EngineLoop::preInit(const TCHAR* cmdLine)
 	{
+		if (!CommandLine::set(cmdLine))
+		{
+			return -1;
+		}
 		GGameThreadId = PlatformTLS::getCurrentThreadId();
 		GIsGameThreadIdInitialized = true;
 		bool bHasEditorToken = false;

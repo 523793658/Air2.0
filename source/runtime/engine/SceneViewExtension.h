@@ -26,5 +26,7 @@ namespace Air
 		virtual void postInitViewFamily_RenderThread(RHICommandListImmediate& RHICmdList, SceneViewFamily& inViewFamily) {};
 
 		virtual void postInitView_RenderThread(RHICommandListImmediate& RHICmdList, SceneView& inView) {}
+
+		virtual void postRenderBasePass_RenderThread(RHICommandListImmediate& RHICmdList, SceneView& inView) {}
 	};
 }

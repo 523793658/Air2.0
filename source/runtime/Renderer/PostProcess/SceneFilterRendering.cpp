@@ -98,13 +98,56 @@ namespace Air
 
 	}
 
-	BEGIN_CONSTANT_BUFFER_STRUCT(DrawRectangleParameters,)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, PosScaleBias)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, UVScaleBias)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, InvTargetSizeAndTextureSize)
-	END_CONSTANT_BUFFER_STRUCT(DrawRectangleParameters)
 
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(DrawRectangleParameters, TEXT("DrawRectangleParameters"));
+
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(DrawRectangleParameters, "DrawRectangleParameters");
+
+	template<typename TRHICommandList>
+	static inline void internalDrawRectangle(TRHICommandList& RHICmdList,
+		float x,
+		float y,
+		float sizeX,
+		float sizeY,
+		float u,
+		float v,
+		float sizeU,
+		float sizeV,
+		int2 targetSize,
+		int2 textureSize,
+		Shader* vertexShader,
+		EDrawRectangleFlags flags,
+		int32 instanceCount)
+	{
+		float clipSpaceQuadZ = 0.0f;
+		doDrawRectangleFlagOverride(flags);
+		if (x > 0.0f || y > 0.0f)
+		{
+			flags = EDRF_Default;
+		}
+		DrawRectangleParameters parameters;
+		parameters.PosScaleBias = float4(sizeX, sizeY, x, y);
+		parameters.UVScaleBias = float4(sizeU, sizeV, u, v);
+		parameters.InvTargetSizeAndTextureSize = float4(1.0f / targetSize.x, 1.0f / targetSize.y, 1.0f / textureSize.x, 1.0f / textureSize.y);
+		setConstantBufferParameterImmediate(RHICmdList, vertexShader->getVertexShader(), vertexShader->getConstantBufferParameter<DrawRectangleParameters>(), parameters);
+		if (flags == EDRF_UseTesselatedIndexBuffer)
+		{
+			RHICmdList.setStreamSource(0, nullptr, 0);
+			RHICmdList.drawIndexedPrimitive(GTesselatedScreenRectangleIndexBuffer.mIndexBufferRHI, PT_TriangleList, 0, 0, GTesselatedScreenRectangleIndexBuffer.numVertices(), 0, GTesselatedScreenRectangleIndexBuffer.numPrimitives(), instanceCount);
+		}
+		else
+		{
+			RHICmdList.setStreamSource(0, GScreenRectangleVertexBuffer.mVertexBufferRHI, 0);
+			if (flags == EDRF_UseTriangleOptimization)
+			{
+				RHICmdList.drawIndexedPrimitive(GScreenRectangleIndexBuffer.mIndexBufferRHI, PT_TriangleList, 0, 0, 3, 6, 1, instanceCount);
+			}
+			else
+			{
+				RHICmdList.setStreamSource(0, GScreenRectangleVertexBuffer.mVertexBufferRHI, 0);
+				RHICmdList.drawIndexedPrimitive(GScreenRectangleIndexBuffer.mIndexBufferRHI, PT_TriangleList, 0, 0, 4, 0, 2, instanceCount);
+			}
+		}
+	}
 
 	void drawRectangle(
 		RHICommandList& RHICmdList,
@@ -123,36 +166,10 @@ namespace Air
 		uint32 instanceCount
 	)
 	{
-		float clipSpaceQuadZ = 0.0f;
-		doDrawRectangleFlagOverride(flags);
-		if (x > 0.0f || y > 0.0f)
-		{
-			flags = EDRF_Default;
-		}
-		DrawRectangleParameters parameters;
-		parameters.PosScaleBias = float4(sizeX, sizeY, x, y);
-		parameters.UVScaleBias = float4(sizeU, sizeV, U, V);
-		parameters.InvTargetSizeAndTextureSize = float4(1.0f / targetSize.x, 1.0f / targetSize.y, 1.0f / textureSize.x, 1.0f / textureSize.y);
-		setConstantBufferParameterImmediate(RHICmdList, vertexShader->getVertexShader(), vertexShader->getConstantBufferParameter<DrawRectangleParameters>(), parameters);
-		if (flags == EDRF_UseTesselatedIndexBuffer)
-		{
-			RHICmdList.setStreamSource(0, nullptr, 0, 0);
-			RHICmdList.drawIndexedPrimitive(GTesselatedScreenRectangleIndexBuffer.mIndexBufferRHI, PT_TriangleList, 0, 0, GTesselatedScreenRectangleIndexBuffer.numVertices(), 0, GTesselatedScreenRectangleIndexBuffer.numPrimitives(), instanceCount);
-		}
-		else
-		{
-			RHICmdList.setStreamSource(0, GScreenRectangleVertexBuffer.mVertexBufferRHI, sizeof(FilterVertex), 0);
-			if (flags == EDRF_UseTriangleOptimization)
-			{
-				RHICmdList.drawIndexedPrimitive(GScreenRectangleIndexBuffer.mIndexBufferRHI, PT_TriangleList, 0, 0, 3, 6, 1, instanceCount);
-			}
-			else
-			{
-				RHICmdList.setStreamSource(0, GScreenRectangleVertexBuffer.mVertexBufferRHI, sizeof(FilterVertex), 0);
-				RHICmdList.drawIndexedPrimitive(GScreenRectangleIndexBuffer.mIndexBufferRHI, PT_TriangleList, 0, 0, 4, 0, 2, instanceCount);
-			}
-		}
+		internalDrawRectangle(RHICmdList, x, y, sizeX, sizeY, U, V, sizeU, sizeV, targetSize, textureSize, vertexShader, flags, instanceCount);
 	}
+
+	
 
 	void drawPostProcessPass(
 		RHICommandList& RHICmdList,

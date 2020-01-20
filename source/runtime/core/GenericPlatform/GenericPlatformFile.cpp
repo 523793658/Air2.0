@@ -1,7 +1,16 @@
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "Misc/Paths.h"
 #include "Math/Math.h"
-#if AIR_TS_LIBRARY_FILESYSTEM_V3_SUPPORT
+#if AIR_TS_LIBRARY_FILESYSTEM_V4_SUPPORT
+#include<filesystem>
+namespace std
+{
+	namespace experimental
+	{
+		namespace filesystem = std::filesystem;
+	}
+}
+#elif AIR_TS_LIBRARY_FILESYSTEM_V3_SUPPORT
 #include <experimental/filesystem>
 #elif AIR_TS_LIBRARY_FILESYSTEM_V2_SUPPORT
 #include <filesystem>
@@ -16,6 +25,8 @@ namespace std
 #endif
 namespace Air
 {
+	using namespace std::experimental;
+
 	int64 IFileHandle::size()
 	{
 		int64 current = tell();

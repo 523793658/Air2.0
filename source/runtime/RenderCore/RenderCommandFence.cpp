@@ -15,7 +15,7 @@ namespace Air
 		else
 		{
 			static std::mutex NullGraphTaskMutex;
-			mCompletionEvent = GraphTask<NullGraphTask>::createTask(nullptr, ENamedThreads::GameThread).constructAndDispatchWhenReady(ENamedThreads::RenderThread);
+			mCompletionEvent = TGraphTask<NullGraphTask>::createTask(nullptr, ENamedThreads::GameThread).constructAndDispatchWhenReady(ENamedThreads::getRenderThread());
 		}
 	}
 

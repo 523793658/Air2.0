@@ -11,6 +11,7 @@ namespace Air
 	template<typename T>
 	struct Vector3;
 
+	template<typename T>
 	struct Vector4;
 
 	template<typename T>
@@ -45,7 +46,7 @@ namespace Air
 
 		}
 
-		FORCEINLINE Vector3(const Vector4& rhs)
+		FORCEINLINE Vector3(const Vector4<T>& rhs)
 			: x(rhs.x), y(rhs.y), z(rhs.z)
 		{
 
@@ -256,26 +257,24 @@ namespace Air
 	};
 
 
-	MS_ALIGN(16) struct Vector4
+	template<typename T>
+	struct Vector4
 	{
 	public:
-		float x, y, z, w;
+		T x, y, z, w;
 		FORCEINLINE Vector4(const Vector4 &);
-		FORCEINLINE Vector4(float inX, float inY, float inZ, float inW);
+		FORCEINLINE Vector4(T inX, T inY, T inZ, T inW);
 		FORCEINLINE Vector4();
-		FORCEINLINE Vector4(const Vector4& inV, float inW)
-			:x(inV.x),
-			y(inV.y),
-			z(inV.z),
-			w(inW)
-		{}
-		FORCEINLINE Vector4(float v)
+
+
+		
+		FORCEINLINE Vector4(T v)
 			:x(v), y(v), z(v), w(v)
 		{
 
 		}
 
-		FORCEINLINE Vector4(const Vector3<float>& inVector, float inW = 1.0f)
+		FORCEINLINE Vector4(const Vector3<T>& inVector, T inW = 1.0f)
 			:x(inVector.x)
 			,y(inVector.y)
 			,z(inVector.z)
@@ -319,33 +318,41 @@ namespace Air
 	}GCC_ALIGN(16);
 
 
-	FORCEINLINE Vector4::Vector4(float inX, float inY, float inZ, float inW)
+	template<typename T>
+	FORCEINLINE Vector4<T>::Vector4(T inX, T inY, T inZ, T inW)
 		:x(inX), y(inY), z(inZ), w(inW)
 	{
 	}
 
-	FORCEINLINE Vector4::Vector4(const Vector4 &rhs)
+	template<typename T>
+	FORCEINLINE Vector4<T>::Vector4(const Vector4 &rhs)
 		:x(rhs.x), y(rhs.y), z(rhs.z), w(rhs.w)
 	{
 
 	}
 
-	FORCEINLINE Vector4::Vector4()
+	template<typename T>
+	FORCEINLINE Vector4<T>::Vector4()
 	{}
 
-	FORCEINLINE Vector4::Vector4(const LinearColor& inColor)
+
+	template<typename T>
+	FORCEINLINE Vector4<T>::Vector4(const LinearColor& inColor)
 		:x(inColor.R)
 		,y(inColor.G)
 		,z(inColor.B)
 		,w(inColor.A)
 	{}
 	
-	FORCEINLINE float& Vector4::operator[](int32 componentIndex)
+
+	template<typename T>
+	FORCEINLINE float& Vector4<T>::operator[](int32 componentIndex)
 	{
 		return (&x)[componentIndex];
 	}
 
-	FORCEINLINE float Vector4::operator[](int32 componentIndex) const
+	template<typename T>
+	FORCEINLINE float Vector4<T>::operator[](int32 componentIndex) const
 	{
 		return (&x)[componentIndex];
 	}
@@ -467,6 +474,13 @@ namespace Air
 			return Vector2<decltype(x + v.x)>(x + v.x, y + v.y);
 		}
 
+		template<typename M>
+		FORCEINLINE Vector2 operator -=(const Vector2<M>& v)
+		{
+			x += v.x;
+			y += v.y;
+			return *this;
+		}
 
 
 		FORCEINLINE static const Vector2 & zero()
@@ -485,7 +499,8 @@ namespace Air
 		CORE_API static const Vector2 Up;
 	};
 
-	typedef Vector4 float4;
+	typedef Vector4<float> float4;
+	typedef Vector4<int> int4;
 
 	typedef Vector3<float> float3;
 	typedef Vector3<int> int3;

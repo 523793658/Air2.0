@@ -7,12 +7,12 @@
 namespace Air
 {
 
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(PrimitiveConstantShaderParameters, TEXT("Primitive"));
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(PrimitiveConstantShaderParameters, "Primitive");
 
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(ViewConstantShaderParameters, TEXT("View"));
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(BuiltinSamplersParameters, TEXT("BuiltinSamplers"));
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(ViewConstantShaderParameters, "View");
 
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(InstancedViewConstantShaderParameters, TEXT("InstancedView"));
+
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(InstancedViewConstantShaderParameters, "InstancedView");
 
 
 	float4 createInvDeviceZToWorldZTransform(const Matrix& projMatrix)
@@ -121,6 +121,40 @@ namespace Air
 		}
 
 		const bool bIsMobile = SceneInterface::getShadingPath(getFeatureLevel()) == EShadingPath::Mobile;
+	}
+
+	const SceneView& SceneViewFamily::getSteredEyeView(const EStereoscopicPass eye) const
+	{
+		const int32 eyeIndex = static_cast<int32>(eye);
+		BOOST_ASSERT(mViews.size() > 0 && mViews.size() >= eyeIndex);
+		if (eyeIndex <= 1)
+		{
+			return *mViews[0];
+		}
+		else if (eyeIndex == 2)
+		{
+			return *mViews[1];
+		}
+		else
+		{
+			return *mViews[eyeIndex - eSSP_RIGHT_EYE + 1];
+		}
+	}
+
+	bool SceneViewFamily::supportsScreenPercentage() const
+	{
+		EShadingPath shadingPath = mScene->getShadingPath();
+
+		if (mScene->getShadingPath() == EShadingPath::Deferred)
+		{
+			return true;
+		}
+		if (getFeatureLevel() <= ERHIFeatureLevel::ES3_1)
+		{
+			return false;
+		}
+
+		return true;
 	}
 
 	void SceneViewFamily::computeFamilySize()
@@ -392,4 +426,6 @@ namespace Air
 	{
 		return GShaderPlatformForFeatureLevel[getFeatureLevel()];
 	}
+
+
 }

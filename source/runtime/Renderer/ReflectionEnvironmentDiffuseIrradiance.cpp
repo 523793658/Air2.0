@@ -16,9 +16,9 @@ namespace Air
 
 	class CopyDiffuseIrradiancePS : public GlobalShader
 	{
-		DECLARE_SHADER_TYPE(CopyDiffuseIrradiancePS, Global);
+		DECLARE_GLOBAL_SHADER(CopyDiffuseIrradiancePS);
 	public:
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
@@ -80,13 +80,13 @@ namespace Air
 		ShaderParameter mNumSamples;
 	};
 
-	IMPLEMENT_SHADER_TYPE(, CopyDiffuseIrradiancePS, TEXT("ReflectionEnvironmentShaders"), TEXT("DiffuseIrradianceCopyPS"), SF_Pixel);
+	IMPLEMENT_GLOBAL_SHADER(CopyDiffuseIrradiancePS, "ReflectionEnvironmentShaders", "DiffuseIrradianceCopyPS", SF_Pixel);
 
 	class AccumulateDiffuseIrradiancePS : public GlobalShader
 	{
-		DECLARE_SHADER_TYPE(AccumulateDiffuseIrradiancePS, Global);
+		DECLARE_GLOBAL_SHADER(AccumulateDiffuseIrradiancePS);
 	public:
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
@@ -104,9 +104,9 @@ namespace Air
 
 		AccumulateDiffuseIrradiancePS() {}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
-			GlobalShader::modifyCompilationEnvironment(platform, outEnvironment);
+			GlobalShader::modifyCompilationEnvironment(parameters, outEnvironment);
 		}
 
 		void setParameters(RHICommandList& RHICmdList, int32 cubefaceValue, int32 numMips, int32 sourceMipIndexValue, int32 coefficientIndex, TextureRHIRef& sourceTextureValue)
@@ -151,13 +151,13 @@ namespace Air
 		ShaderParameter mSample23;
 	};
 
-	IMPLEMENT_SHADER_TYPE(, AccumulateDiffuseIrradiancePS, TEXT("ReflectionEnvironmentShaders"), TEXT("DiffuseIrradianceAccumulatePS"), SF_Pixel);
+	IMPLEMENT_GLOBAL_SHADER(AccumulateDiffuseIrradiancePS, "ReflectionEnvironmentShaders", "DiffuseIrradianceAccumulatePS", SF_Pixel);
 
 	class AccumulateCubeFacesPS : public GlobalShader
 	{
-		DECLARE_SHADER_TYPE(AccumulateCubeFacesPS, Global);
+		DECLARE_GLOBAL_SHADER(AccumulateCubeFacesPS);
 	public:
-		static bool shouldCache(EShaderPlatform platform)
+		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
@@ -198,7 +198,7 @@ namespace Air
 		ShaderResourceParameter mSourceTextureSampler;
 	};
 
-	IMPLEMENT_SHADER_TYPE(, AccumulateCubeFacesPS, TEXT("ReflectionEnvironmentShaders"), TEXT("AccumulateCubeFacesPS"), SF_Pixel);
+	IMPLEMENT_GLOBAL_SHADER(AccumulateCubeFacesPS, "ReflectionEnvironmentShaders", "AccumulateCubeFacesPS", SF_Pixel);
 
 
 
@@ -226,6 +226,12 @@ namespace Air
 	{
 		auto shaderMap = getGlobalShaderMap(featureLevel);
 		SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+		GraphicsPipelineStateInitializer graphicsPSOInit;
+		graphicsPSOInit.mRasterizerState = TStaticRasterizerState<FM_Solid, CM_None>::getRHI();
+		graphicsPSOInit.mDepthStencilState = TStaticDepthStencilState<false, CF_Always>::getRHI();
+		graphicsPSOInit.mBlendState = TStaticBlendState<>::getRHI();
+
+
 		for (int32 coefficientIndex = 0; coefficientIndex < SHVector3::MaxSHBasis; coefficientIndex++)
 		{
 			{
@@ -235,21 +241,23 @@ namespace Air
 
 				for (int32 cubeface = 0; cubeface < CubeFace_MAX; cubeface++)
 				{
-					setRenderTarget(RHICmdList, effectiveRT.mTargetableTexture, 0, cubeface, nullptr, true);
-
-					RHICmdList.clearColorTexture(effectiveRT.mTargetableTexture, LinearColor(0, 0, 0, 0), IntRect());
+					RHIRenderPassInfo RPInfo(effectiveRT.mTargetableTexture, ERenderTargetActions::DontLoad_Store, nullptr, 0, cubeface);
+					RHICmdList.beginRenderPass(RPInfo, TEXT("CopyDiffuseIrradianceRP"));
+					RHICmdList.applyCachedRenderTargets(graphicsPSOInit);
 
 					const IntRect viewRect(0, 0, mipSize, mipSize);
 					RHICmdList.setViewport(0, 0, 0.0f, mipSize, mipSize, 1.0f);
-					RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-					RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
-					RHICmdList.setBlendState(TStaticBlendState<>::getRHI());
+					
 
 					TShaderMapRef<CopyDiffuseIrradiancePS> pixelShader(shaderMap);
 
 					TShaderMapRef<ScreenVS> vertexShader(getGlobalShaderMap(featureLevel));
 
-					setGlobalBoundShaderState(RHICmdList, featureLevel, s_CopyDiffuseIrradianceShaderState, GFilterVertexDeclaration.mVertexDeclarationRHI, *vertexShader, *pixelShader);
+					graphicsPSOInit.mBoundShaderState.mVertexDeclarationRHI = GFilterVertexDeclaration.mVertexDeclarationRHI;
+					graphicsPSOInit.mBoundShaderState.mVertexShaderRHI = GETSAFERHISHADER_VERTEX(*vertexShader);
+					graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+					graphicsPSOInit.mPrimitiveType = PT_TriangleList;
+					setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
 
 					pixelShader->setParameters(RHICmdList, cubeface, lightingSourceMipIndex, coefficientIndex, mipSize, lightingSource);
 
@@ -261,9 +269,11 @@ namespace Air
 						int2(viewRect.width(), viewRect.height()),
 						int2(mipSize, mipSize),
 						*vertexShader);
+					RHICmdList.endRenderPass();
 
-					RHICmdList.copyToResolveTarget(effectiveRT.mTargetableTexture, effectiveRT.mShaderResourceTexture, true, ResolveParams(ResolveRect(), (ECubeFace)cubeface));
+					
 				}
+				RHICmdList.transitionResource(EResourceTransitionAccess::EReadable, effectiveRT.mTargetableTexture);
 			}
 			const int32 numMips = Math::ceilLogTwo(GDiffuseIrradianceCubemapSize) + 1;
 
@@ -279,18 +289,25 @@ namespace Air
 
 					for (int32 cubeface = 0; cubeface < CubeFace_MAX; cubeface++)
 					{
-						setRenderTarget(RHICmdList, effectiveRT.mTargetableTexture, mipIndex, cubeface, nullptr, true);
+						RHIRenderPassInfo RPInfo(effectiveRT.mTargetableTexture, ERenderTargetActions::Load_Store, nullptr, mipIndex, cubeface);
+						RHICmdList.beginRenderPass(RPInfo, TEXT("AccumulateDiffuseIrradianceRP"));
+						RHICmdList.applyCachedRenderTargets(graphicsPSOInit);
+
+					
 
 						const IntRect viewRect(0, 0, mipSize, mipSize);
 						RHICmdList.setViewport(0, 0, 0.0f, mipSize, mipSize, 1.0f);
-						RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-						RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
-						RHICmdList.setBlendState(TStaticBlendState<>::getRHI());
+						
 						TShaderMapRef<AccumulateDiffuseIrradiancePS> pixelShader(shaderMap);
 
 						TShaderMapRef<ScreenVS> vertexShader(getGlobalShaderMap(featureLevel));
 
-						setGlobalBoundShaderState(RHICmdList, featureLevel, s_DiffuseIrradianceAccumulateShaderState, GFilterVertexDeclaration.mVertexDeclarationRHI, *vertexShader, *pixelShader);
+						graphicsPSOInit.mBoundShaderState.mVertexDeclarationRHI = GFilterVertexDeclaration.mVertexDeclarationRHI;
+						graphicsPSOInit.mBoundShaderState.mVertexShaderRHI = GETSAFERHISHADER_VERTEX(*vertexShader);
+						graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+						graphicsPSOInit.mPrimitiveType = PT_TriangleList;
+						setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+
 						pixelShader->setParameters(RHICmdList, cubeface, numMips, sourceMipIndex, coefficientIndex, effectiveSource.mShaderResourceTexture);
 
 						drawRectangle(RHICmdList,
@@ -301,26 +318,33 @@ namespace Air
 							int2(viewRect.width(), viewRect.height()),
 							int2(mipSize, mipSize),
 							*vertexShader);
-						RHICmdList.copyToResolveTarget(effectiveRT.mTargetableTexture, effectiveRT.mShaderResourceTexture, true, ResolveParams(ResolveRect(), (ECubeFace)cubeface, mipIndex));
+						RHICmdList.endRenderPass();
 					}
+					RHICmdList.transitionResource(EResourceTransitionAccess::EReadable, effectiveRT.mTargetableTexture);
 				}
 			}
 			{
 				SceneRenderTargetItem& effectiveRT = SceneRenderTargets::get(RHICmdList).mSkySHIrradianceMap->getRenderTargetItem();
 
-				RHIRenderTargetView RTV(effectiveRT.mTargetableTexture, 0, -1, ERenderTargetLoadAction::ELoad, ERenderTargetStoreAction::EStore);
+			
 				RHICmdList.transitionResource(EResourceTransitionAccess::EWritable, effectiveRT.mTargetableTexture);
-				RHICmdList.setRenderTargets(1, &RTV, nullptr, 0, nullptr);
+				RHIRenderPassInfo RPInfo(effectiveRT.mTargetableTexture, ERenderTargetActions::Load_Store, nullptr);
+				RHICmdList.beginRenderPass(RPInfo, TEXT("GatherCoeffRP"));
+				RHICmdList.applyCachedRenderTargets(graphicsPSOInit);
+
+
+
 				const IntRect viewRect(coefficientIndex, 0, coefficientIndex + 1, 1);
 				RHICmdList.setViewport(0, 0, 0.0f, SHVector3::MaxSHBasis, 1, 1.0f);
-				RHICmdList.setRasterizerState(TStaticRasterizerState<FM_Solid, CM_None>::getRHI());
-				RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
-				RHICmdList.setBlendState(TStaticBlendState<>::getRHI());
+				
 
 				TShaderMapRef<ScreenVS> vertexShader(shaderMap);
 				TShaderMapRef<AccumulateCubeFacesPS> pixelShader(shaderMap);
 
-				setGlobalBoundShaderState(RHICmdList, featureLevel, s_AccumulateCubeFacesBoundShaderState, GFilterVertexDeclaration.mVertexDeclarationRHI, *vertexShader, *pixelShader);
+				graphicsPSOInit.mBoundShaderState.mVertexDeclarationRHI = GFilterVertexDeclaration.mVertexDeclarationRHI;
+				graphicsPSOInit.mBoundShaderState.mVertexShaderRHI = GETSAFERHISHADER_VERTEX(*vertexShader);
+				graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+				setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
 
 				const int32 sourceMipIndex = numMips - 1;
 
@@ -333,7 +357,8 @@ namespace Air
 					0, 0, mipSize, mipSize,
 					int2(SHVector3::MaxSHBasis, 1),
 					int2(mipSize, mipSize), *vertexShader);
-				RHICmdList.copyToResolveTarget(effectiveRT.mTargetableTexture, effectiveRT.mShaderResourceTexture, true, ResolveParams());
+				RHICmdList.endRenderPass();
+				RHICmdList.transitionResource(EResourceTransitionAccess::EReadable, effectiveRT.mTargetableTexture);
 			}
 		}
 		{

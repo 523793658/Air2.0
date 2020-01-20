@@ -103,11 +103,10 @@ namespace Air
 
 					setRequiresVsync(false);
 					EndDrawingCommandParams params = { this, bLockToVsync, false, bShouldPresent };
-					ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-						EndDrawingCommand,
-						EndDrawingCommandParams, parameters, params,
+					ENQUEUE_RENDER_COMMAND(
+						EndDrawingCommand)([params](RHICommandListImmediate& RHICmdList)
 						{
-							viewportEndDrawing(RHICmdList, parameters);
+							viewportEndDrawing(RHICmdList, params);
 						});
 					
 				}
@@ -125,11 +124,10 @@ namespace Air
 	void Viewport::enqueueBeginRenderFrame()
 	{
 		advanceFrameRenderPrerequisite();
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			BeginDrawingCommand,
-			Viewport*, viewport, this,
+		ENQUEUE_RENDER_COMMAND(
+			BeginDrawingCommand)([this](RHICommandListImmediate& RHICmdList)
 			{
-				viewport->beginRenderFrame(RHICmdList);
+				this->beginRenderFrame(RHICmdList);
 			});
 	}
 

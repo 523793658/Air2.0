@@ -2,6 +2,15 @@
 #include "RHIConfig.h"
 namespace Air
 {
+
+#ifndef RHI_RAYTRACING
+#if (PLATFORM_WINDOWS && PLATFORM_64BITS)
+#define	RHI_RAYTRACING	1
+#else
+#define RHI_RAYTRACING	0
+#endif
+#endif
+
 	namespace ERHIFeatureLevel
 	{
 		enum Type
@@ -14,6 +23,38 @@ namespace Air
 		};
 	}
 
+	enum EConstantBufferBaseType : uint8
+	{
+		CBMT_INVALID,
+		CBMT_BOOL,
+		CBMT_INT32,
+		CBMT_UINT32,
+		CBMT_FLOAT32,
+
+		CBMT_TEXTURE,
+		CBMT_SRV,
+		CBMT_UAV,
+		CBMT_SAMPLER,
+
+		CBMT_RDG_TEXTURE,
+		CBMT_RDG_TEXTURE_SRV,
+		CBMT_RDG_TEXTURE_UAV,
+		CBMT_RDG_BUFFER,
+		CBMT_RDG_BUFFER_SRV,
+		CBMT_RDG_BUFFER_UAV,
+
+		CBMT_NESTED_STRUCT,
+		CBMT_INCLUDED_STRUCT,
+		CBMT_REFERENCED_STRUCT,
+		CBMT_RENDER_TARGET_BINDING_SLOTS,
+
+		EConstantBufferBaseType_Num,
+		EConstantBufferBaseType_NumBits = 5,
+
+	};
+
+	static_assert(EConstantBufferBaseType_Num <= (1 << EConstantBufferBaseType_NumBits), "EConstantBufferBaseType_Num will not fit on EConstantBufferBaseType_NumBits");
+
 	enum EShaderPlatform
 	{
 		SP_PCD3D_SM5		= 0,
@@ -21,7 +62,7 @@ namespace Air
 		SP_PS4				= 2,
 		/** Used when running in Feature Level ES2 in OpenGL. */
 		SP_OPENGL_PCES2 = 3,
-		SP_XBOXONE = 4,
+		SP_XBOXONE_D3D12 = 4,
 		SP_PCD3D_SM4 = 5,
 		SP_OPENGL_SM5 = 6,
 		/** Used when running in Feature Level ES2 in D3D11. */
@@ -53,6 +94,24 @@ namespace Air
 		SP_NumBits = 5,
 	};
 
+	inline bool isSimulatedPlatform(EShaderPlatform platform)
+	{
+		switch (platform)
+		{
+		case SP_OPENGL_PCES2:
+		case SP_PCD3D_ES2:
+		case SP_PCD3D_ES3_1:
+		case SP_OPENGL_PCES3_1:
+		case SP_METAL_MACES3_1:
+		case SP_METAL_MACES2:
+		case SP_VULKAN_PCES3_1:
+			return true;
+		default:
+			return false;
+		}
+		return false;
+	}
+
 
 	inline ERHIFeatureLevel::Type getMaxSupportedFeatureLevel(EShaderPlatform inShaderPlatform)
 	{
@@ -74,6 +133,23 @@ namespace Air
 		return inFeatureLevel <= getMaxSupportedFeatureLevel(inShaderPlatform);
 	}
 
+	inline bool isD3DPlatform(const EShaderPlatform platform, bool bIncludeXboxone)
+	{
+		switch (platform)
+		{
+		case SP_PCD3D_SM4:
+		case SP_PCD3D_SM5:
+		case SP_PCD3D_ES3_1:
+		case SP_PCD3D_ES2:
+			return true;
+		case SP_XBOXONE_D3D12:
+			return bIncludeXboxone;
+		default:
+			return false;
+		}
+		return false;
+	}
+
 	enum EShaderFrequency
 	{
 		SF_Vertex				= 0,
@@ -82,8 +158,14 @@ namespace Air
 		SF_Pixel				= 3,
 		SF_Geometry				= 4,
 		SF_Compute				= 5,
-		SF_NumFrequencies		= 6,
-		SF_NumBits				= 3,
+		SF_NumStandardFrequencices = 6,
+
+		SF_RayGen				= 6,
+		SF_RayMiss				= 7,
+		SF_RayHitGroup			= 8,
+		SF_RayCallable			= 9,
+		SF_NumFrequencies		= 10,
+		SF_NumBits				= 4,
 	};
 
 	enum ECubeFace
@@ -233,6 +315,8 @@ namespace Air
 		return platform == SP_OPENGL_ES2_ANDROID || SP_OPENGL_ES3_1_ANDROID;
 	}
 
+	
+
 	inline bool RHISupportsSeparateMSAAAndResolveTextures(const EShaderPlatform platform)
 	{
 		return !isMetalPlatform(platform) && !isVulkanPlatform(platform) && !isAndroidOpenGLESPlatform(platform);
@@ -243,20 +327,6 @@ namespace Air
 		//return platform != SP_XBOXONE;
 		return false;
 	}
-
-	enum EConstantBufferBaseType
-	{
-		CBMT_INVALID,
-		CBMT_BOOL,
-		CBMT_INT32,
-		CBMT_UINT32,
-		CBMT_FLOAT32,
-		CBMT_STRUCT,
-		CBMT_SRV,
-		CBMT_UAV,
-		CBMT_SAMPLER,
-		CBMT_TEXTURE
-	};
 
 	inline bool isConstantBufferResourceType(EConstantBufferBaseType baseType)
 	{
@@ -318,14 +388,23 @@ namespace Air
 		FM_Point,
 		FM_Wireframe,
 		FM_Solid,
+
+		ERasterizerFillMode_Num,
+		ERasterizerFillMode_NumBits = 2,
 	};
+
+	static_assert(ERasterizerFillMode_Num <= (1 << ERasterizerFillMode_NumBits), "ERasterizerFillMode_Num will not fit on ERasterizerFillMode_NumBits");
 
 	enum ERasterizerCullMode
 	{
 		CM_None,
 		CM_CW,
-		CM_CCW	//	ÄæÊ±Õë
+		CM_CCW,	//	ÄæÊ±Õë
+		ERasterizerCullMode_Num,
+		ERasterizerCullMode_NumBits,
 	};
+
+	static_assert(ERasterizerCullMode_Num <= (1 << ERasterizerCullMode_NumBits), "ERasterizerCullMode_Num will not fit on ERasterizerCullMode_NumBits");
 
 	enum ECompareFunction
 	{
@@ -538,4 +617,76 @@ namespace Air
 		Stencil,
 		DepthStencil
 	};
+
+	enum class EConstantBufferValidation
+	{
+		None,
+		ValidateResources
+	};
+
+	inline bool isRDGResourceReferenceShaderParameterType(EConstantBufferBaseType baseType)
+	{
+		return
+			baseType == CBMT_RDG_TEXTURE ||
+			baseType == CBMT_RDG_TEXTURE_SRV ||
+			baseType == CBMT_RDG_TEXTURE_UAV ||
+			baseType == CBMT_RDG_BUFFER ||
+			baseType == CBMT_RDG_BUFFER_SRV ||
+			baseType == CBMT_RDG_BUFFER_UAV;
+	}
+
+	inline bool isShaderParameterTypeForConstantBufferLayout(EConstantBufferBaseType baseType)
+	{
+		return baseType == CBMT_TEXTURE ||
+			baseType == CBMT_SRV ||
+			baseType == CBMT_SAMPLER ||
+			isRDGResourceReferenceShaderParameterType(baseType) ||
+			baseType == CBMT_REFERENCED_STRUCT ||
+			baseType == CBMT_RENDER_TARGET_BINDING_SLOTS;
+	}
+
+
+	inline bool RHISupportsShaderPipelines(EShaderPlatform platform)
+	{
+		return !isMobilePlatform(platform);
+	}
+
+	inline bool isSwitchPlatform(CONST EShaderPlatform platform)
+	{
+		return platform == SP_SWITCH || platform == SP_SWITCH_FORWARD;
+	}
+
+	inline bool RHISupportsComputeShaders(const EShaderPlatform platform)
+	{
+		return isFeatureLevelSupported(platform, ERHIFeatureLevel::SM5) || (getMaxSupportedFeatureLevel(platform) == ERHIFeatureLevel::ES3_1 && !isSwitchPlatform(platform));
+	}
+
+	inline bool RHISupportsGeometryShaders(const EShaderPlatform platform)
+	{
+		return isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4) && !isMetalPlatform(platform) && !isVulkanMobilePlatform(platform);
+	}
+
+	enum
+	{
+		MaxImmutableSamplers = 2
+	};
+
+	inline bool isMetalMobilePlatform(const EShaderPlatform platform)
+	{
+		return platform == SP_METAL;
+	}
+
+	inline bool RHINeedsToSwitchVerticalAxis(EShaderPlatform platform)
+	{
+#if 0
+#endif
+		return isOpenGLPlatform(platform) && isMobilePlatform(platform) && !isPCPlatform(platform) && !isMetalMobilePlatform(platform) && !isVulkanPlatform(platform) && platform != SP_SWITCH && platform != SP_SWITCH_FORWARD;
+	}
+
+	inline bool RHIVolumeTextureRenderingSupportGuaranteed(const EShaderPlatform platform)
+	{
+		return isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4)
+			&& !isMetalPlatform(platform)
+			&& !isOpenGLPlatform(platform);
+	}
 }

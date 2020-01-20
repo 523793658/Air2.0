@@ -3,28 +3,22 @@
 #include "ShaderParameters.h"
 #include "Containers/DynamicRHIResourceArray.h"
 #include "ScenePrivate.h"
+#include "ShaderParameterMacros.h"
+#include "LightSceneInfo.h"
+#include "Rendering/SceneRenderTargetParameters.h"
 namespace Air
 {
 	float getLightFadeFactor(const SceneView& view, const LightSceneProxy* proxy);
 
-	BEGIN_CONSTANT_BUFFER_STRUCT(DeferredLightConstantStruct,)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, LightPosition)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, LightInvRadius)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, LightColor)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, LightFalloffExponent)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, NormalizedLightDirection)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float2, SpotAngles)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, SourceRadius)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, SourceLength)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, MinRoughness)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float, ContactShadowLength)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float2, DistanceFadeMAD)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, ShadowMapChannelMask)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(uint32, ShadowedBits)
-	DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(uint32, LightingChannelMask)
-
-
-	END_CONSTANT_BUFFER_STRUCT(DeferredLightConstantStruct)
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(DeferredLightConstantStruct, )
+		SHADER_PARAMETER(float4, ShadowMapChannelMask)
+		SHADER_PARAMETER(float2, DistanceFadeMAD)
+		SHADER_PARAMETER(float, ContactShadowLength)
+		SHADER_PARAMETER(float, VolumetricScatteringIntensity)
+		SHADER_PARAMETER(uint32, ShadowedBits)
+		SHADER_PARAMETER(uint32, LightingChannelMask)
+		SHADER_PARAMETER_STRUCT_INCLUDE(LightShaderParameters, LightParameters)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT()
 
 
 	namespace StencilingGeometry
@@ -276,23 +270,13 @@ namespace Air
 	void setDeferredLightParameters(RHICommandList& RHICmdList, const ShaderRHIParamRef shaderRHI,
 		const TShaderConstantBufferParameter<DeferredLightConstantStruct>& deferredLightConstantBufferParameter, const LightSceneInfo* lightSceneInfo, const SceneView& view)
 	{
-		float4 lightPositionAndInvRadius;
-		float4 LightColorAndFalloffExponent;
+
 		DeferredLightConstantStruct deferredLightConstantsValue;
-		lightSceneInfo->mProxy->getParameters(
-			lightPositionAndInvRadius,
-			LightColorAndFalloffExponent,
-			deferredLightConstantsValue.NormalizedLightDirection,
-			deferredLightConstantsValue.SpotAngles,
-			deferredLightConstantsValue.SourceRadius,
-			deferredLightConstantsValue.SourceLength,
-			deferredLightConstantsValue.MinRoughness
+		lightSceneInfo->mProxy->getLightShaderParameters(
+			deferredLightConstantsValue.LightParameters
 		);
 
-		deferredLightConstantsValue.LightPosition = lightPositionAndInvRadius;
-		deferredLightConstantsValue.LightInvRadius = lightPositionAndInvRadius.w;
-		deferredLightConstantsValue.LightColor = LightColorAndFalloffExponent;
-		deferredLightConstantsValue.LightFalloffExponent = LightColorAndFalloffExponent.w;
+		
 
 		const float2 fadParams = lightSceneInfo->mProxy->getDirectionalLightDistanceFadeParameters(view.getFeatureLevel(), false);
 		deferredLightConstantsValue.DistanceFadeMAD = float2(fadParams.y, -fadParams.x * fadParams.y);
@@ -316,19 +300,132 @@ namespace Air
 		deferredLightConstantsValue.ShadowedBits = lightSceneInfo->mProxy->castsStaticShadow() || bHasLightFunction ? 1 : 0;
 		deferredLightConstantsValue.ShadowedBits |= lightSceneInfo->mProxy->castsDynamicShadow() && view.mFamily->mEngineShowFlags.DynamicShadows ? 3 : 0;
 
-		if (lightSceneInfo->mProxy->isInverseSquared())
-		{
-			deferredLightConstantsValue.LightColor *= 16.0f;
-		}
 
 		const ELightComponentType lightType = (ELightComponentType)lightSceneInfo->mProxy->getLightType();
 		if ((lightType == LightType_Point || lightType == LightType_Spot) && view.isPerspectiveProjection())
 		{
-			deferredLightConstantsValue.LightColor *= getLightFadeFactor(view, lightSceneInfo->mProxy);
+			deferredLightConstantsValue.LightParameters.Color *= getLightFadeFactor(view, lightSceneInfo->mProxy);
 		}
 		deferredLightConstantsValue.LightingChannelMask = lightSceneInfo->mProxy->getLightingChannelMask();
 
 		setConstantBufferParameterImmediate(RHICmdList, shaderRHI, deferredLightConstantBufferParameter, deferredLightConstantsValue);
 
 	}
+
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(ShadowDepthPassConstantParameters,)
+		SHADER_PARAMETER_STRUCT(SceneTextureConstantParameters, SceneTextures)
+		SHADER_PARAMETER(Matrix, ProjectionMatrix)
+		SHADER_PARAMETER(Matrix, ViewMatrix)
+		SHADER_PARAMETER(float4, ShadowParams)
+		SHADER_PARAMETER(float, bClampToNearPlane)
+		SHADER_PARAMETER_ARRAY(Matrix, ShadowViewProjectioinMatrices, [6])
+		SHADER_PARAMETER_ARRAY(Matrix, ShadowViewMatrices, [6])
+	END_GLOBAL_SHADER_PARAMETER_STRUCT()
+
+	class ShadowMapRenderTargets
+	{
+	public:
+		TArray<IPooledRenderTarget*, SceneRenderingAllocator> mColorTargets;
+		IPooledRenderTarget* mDepthTarget;
+
+		ShadowMapRenderTargets()
+			:mDepthTarget(nullptr)
+		{}
+
+		int2 getSize() const
+		{
+			if (mDepthTarget)
+			{
+				return mDepthTarget->getDesc().mExtent;
+			}
+			else
+			{
+				BOOST_ASSERT(mColorTargets.size() > 0);
+				return mColorTargets[0]->getDesc().mExtent;
+			}
+		}
+	};
+
+	enum EShadowDepthCacheMode
+	{
+		SDCM_MovablePrimitivesOnly,
+		SDCM_StaticPrimitivesOnly,
+		SDCM_Uncached,
+	};
+
+	class ProjectedShadowInfo : public RefCountedObject
+	{
+	public:
+		typedef TArray<const PrimitiveSceneInfo*, SceneRenderingAllocator> PrimitiveArrayType;
+
+		ViewInfo* mShadowDepthView;
+
+		TConstantBufferRef<ShadowDepthPassConstantParameters> mShadowdepthPassConstantBuffer;
+
+		ShadowMapRenderTargets mRenderTargets;
+
+		EShadowDepthCacheMode mCacheMode;
+
+		ViewInfo* mDependentView;
+
+		int32 mShadowId;
+
+		float3 mPreShadowTranslation;
+
+		Matrix mShadowViewMatrix;
+
+		Matrix mSubjectAndReceiverMatrix;
+
+		Matrix mReceiverMatrix;
+
+		Matrix mInvReceiverMatrix;
+
+		float mInvMaxSubjectDepth;
+
+		float mMaxSubjectZ;
+		float mMinSubjectZ;
+
+		ConvexVolume mCasterFrustum;
+		ConvexVolume mReceiverFrustum;
+
+		float mMinPreSubjectZ;
+
+		Sphere mShadowBounds;
+
+		ShadowCascadeSettings mCascadeSettings;
+
+		uint32 mX;
+
+		uint32 mY;
+
+		uint32 mResolutionX;
+
+		uint32 mResolutionY;
+
+		uint32 mBorderSize;
+
+		float mMaxScreenPercent;
+
+		TArray<float, TInlineAllocator<2>> mFadeAlphas;
+
+		uint32 bAllocated : 1;
+
+		uint32 bRendered : 1;
+
+		uint32 bAllocatedInPreshadowCache : 1;
+
+		uint32 bDepthsCached : 1;
+
+		uint32 bDirectionalLight : 1;
+
+		uint32 bOnePassPointLightShadow : 1;
+
+		uint32 bWholeSceneShadow : 1;
+
+		uint32 bReflectiveShadowmap : 1;
+
+		uint32 bTranslucentShadow : 1;
+
+
+	};
 }

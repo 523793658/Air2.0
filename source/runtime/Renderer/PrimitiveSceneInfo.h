@@ -4,11 +4,21 @@
 #include "PrimitiveSceneProxy.h"
 #include "Containers/IndirectArray.h"
 #include "GenericOctree.h"
+#include "MeshPassProcessor.h"
+#include "SceneCore.h"
 namespace Air
 {
 	class IndirectLightingCacheAllocation
 	{
 
+	};
+
+	struct PrimitiveFlagsCompact
+	{
+		uint8 bCastDynamicShadow : 1;
+		uint8 bStaticLighting : 1;
+		uint8 bCastStaticShadow : 1;
+		PrimitiveFlagsCompact(const PrimitiveSceneProxy* proxy);
 	};
 
 	class PrimitiveSceneInfo : public DeferredCleanupInterface
@@ -22,17 +32,23 @@ namespace Air
 		PrimitiveComponentId mLightingAttachmentRoot;
 
 		PrimitiveComponentId mLODParentComponentId;
-		TindirectArray<class StaticMesh> mStaticMeshes;
+		TArray<class StaticMeshBatch> mStaticMeshes;
+		TArray<class StaticMeshBatchRelevance> mStaticMeshRelevances;
+		TArray<class CachedMeshDrawCommandInfo> mStaticMeshCommandInfos;
 		float mLastRenderTime;
 		float mLastVisibilityChangeTime;
-		bool bNeedsStaticMeshUpdate;
-		bool bNeedsConstantBufferUpdate;
-		bool bPrecomputeLightingBufferDirty;
+		uint8 bNeedsConstantBufferUpdate : 1;
+		uint8 bPrecomputeLightingBufferDirty : 1;
+		uint8 bNeedsStaticMeshUpdateWithoutVisibilityCheck : 1;
 		Scene* mScene;
 		ConstantBufferRHIRef mIndirectLightingCacheConstantBuffer;
+
+
 	private:
 		friend Scene;
 		int32 mPackedIndex;
+
+		int32 mNumLightmapDataEntries;
 	public:
 		PrimitiveSceneInfo(PrimitiveComponent* inComponent, Scene* inScene);
 
@@ -42,9 +58,11 @@ namespace Air
 
 		void linkLODParentComponent();
 
-		void addToScene(RHICommandListImmediate& RHICmdList, bool bUpdateStaticDrawLists);
+		int32 getNumLightmapDataEntries() const { return mNumLightmapDataEntries; }
 
-		void addStaticMeshes(RHICommandListImmediate& RHICmdList);
+		void addToScene(RHICommandListImmediate& RHICmdList, bool bUpdateStaticDrawLists, bool bAddToStaticDrawList = true);
+
+		void addStaticMeshes(RHICommandListImmediate& RHICmdList, bool bAddToStaticDrawLists);
 
 		FORCEINLINE void setNeedsConstantBufferUpdate(bool bInNeedsConstantBufferUpdate)
 		{
@@ -56,6 +74,8 @@ namespace Air
 			return bNeedsConstantBufferUpdate;
 		}
 
+		FORCEINLINE bool isIndexValid() const { return mPackedIndex != INDEX_NONE && mPackedIndex != std::numeric_limits<int32>::max(); }
+
 		void updateConstantBuffer(RHICommandListImmediate& RHICmdList);
 
 		FORCEINLINE void conditionalUpdateConstantBuffer(RHICommandListImmediate& RHICmdList)
@@ -66,17 +86,8 @@ namespace Air
 			}
 		}
 
-		FORCEINLINE bool needsLazyUpdateForRendering()
-		{
-			return needsConstantBufferUpdate() || needsUpdateStaticMeshes();
-		}
-
-		FORCEINLINE bool needsUpdateStaticMeshes()
-		{
-			return bNeedsStaticMeshUpdate;
-		}
-
-		void updateStaticMeshes(RHICommandListImmediate& RHICmdList);
+	
+		void updateStaticMeshes(RHICommandListImmediate& RHICmdList, bool bReAddToDrawLists = true);
 
 		FORCEINLINE void conditionalUpdateStaticMeshes(RHICommandListImmediate& RHICmdList)
 		{
@@ -92,9 +103,18 @@ namespace Air
 			conditionalUpdateStaticMeshes(RHICmdList);
 		}
 
+		bool needsUpdateStaticMeshes();
+
 		void removeStaticMeshes();
 
 		void removeFromScene(bool bUpdateStaticDrawList);
+
+		void beginDeferredUpdateStaticMeshes();
+
+	private:
+		void cacheMeshDrawCommand(RHICommandListImmediate& RHICmdList);
+
+		void removeCachedDrawMeshCommand();
 	};
 
 	class PrimitiveSceneInfoCompact

@@ -11,30 +11,36 @@
 #include "GlobalShader.h"
 #include "StaticBoundShaderState.h"
 #include "RHICommandList.h"
+#include "sceneRendering.h"
 #include "HdrCustomResolveShaders.h"
+#include "RHIDefinitions.h"
+#include "ClearQuad.h"
+#include "Rendering/SceneRenderTargetParameters.h"
+#include "VolumeRendering.h"
+#include "OneColorShader.h"
 namespace Air
 {
 	static TGlobalResource<SceneRenderTargets> mSceneRenderTargetSingleton;
 	extern int32 GDiffuseIrradianceCubemapSize;
 
-	IMPLEMENT_CONSTANT_BUFFER_STRUCT(GBufferResourceStruct, TEXT("GBuffers"));
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(GBufferResourceStruct, "GBuffers");
 
 	SceneRenderTargets& SceneRenderTargets::get(RHICommandList& RHICmdList)
 	{
-		BOOST_ASSERT(isInRenderingThread() && !RHICmdList.getRenderThreadContext(RHICommandListBase::ERenderThreadContext::SceneRenderTargets) && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local));
+		BOOST_ASSERT(isInRenderingThread() && !RHICmdList.getRenderThreadContext(RHICommandListBase::ERenderThreadContext::SceneRenderTargets) && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()));
 		return mSceneRenderTargetSingleton;
 	}
 
 	SceneRenderTargets& SceneRenderTargets::get(RHICommandListImmediate& RHICmdList)
 	{
-		BOOST_ASSERT(isInRenderingThread() && !RHICmdList.getRenderThreadContext(RHICommandListBase::ERenderThreadContext::SceneRenderTargets) && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local));
+		BOOST_ASSERT(isInRenderingThread() && !RHICmdList.getRenderThreadContext(RHICommandListBase::ERenderThreadContext::SceneRenderTargets) && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()));
 
 		return mSceneRenderTargetSingleton;
 	}
 
 	SceneRenderTargets& SceneRenderTargets::get(RHIAsyncComputeCommandListImmediate& RHICmdList)
 	{
-		BOOST_ASSERT(isInRenderingThread() && !RHICmdList.getRenderThreadContext(RHICommandListBase::ERenderThreadContext::SceneRenderTargets) && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::RenderThread_Local));
+		BOOST_ASSERT(isInRenderingThread() && !RHICmdList.getRenderThreadContext(RHICommandListBase::ERenderThreadContext::SceneRenderTargets) && !TaskGraphInterface::get().isThreadProcessingTasks(ENamedThreads::getRenderThread_Local()));
 
 		return mSceneRenderTargetSingleton;
 	}
@@ -52,9 +58,11 @@ namespace Air
 		}
 	}
 
-	void SceneRenderTargets::allocate(RHICommandList& RHICmdList, const SceneViewFamily& viewFamily)
+	void SceneRenderTargets::allocate(RHICommandList& RHICmdList, const SceneRenderer* sceneRenderer)
 	{
 		BOOST_ASSERT(isInRenderingThread());
+		BOOST_ASSERT(sceneRenderer->mViewFamily.mFrameNumber != UINT_MAX);
+		const SceneViewFamily& viewFamily = sceneRenderer->mViewFamily;
 		const auto newFeatureLevel = viewFamily.mScene->getFeatureLevel();
 		mCurrentShadingPath = viewFamily.mScene->getShadingPath();
 		bRequireSceneColorAlpha = false;
@@ -68,7 +76,7 @@ namespace Air
 
 		int2 DesiredBufferSize = computeDesiredSize(viewFamily);
 		
-		quantizeSceneBufferSize(DesiredBufferSize.x, DesiredBufferSize.y);
+		quantizeSceneBufferSize(DesiredBufferSize, DesiredBufferSize);
 		if ((mBufferSize.x != DesiredBufferSize.x) ||
 			(mBufferSize.y != DesiredBufferSize.y))
 		{
@@ -284,65 +292,91 @@ namespace Air
 
 	}
 
-	void SceneRenderTargets::beginRenderingGBuffer(RHICommandList& RHICmdList, ERenderTargetLoadAction colorLoadAction, ERenderTargetLoadAction depthLoadAction, bool bBindQuadOverdrawBuffers, const LinearColor& clearColor /* = LinearColor(0, 0, 0, 1) */)
+	void SceneRenderTargets::beginRenderingGBuffer(RHICommandList& RHICmdList, ERenderTargetLoadAction colorLoadAction, ERenderTargetLoadAction depthLoadAction, FExclusiveDepthStencil::Type depthStencilAccess, bool bBindQuadOverdrawBuffers, bool bClearQuadOverdrawBuffers, const LinearColor& clearColor, bool bIsWireframe)
 	{
-		if (isAnyForwardShadingEnabled(getFeatureLevelShaderPlatform(mCurrentFeatureLevel)))
-		{
-			beginRenderingSceneColor(RHICmdList, colorLoadAction == ERenderTargetLoadAction::EClear ? ESimpleRenderTargetMode::EClearColorExistingDepth : ESimpleRenderTargetMode::EUninitializedColorExistingDepth);
-			return;
-		}
+		BOOST_ASSERT(RHICmdList.isOutsideRenderPass());
+		BOOST_ASSERT(mCurrentFeatureLevel >= ERHIFeatureLevel::SM4);
 		allocSceneColor(RHICmdList);
 
-		if (mCurrentFeatureLevel >= ERHIFeatureLevel::SM4)
+		const ERenderTargetStoreAction depthStoreAction = (depthStencilAccess & FExclusiveDepthStencil::DepthWrite) ? ERenderTargetStoreAction::EStore : ERenderTargetStoreAction::ENoAction;
+
+		bool bClearColor = colorLoadAction == ERenderTargetLoadAction::EClear;
+		bool bClearDepth = depthLoadAction == ERenderTargetLoadAction::EClear;
+
+		const TextureRHIRef& sceneColorTex = getSceneColorSurface();
+		bool bShaderClear = false;
+		int32 velocityRTIndex = -1;
+		RHIRenderPassInfo RPInfo;
+		int32 MRTCount = fillGBufferRenderPassInfo(colorLoadAction, RPInfo, velocityRTIndex);
+		BOOST_ASSERT(RPInfo.mColorRenderTargets[0].mRenderTarget == sceneColorTex);
+		if (bClearDepth)
 		{
-			bool bClearColor = colorLoadAction == ERenderTargetLoadAction::EClear;
-			bool bClearDepth = depthLoadAction == ERenderTargetLoadAction::EClear;
-
-			const TextureRHIRef& sceneColorTexture = getSceneColorSurface();
-			bool bShaderClear = false;
-			if (bClearColor)
-			{
-				if (!sceneColorTexture->hasClearValue() || (clearColor != sceneColorTexture->getClearColor()))
-				{
-					colorLoadAction = ERenderTargetLoadAction::ENoAction;
-					bShaderClear = true;
-				}
-				else
-				{
-					bGBufferFastCleared = true;
-				}
-			}
-			int32 VolocityRTIndex;
-			RHIRenderTargetView renderTargets[MaxSimultaneousRenderTargets];
-			int32 MRTCount = getGBufferRenderTargets(colorLoadAction, renderTargets, VolocityRTIndex);
-			BOOST_ASSERT(renderTargets[0].mTexture == sceneColorTexture);
-
-			RHIDepthRenderTargetView depthView(getSceneDepthSurface(), depthLoadAction, ERenderTargetStoreAction::EStore);
-			RHISetRenderTargetsInfo info(MRTCount, renderTargets, depthView);
-			if (bClearDepth)
-			{
-				bSceneDepthCleared = true;
-			}
-			//if(bBindQuadOverdrawBuffers && )
-			RHICmdList.setRenderTargetAndClear(info);
-			if (bShaderClear)
-			{
-				LinearColor clearColors[MaxSimultaneousRenderTargets];
-				TextureRHIParamRef textures[MaxSimultaneousRenderTargets];
-				clearColors[0] = clearColor;
-				textures[0] = renderTargets[0].mTexture;
-				for (int32 i = 0; i < MRTCount; ++i)
-				{
-					clearColors[i] = renderTargets[i].mTexture->getClearColor();
-					textures[i] = renderTargets[i].mTexture;
-				}
-				RHICmdList.clearColorTextures(MRTCount, textures, clearColors, IntRect());
-			}
-
-			bool bBindClearColor = !bClearColor && bGBufferFastCleared;
-			bool bBindClearDepth = !bClearDepth && bSceneDepthCleared;
-			RHICmdList.bindClearMRTValues(bBindClearColor, bBindClearDepth, bBindClearDepth);
+			bSceneDepthCleared = true;
 		}
+		setQuadOverdrawUAV(RHICmdList, bBindQuadOverdrawBuffers, bClearQuadOverdrawBuffers, RPInfo);
+		RPInfo.mDepthStencilRenderTarget.mActions = makeDepthStencilTargetActions(makeRenderTargetActions(depthLoadAction, depthStoreAction), makeRenderTargetActions(depthLoadAction, ERenderTargetStoreAction::EStore));
+		RPInfo.mDepthStencilRenderTarget.mDepthStencilTarget = getSceneDepthSurface();
+		RPInfo.mDepthStencilRenderTarget.mExculusiveDepthStencil = depthStencilAccess;
+
+		if (useVirtualTexturing(mCurrentFeatureLevel))
+		{
+
+		}
+		RHICmdList.beginRenderPass(RPInfo, TEXT("GBuffer"));
+
+		if (bShaderClear)
+		{
+			LinearColor clearColors[MaxSimultaneousRenderTargets];
+			RHITexture* textures[MaxSimultaneousRenderTargets];
+			clearColors[0] = clearColor;
+			textures[0] = RPInfo.mColorRenderTargets[0].mRenderTarget;
+			for (int32 i = 1; i < MRTCount; i++)
+			{
+				clearColors[i] = RPInfo.mColorRenderTargets[i].mRenderTarget->getClearColor();
+				textures[i] = RPInfo.mColorRenderTargets[i].mRenderTarget;
+			}
+			drawClearQuadMRT(RHICmdList, true, MRTCount, clearColors, false, 0, false, 0);
+		}
+
+		bool bBindClearColor = !bClearColor && bGBufferFastCleared;
+		bool bBindClearDepth = !bClearDepth && bSceneDepthCleared;
+
+		RHICmdList.bindClearMRTValues(bBindClearColor, bBindClearDepth, bBindClearDepth);
+
+		if (bIsWireframe)
+		{
+			RHICmdList.endRenderPass();
+			SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+			RPInfo = RHIRenderPassInfo();
+			RPInfo.mColorRenderTargets[0].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+			//RPInfo.mColorRenderTargets[0].mRenderTarget = sceneContext.getedi
+		}
+	}
+
+	void SceneRenderTargets::finishGBufferPassAndResolve(RHICommandListImmediate& RHICmdList)
+	{
+		RHICmdList.endRenderPass();
+
+		const EShaderPlatform shaderPlatform = getFeatureLevelShaderPlatform(mCurrentFeatureLevel);
+		if (isSimpleForwardShadingEnable(shaderPlatform))
+		{
+			return;
+		}
+
+		int32 velocityRTIndex;
+		RHIRenderTargetView renderTargets[MaxSimultaneousRenderTargets];
+		int32 numMRTs = getGBufferRenderTargets(ERenderTargetLoadAction::ELoad, renderTargets, velocityRTIndex);
+		ResolveParams resolveParams;
+		int32 i = isForwardShadingEnabled(shaderPlatform) ? 1 : 0;
+		for (; i < numMRTs; ++i)
+		{
+			if (i != velocityRTIndex || !isUsingSelectiveBasePassOutputs(shaderPlatform))
+			{
+				RHICmdList.copyToResolveTarget(renderTargets[i].mTexture, renderTargets[i].mTexture, resolveParams);
+			}
+		}
+
+		mQuadOverdrawIndex = INDEX_NONE;
 	}
 
 	int32 SceneRenderTargets::getGBufferRenderTargets(ERenderTargetLoadAction colorLoadAction, RHIRenderTargetView outRenderTargets[MaxSimultaneousRenderTargets], int32& outVelocityRTIndex)
@@ -595,7 +629,7 @@ namespace Air
 		if (inFeatureLevel >= ERHIFeatureLevel::SM4)
 		{
 			EAntiAliasingMethod method = (EAntiAliasingMethod)0;
-			if (isForwardShadingEnabled(inFeatureLevel) && method == AAM_MSAA)
+			if (isForwardShadingEnabled(getFeatureLevelShaderPlatform(inFeatureLevel)) && method == AAM_MSAA)
 			{
 				numSamples = 1;
 				if (numSamples != 1 && numSamples != 2 && numSamples != 4)
@@ -666,76 +700,11 @@ namespace Air
 
 	void SceneRenderTargets::finishRenderingLightAttenuation(RHICommandList& RHICmdList)
 	{
-		RHICmdList.copyToResolveTarget(getLightAttenuationTexture(), mLightAttenuation->getRenderTargetItem().mShaderResourceTexture, false, ResolveParams(ResolveRect()));
+		RHICmdList.copyToResolveTarget(getLightAttenuationTexture(), mLightAttenuation->getRenderTargetItem().mShaderResourceTexture, ResolveParams(ResolveRect()));
 
 	}
 
-	void SceneRenderTargets::resolveSceneColor(RHICommandList& RHICmdList, const ResolveRect& resolveRect /* = ResolveRect() */)
-	{
-		auto& currentSceneColor = getSceneColor();
-		uint32 currentNumSamples = currentSceneColor->getDesc().mNumSamples;
-
-		const EShaderPlatform currentShaderPlatform = GShaderPlatformForFeatureLevel[mCurrentFeatureLevel];
-
-		if (currentNumSamples <= 1 || !RHISupportsSeparateMSAAAndResolveTextures(currentShaderPlatform))
-		{
-			RHICmdList.copyToResolveTarget(getSceneColorSurface(), getSceneColorTexture(), true, ResolveParams(resolveRect));
-		}
-		else
-		{
-			setRenderTarget(RHICmdList, getSceneColorTexture(), TextureRHIParamRef());
-			if (resolveRect.isValid())
-			{
-				RHICmdList.setScissorRect(true, resolveRect.X1, resolveRect.Y1, resolveRect.X2, resolveRect.Y2);
-			}
-			RHICmdList.setBlendState(TStaticBlendState<>::getRHI());
-			RHICmdList.setRasterizerState(TStaticRasterizerState<>::getRHI());
-			RHICmdList.setDepthStencilState(TStaticDepthStencilState<false, CF_Always>::getRHI());
-			RHICmdList.setStreamSource(0, NULL, 0, 0);
-			int32 resolveWidth = 0;
-			if (currentNumSamples <= 1)
-			{
-				resolveWidth = 0;
-			}
-			if (resolveWidth != 0)
-			{
-			}
-			else
-			{
-				auto shaderMap = getGlobalShaderMap(mCurrentFeatureLevel);
-				TShaderMapRef<HdrCustomResolveVS> vertexShader(shaderMap);
-				if (currentNumSamples == 2)
-				{
-					TShaderMapRef<HdrCustomResolve2xPS> pixelShader(shaderMap);
-					static GlobalBoundShaderState boundShaderState;
-					setGlobalBoundShaderState(RHICmdList, mCurrentFeatureLevel, boundShaderState, getVertexDeclarationVector4(), *vertexShader, *pixelShader);
-					pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture);
-					RHICmdList.drawPrimitive(PT_TriangleList, 0, 1, 1);
-				}
-				else if(currentNumSamples == 4)
-				{
-					TShaderMapRef<HdrCustomResolve4xPS> pixelShader(shaderMap);
-					static GlobalBoundShaderState boundShaderState;
-					setGlobalBoundShaderState(RHICmdList, mCurrentFeatureLevel, boundShaderState, getVertexDeclarationVector4(), *vertexShader, *pixelShader);
-					pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture);
-					RHICmdList.drawPrimitive(PT_TriangleList, 0, 1, 1);
-
-				}
-				else if (currentNumSamples == 8)
-				{
-					TShaderMapRef<HdrCustomResolve8xPS> pixelShader(shaderMap);
-					static GlobalBoundShaderState boundShaderState;
-					setGlobalBoundShaderState(RHICmdList, mCurrentFeatureLevel, boundShaderState, getVertexDeclarationVector4(), *vertexShader, *pixelShader);
-					pixelShader->setParameters(RHICmdList, currentSceneColor->getRenderTargetItem().mTargetableTexture);
-					RHICmdList.drawPrimitive(PT_TriangleList, 0, 1, 1);
-				}
-				else
-				{
-					BOOST_ASSERT(false);
-				}
-			}
-		}
-	}
+	
 
 	void SceneRenderTargets::setSceneColor(IPooledRenderTarget* i)
 	{
@@ -812,5 +781,272 @@ namespace Air
 
 			}
 		}
+	}
+
+	
+
+	void setupSceneTextureConstantParameter(
+		SceneRenderTargets& sceneContext,
+		ERHIFeatureLevel::Type featureLevel,
+		ESceneTextureSetupMode setupMode,
+		SceneTextureConstantParameters& sceneTextureParameters)
+	{
+		RHITexture* whiteDefault2D = GSystemTextures.mWhiteDummy->getRenderTargetItem().mShaderResourceTexture;
+		RHITexture* blackDefault2D = GSystemTextures.mBlackDummy->getRenderTargetItem().mShaderResourceTexture;
+		RHITexture* depthDefault = GSystemTextures.mDepthDummy->getRenderTargetItem().mShaderResourceTexture;
+
+		{
+			const bool bSetupDepth = (setupMode & ESceneTextureSetupMode::SceneDepth) != ESceneTextureSetupMode::None;
+			sceneTextureParameters.SceneColorTexture = bSetupDepth ? sceneContext.getSceneColorTexture().getReference() : blackDefault2D;
+			sceneTextureParameters.SceneColorTextureSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::getRHI();
+			const Texture2DRHIRef* actualDepthTexture = sceneContext.getActualDepthTexture();
+			sceneTextureParameters.SceneDepthTexture = bSetupDepth && actualDepthTexture ? (*actualDepthTexture).getReference() : depthDefault;
+
+			if (bSetupDepth && sceneContext.isSeparateTranslucencyPass() && sceneContext.isDownsampleTranslucencyDepthValid())
+			{
+				int2 outScaleSize;
+				float outScale;
+				sceneContext.getSeparateTranslucencyDimensions(outScaleSize, outScale);
+				if (outScale < 1.0f)
+				{
+					sceneTextureParameters.SceneDepthTexture = sceneContext.getDownsampledTranslucencyDepthSurface();
+				}
+			}
+			if (bSetupDepth)
+			{
+				sceneTextureParameters.SceneDepthTextureNonMS = GSupportsDepthFetchDuringDepthTest ? sceneContext.getSceneDepthTexture() : sceneContext.getAuxiliarySceneDepthSurface();
+			}
+			else
+			{
+				sceneTextureParameters.SceneDepthTextureNonMS = depthDefault;
+			}
+
+			sceneTextureParameters.SceneDepthTextureSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::getRHI();
+		}
+		{
+			const bool bSetupGBuffers = (setupMode & ESceneTextureSetupMode::GBuffers) != ESceneTextureSetupMode::None;
+			const EShaderPlatform shaderPlatform = getFeatureLevelShaderPlatform(featureLevel);
+			const bool bUseGBuffer = isUsingGBuffers(shaderPlatform);
+			const bool bCanReadGBufferConstants = bSetupGBuffers && (bUseGBuffer || isSimpleForwardShadingEnable(shaderPlatform));
+
+			const SceneRenderTargetItem& GBufferAToUse = bCanReadGBufferConstants && sceneContext.mGBufferA ? sceneContext.mGBufferA->getRenderTargetItem() : GSystemTextures.mBlackDummy->getRenderTargetItem();
+			const SceneRenderTargetItem& GBufferBToUse = bCanReadGBufferConstants && sceneContext.mGBufferB ? sceneContext.mGBufferB->getRenderTargetItem() : GSystemTextures.mBlackDummy->getRenderTargetItem();
+			const SceneRenderTargetItem& GBufferCToUse = bCanReadGBufferConstants && sceneContext.mGBufferC ? sceneContext.mGBufferC->getRenderTargetItem() : GSystemTextures.mBlackDummy->getRenderTargetItem();
+			const SceneRenderTargetItem& GBufferDToUse = bCanReadGBufferConstants && sceneContext.mGBufferD ? sceneContext.mGBufferD->getRenderTargetItem() : GSystemTextures.mBlackDummy->getRenderTargetItem();
+			const SceneRenderTargetItem& GBufferEToUse = bCanReadGBufferConstants && sceneContext.mGBufferE ? sceneContext.mGBufferE->getRenderTargetItem() : GSystemTextures.mBlackDummy->getRenderTargetItem();
+			const SceneRenderTargetItem& GBufferVelocityToUse = bCanReadGBufferConstants && sceneContext.mGBufferVelocity ? sceneContext.mGBufferVelocity->getRenderTargetItem() : GSystemTextures.mBlackDummy->getRenderTargetItem();
+
+			sceneTextureParameters.GBufferATexture = GBufferAToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferBTexture = GBufferBToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferCTexture = GBufferCToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferDTexture = GBufferDToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferETexture = GBufferEToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferVelocityTexture = GBufferVelocityToUse.mShaderResourceTexture;
+
+			sceneTextureParameters.GBufferATextureNonMS = GBufferAToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferBTextureNonMS = GBufferBToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferCTextureNonMS = GBufferCToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferDTextureNonMS = GBufferDToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferETextureNonMS = GBufferEToUse.mShaderResourceTexture;
+			sceneTextureParameters.GBufferVelocityTextureNonMS = GBufferVelocityToUse.mShaderResourceTexture;
+		
+			sceneTextureParameters.GBufferATextureSampler = TStaticSamplerState<>::getRHI();
+			sceneTextureParameters.GBufferBTextureSampler = TStaticSamplerState<>::getRHI();
+			sceneTextureParameters.GBufferCTextureSampler = TStaticSamplerState<>::getRHI();
+			sceneTextureParameters.GBufferDTextureSampler = TStaticSamplerState<>::getRHI();
+			sceneTextureParameters.GBufferETextureSampler = TStaticSamplerState<>::getRHI();
+			sceneTextureParameters.GBufferVelocityTextureSampler = TStaticSamplerState<>::getRHI();
+		}
+	}
+
+
+	template<typename TRHICmdList>
+	TConstantBufferRef<SceneTextureConstantParameters> createSceneTextureConstantBufferSingleDraw(TRHICmdList& RHICmdList, ESceneTextureSetupMode sceneTextureSetupMode, ERHIFeatureLevel::Type featureLevel)
+	{
+		SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+		SceneTextureConstantParameters sceneTextureParameters;
+		setupSceneTextureConstantParameter(sceneContext, featureLevel, sceneTextureSetupMode, sceneTextureParameters);
+		return TConstantBufferRef<SceneTextureConstantParameters>::createConstantBufferImmediate(sceneTextureParameters, ConstantBuffer_SingleFrame);
+	}
+
+	int32 GAllowCustomMSAAResolves = 1;
+
+	void SceneRenderTargets::resolveSceneDepthTexture(RHICommandList& RHICmdList, const ResolveRect& resolveRect)
+	{
+		BOOST_ASSERT(RHICmdList.isOutsideRenderPass());
+		ResolveParams resolveParameters;
+		if (resolveRect.isValid())
+		{
+			resolveParameters.mDestRect = resolveRect;
+			resolveParameters.mRect = resolveRect;
+		}
+
+		SceneRenderTargets& sceneContext = SceneRenderTargets::get(RHICmdList);
+		uint32 currentNumSamples = mSceneDepthZ->getDesc().mNumSamples;
+		const EShaderPlatform currentShaderPlatform = GShaderPlatformForFeatureLevel[sceneContext.getCurrentFeatureLevel()];
+		if ((currentNumSamples <= 1 || !RHISupportsSeparateMSAAAndResolveTextures(currentShaderPlatform)) || !GAllowCustomMSAAResolves)
+		{
+			RHICmdList.copyToResolveTarget(getSceneDepthSurface(), getSceneDepthTexture(), resolveParameters);
+		}
+		else
+		{
+			BOOST_ASSERT(false);
+		}
+	}
+
+	void SceneRenderTargets::resolveSceneDepthToAuxiliaryTexture(RHICommandList& RHICmdList)
+	{
+		if (!GSupportsDepthFetchDuringDepthTest)
+		{
+			RHICmdList.copyToResolveTarget(getSceneDepthSurface(), getAuxiliarySceneDepthTexture(), ResolveParams());
+		}
+	}
+
+	int32 SceneRenderTargets::fillGBufferRenderPassInfo(ERenderTargetLoadAction colorLoadAction, RHIRenderPassInfo& outRenderPassInfo, int32& outVelocityRTIndex)
+	{
+		int32 MRTNum = 0;
+		outRenderPassInfo.mColorRenderTargets[MRTNum].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+		outRenderPassInfo.mColorRenderTargets[MRTNum].mArraySlice = -1;
+		outRenderPassInfo.mColorRenderTargets[MRTNum].mMipIndex = 0;
+		outRenderPassInfo.mColorRenderTargets[MRTNum].mRenderTarget = getSceneColorSurface();
+
+		MRTNum++;
+
+		const EShaderPlatform shaderPlatform = GShaderPlatformForFeatureLevel[mCurrentFeatureLevel];
+		const bool bUseGBuffer = isUsingGBuffers(shaderPlatform);
+		if (bUseGBuffer)
+		{
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mRenderTarget = mGBufferA->getRenderTargetItem().mTargetableTexture;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mArraySlice = -1;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mMipIndex = 0;
+			MRTNum++;
+
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mRenderTarget = mGBufferB->getRenderTargetItem().mTargetableTexture;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mArraySlice = -1;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mMipIndex = 0;
+			MRTNum++;
+
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mRenderTarget = mGBufferC->getRenderTargetItem().mTargetableTexture;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mArraySlice = -1;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mMipIndex = 0;
+			MRTNum++;
+		}
+
+		if (bAllocateVelocityGBuffer && !isSimpleForwardShadingEnable(shaderPlatform))
+		{
+
+		}
+		else
+		{
+			outVelocityRTIndex = -1;
+		}
+
+		if (bUseGBuffer)
+		{
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mRenderTarget = mGBufferD->getRenderTargetItem().mTargetableTexture;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mArraySlice = -1;
+			outRenderPassInfo.mColorRenderTargets[MRTNum].mMipIndex = 0;
+			MRTNum++;
+			if (bAllowStaticLighting)
+			{
+				BOOST_ASSERT(MRTNum == (bAllocateVelocityGBuffer ? 6 : 5));
+				outRenderPassInfo.mColorRenderTargets[MRTNum].mAction = makeRenderTargetActions(colorLoadAction, ERenderTargetStoreAction::EStore);
+				outRenderPassInfo.mColorRenderTargets[MRTNum].mRenderTarget = mGBufferE->getRenderTargetItem().mTargetableTexture;
+				outRenderPassInfo.mColorRenderTargets[MRTNum].mArraySlice = -1;
+				outRenderPassInfo.mColorRenderTargets[MRTNum].mMipIndex = 0;
+				MRTNum++;
+			}
+		}
+
+		BOOST_ASSERT(MRTNum <= MaxSimultaneousRenderTargets);
+		return MRTNum;
+		
+	}
+
+	void SceneRenderTargets::setQuadOverdrawUAV(RHICommandList& RHICmdList, bool bBindQuadOverdrawBuffers, bool bClearQuadOverdrawBuffers, RHIRenderPassInfo& info)
+	{
+
+	}
+
+	void SceneRenderTargets::clearTranslucentVolumeLighting(RHICommandListImmediate& RHICmdList, int32 viewIndex)
+	{
+		if (GSupportsVolumeTextureRendering)
+		{
+			static_assert(TVC_Max == 2, "Only expecting two transluceny lighting cascades.");
+			static constexpr int32 num3DTextures = NumTranslucentVolumeRenderTargetSets << 1;
+
+			RHITexture* renderTargets[num3DTextures];
+			bool bUseTransLightingVolBlur = false;
+			const int32 numIterations = bUseTransLightingVolBlur ? NumTranslucentVolumeRenderTargetSets : NumTranslucentVolumeRenderTargetSets - 1;
+
+			for (int32 idx = 0; idx < numIterations; ++idx)
+			{
+				renderTargets[idx << 1] = mTranslucencyLightingVolumeAmbient[idx + NumTranslucentVolumeRenderTargetSets * viewIndex]->getRenderTargetItem().mTargetableTexture;
+				renderTargets[(idx << 1) + 1] = mTranslucencyLightingVolumeAmbient[idx + NumTranslucentVolumeRenderTargetSets * viewIndex]->getRenderTargetItem().mTargetableTexture;
+			}
+
+			static const LinearColor clearColors[num3DTextures] = { LinearColor::Transparent };
+
+			if (bUseTransLightingVolBlur)
+			{
+				clearVolumeTextures<num3DTextures>(RHICmdList, mCurrentFeatureLevel, renderTargets, clearColors);
+			}
+			else
+			{
+				clearVolumeTextures<num3DTextures - 2>(RHICmdList, mCurrentFeatureLevel, renderTargets, clearColors);
+			}
+		}
+	}
+
+	template<int32 NumRenderTargets>
+	void SceneRenderTargets::clearVolumeTextures(RHICommandList& RHICmdList, ERHIFeatureLevel::Type featureLevel, RHITexture** renderTargets, const LinearColor* clearColors)
+	{
+		BOOST_ASSERT(!RHICmdList.isInsideRenderPass());
+		RHIRenderPassInfo RPInfo(NumRenderTargets, renderTargets, ERenderTargetActions::DontLoad_Store);
+		transitionRenderPassTargets(RHICmdList, RPInfo);
+
+		RHICmdList.beginRenderPass(RPInfo, TEXT("clearVolumeTextures"));
+		{
+			GraphicsPipelineStateInitializer graphicsPSOInit;
+			RHICmdList.applyCachedRenderTargets(graphicsPSOInit);
+			graphicsPSOInit.mRasterizerState = TStaticRasterizerState<FM_Solid, CM_None>::getRHI();
+			graphicsPSOInit.mDepthStencilState = TStaticDepthStencilState<false, CF_Always>::getRHI();
+			graphicsPSOInit.mBlendState = TStaticBlendState<>::getRHI();
+
+			const int32 translucencyLightingVolumeDim = getTranslucencyLightingVolumeDim();
+
+			const VolumeBounds volumeBounds(translucencyLightingVolumeDim);
+			TShaderMap<GlobalShaderType>* shaderMap = getGlobalShaderMap(featureLevel);
+			TShaderMapRef<WriteToSliceVS> vertexShader(shaderMap);
+			TOptionalShaderMapRef<WriteToSliceGS> geometryShader(shaderMap);
+			TShaderMapRef<TOneColorPixelShaderMRT<NumRenderTargets>> pixelShader(shaderMap);
+
+			graphicsPSOInit.mBoundShaderState.mVertexDeclarationRHI = GScreenVertexDeclaration.mVertexDeclarationRHI;
+			graphicsPSOInit.mBoundShaderState.mVertexShaderRHI = GETSAFERHISHADER_VERTEX(*vertexShader);
+#if PLATFORM_SUPPORTS_GEOMETRY_SHADERS
+			graphicsPSOInit.mBoundShaderState.mGeometryShaderRHI = GETSAFERHISHADER_GEOMETRY(*geometryShader);
+#endif
+			graphicsPSOInit.mBoundShaderState.mPixelShaderRHI = GETSAFERHISHADER_PIXEL(*pixelShader);
+			graphicsPSOInit.mPrimitiveType = PT_TriangleStrip;
+
+			setGraphicsPipelineState(RHICmdList, graphicsPSOInit);
+
+			vertexShader->setParameters(RHICmdList, volumeBounds, int3(translucencyLightingVolumeDim));
+			if (geometryShader.isValid())
+			{
+				geometryShader->setParameters(RHICmdList, volumeBounds.MinZ);
+			}
+
+			pixelShader->setColors(RHICmdList, clearColors, NumRenderTargets);
+
+			rasterizeToVolumeTexture(RHICmdList, volumeBounds);
+		}
+		RHICmdList.endRenderPass();
+
+		RHICmdList.transitionResources(EResourceTransitionAccess::EReadable, (RHITexture**)renderTargets, NumRenderTargets);
 	}
 }

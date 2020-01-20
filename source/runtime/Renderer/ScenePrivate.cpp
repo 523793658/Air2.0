@@ -82,9 +82,8 @@ namespace Air
 			primitive->calcBounds(Transform::identity)
 		};
 
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			CreateRenderThreadResourceCommand,
-			CreateRenderThreadParameters, params, params,
+		ENQUEUE_RENDER_COMMAND(
+			CreateRenderThreadResourceCommand)([params](RHICommandListImmediate&)
 			{
 				PrimitiveSceneProxy* sceneProxy = params.mPrimitiveSceneProxy;
 		sceneProxy->setTransform(params.mRenderMatrix, params.mWorldBounds, params.mLocalBounds, params.mAttachmentRootPosition);
@@ -93,32 +92,131 @@ namespace Air
 		);
 
 		primitive->mAttachmentCounter.increment();
-		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-			AddPrimitiveCommand,
-			Scene*, scene, this,
-			PrimitiveSceneInfo*, primitiveSceneInfo, primitiveSceneInfo,
+		ENQUEUE_RENDER_COMMAND(
+			AddPrimitiveCommand)([this, primitiveSceneInfo](RHICommandListImmediate& RHICmdList)
 			{
-				scene->addPrimitiveSceneInfo_RenderThread(RHICmdList, primitiveSceneInfo);
+				this->addPrimitiveSceneInfo_RenderThread(RHICmdList, primitiveSceneInfo);
 			}
 		);
 	}
 
+	template<typename T>
+	static void TArraySwapElements(TArray<T>& arr, int i1, int i2)
+	{
+		T tmp = arr[i1];
+		arr[i1] = arr[i2];
+		arr[i2] = tmp;
+	}
+
+	static void TBitArraySwapElements(TBitArray<>& arr, int32 i1, int32 i2)
+	{
+		BitReference bitRef1 = arr[i1];
+		BitReference bitRef2 = arr[i2];
+		bool bit1 = bitRef1;
+		bool bit2 = bitRef2;
+		bitRef1 = bit2;
+		bitRef2 = bit1;
+	}
+
+
 	void Scene::addPrimitiveSceneInfo_RenderThread(RHICommandListImmediate& RHICmdList, PrimitiveSceneInfo* primitiveSceneInfo)
 	{
 		checkPrimitiveArrays();
-		int32 primitiveIndex = mPrimitives.add(primitiveSceneInfo);
-		primitiveSceneInfo->mPackedIndex = primitiveIndex;
+		mPrimitives.add(primitiveSceneInfo);
+		const Matrix localToWorld = primitiveSceneInfo->mProxy->getLocalToWorld();
+		mPrimitiveTransforms.add(localToWorld);
+		mPrimitiveSceneProxies.add(primitiveSceneInfo->mProxy);
 		mPrimitiveBounds.addUninitialized();
+		mPrimitiveFlagsCompact.addUninitialized();
 		mPrimitiveVisibilityIds.addUninitialized();
 		mPrimitiveOcclusionFlags.addUninitialized();
 		mPrimitiveComponentIds.addUninitialized();
 		mPrimitiveOcclusionBounds.addUninitialized();
+		mPrimitivesNeedingStaticMeshUpdate.add(false);
+
+		const int sourceIndex = mPrimitiveSceneProxies.size() - 1;
+		primitiveSceneInfo->mPackedIndex = sourceIndex;
+
+		{
+			bool entryFound = false;
+			int broadIndex = -1;
+			SIZE_T insertProxyHash = primitiveSceneInfo->mProxy->getTypeHash();
+			for (broadIndex = mTypeOffsetTable.size() - 1; broadIndex >= 0; broadIndex--)
+			{
+				if (mTypeOffsetTable[broadIndex].mPrimitiveSceneProxyType == insertProxyHash)
+				{
+					entryFound = true;
+					break;
+				}
+			}
+
+			if (entryFound == false)
+			{
+				broadIndex = mTypeOffsetTable.size();
+				if (broadIndex)
+				{
+					TypeOffsetTableEntry entry = mTypeOffsetTable[broadIndex - 1];
+					mTypeOffsetTable.push(TypeOffsetTableEntry(insertProxyHash, entry.mOffset));
+				}
+				else
+				{
+					mTypeOffsetTable.push(TypeOffsetTableEntry(insertProxyHash, 0));
+				}
+			}
+
+			while (broadIndex < mTypeOffsetTable.size())
+			{
+				TypeOffsetTableEntry& nextEntry = mTypeOffsetTable[broadIndex++];
+				int destIndex = nextEntry.mOffset++;
+
+				if (destIndex != sourceIndex)
+				{
+					BOOST_ASSERT(sourceIndex > destIndex);
+
+					mPrimitives[destIndex]->mPackedIndex = sourceIndex;
+					mPrimitives[sourceIndex]->mPackedIndex = destIndex;
+
+					TArraySwapElements(mPrimitives, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveTransforms, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveSceneProxies, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveBounds, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveFlagsCompact, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveVisibilityIds, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveOcclusionFlags, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveComponentIds, destIndex, sourceIndex);
+					TArraySwapElements(mPrimitiveOcclusionBounds, destIndex, sourceIndex);
+					TBitArraySwapElements(mPrimitivesNeedingStaticMeshUpdate, destIndex, sourceIndex);
+					addPrimitiveToUpdateGPU(*this, destIndex);
+				}
+			}
+		}
 
 		checkPrimitiveArrays();
 
 		primitiveSceneInfo->linkAttachmentGroup();
+
 		primitiveSceneInfo->linkLODParentComponent();
-		primitiveSceneInfo->addToScene(RHICmdList, true);
+
+		if (GIsEditor)
+		{
+			primitiveSceneInfo->addToScene(RHICmdList, true);
+		}
+		else
+		{
+			const bool bAddToDrawLists = true;
+			if (bAddToDrawLists)
+			{
+				primitiveSceneInfo->addToScene(RHICmdList, true);
+			}
+			else
+			{
+				primitiveSceneInfo->addToScene(RHICmdList, true, false);
+				primitiveSceneInfo->beginDeferredUpdateStaticMeshes();
+			}
+		}
+
+		addPrimitiveToUpdateGPU(*this, sourceIndex);
+		bPathTracingNeedsInvalidation = true;
 
 	}
 
@@ -169,9 +267,8 @@ namespace Air
 			updateParams.mAttachmenentRootPosition = attachmentRootPosition;
 			updateParams.mLocalBounds = primitive->calcBounds(Transform::identity);
 
-			ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-				UpdateTransformCommand,
-				PrimitiveUpdateParams, updateParams, updateParams,
+			ENQUEUE_RENDER_COMMAND(
+				UpdateTransformCommand)([updateParams](RHICommandListImmediate& RHICmdList)
 				{
 					updateParams.mScene->updatePrimitiveTransform_RenderThread(RHICmdList, updateParams.mPrimitiveSceneProxy, updateParams.mWorldBounds, updateParams.mLocalBounds, updateParams.mLocalToWorld, updateParams.mAttachmenentRootPosition);
 				}
@@ -195,21 +292,20 @@ namespace Air
 	
 	void Scene::updateParameterCollections(const TArray<class MaterialParameterCollectionInstanceResource *>& inParameterCollections)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_ONEPARAMETER(
-			ClearParameterCollectionsCammand,
-			Scene*, scene, this,
+		ENQUEUE_RENDER_COMMAND(
+			ClearParameterCollectionsCammand)([this](RHICommandListImmediate&)
 			{
-				scene->mParameterCollections.empty();
+				this->mParameterCollections.empty();
 			}
 		);
 		for (int32 collectionIndex = 0; collectionIndex < inParameterCollections.size(); collectionIndex++)
 		{
-			ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-				AddParameterCollectionCammand,
-				Scene*, scene, this,
-				MaterialParameterCollectionInstanceResource*, resource, inParameterCollections[collectionIndex],
+			MaterialParameterCollectionInstanceResource* resource = inParameterCollections[collectionIndex];
+
+			ENQUEUE_RENDER_COMMAND(
+				AddParameterCollectionCammand)([this, resource](RHICommandListImmediate&)
 				{
-					scene->mParameterCollections.emplace(resource->getID(), resource->getConstantBuffer());
+					this->mParameterCollections.emplace(resource->getID(), resource->getConstantBuffer());
 				});
 		}
 	}
@@ -219,18 +315,16 @@ namespace Air
 		BOOST_ASSERT(light);
 		mNumEnabledSkyLights_GameThread++;
 
-		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-			SetSkyLightCommand,
-			Scene*, scene, this,
-			SkyLightSceneProxy*, lightProxy, light,
+		ENQUEUE_RENDER_COMMAND(
+			SetSkyLightCommand)([this, light](RHICommandListImmediate& RHICmdList)
 			{
-				BOOST_ASSERT(!scene->mSkyLightStack.contains(lightProxy));
-				scene->mSkyLightStack.push(lightProxy);
-				const bool bHadSkyLight = scene->mSkyLight != nullptr;
-				scene->mSkyLight = lightProxy;
+				BOOST_ASSERT(!this->mSkyLightStack.contains(light));
+				this->mSkyLightStack.push(light);
+				const bool bHadSkyLight = this->mSkyLight != nullptr;
+				this->mSkyLight = light;
 				if (!bHadSkyLight)
 				{
-					scene->bScenesPrimitivesNeedStaticMeshElementUpdate = true;
+					this->bScenesPrimitivesNeedStaticMeshElementUpdate = true;
 				}
 			}
 		);
@@ -240,26 +334,44 @@ namespace Air
 	{
 		BOOST_ASSERT(light);
 		mNumEnabledSkyLights_GameThread--;
-		ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
-			DisableSkyLightCommand,
-			Scene*, scene, this,
-			SkyLightSceneProxy*, lightProxy, light,
+		ENQUEUE_RENDER_COMMAND(
+			DisableSkyLightCommand)([this, light](RHICommandListImmediate& RHICmdList)
 			{
-				const bool bHadSkyLight = scene->mSkyLight != nullptr;
-				scene->mSkyLightStack.removeSingle(lightProxy);
-				if (scene->mSkyLightStack.size() > 0)
+				const bool bHadSkyLight = this->mSkyLight != nullptr;
+				this->mSkyLightStack.removeSingle(light);
+				if (this->mSkyLightStack.size() > 0)
 				{
-					scene->mSkyLight = scene->mSkyLightStack.last();
+					this->mSkyLight = this->mSkyLightStack.last();
 				}
 				else
 				{
-					scene->mSkyLight = nullptr;
+					this->mSkyLight = nullptr;
 				}
-				if ((scene->mSkyLight != nullptr) != bHadSkyLight)
+				if ((this->mSkyLight != nullptr) != bHadSkyLight)
 				{
-					scene->bScenesPrimitivesNeedStaticMeshElementUpdate = true;
+					this->bScenesPrimitivesNeedStaticMeshElementUpdate = true;
 				}
 			}
 		);
+	}
+
+	bool PersistentConstantBuffers::updateViewConstantBuffer(const ViewInfo& view)
+	{
+		if (mCachedView != &view)
+		{
+			mViewConstantBuffer.updateConstantBufferImmediate(*view.mCachedViewConstantShaderParameters);
+			if ((view.isInstancedStereoPass() || view.bIsMobileMultiViewEnable) && view.mFamily->mViews.size() > 0)
+			{
+				const ViewInfo& instancedView = getInstancedView(view);
+				mInstancedViewConstantBuffer.updateConstantBufferImmediate(reinterpret_cast<InstancedViewConstantShaderParameters&>(*instancedView.mCachedViewConstantShaderParameters));
+			}
+			else
+			{
+				mInstancedViewConstantBuffer.updateConstantBufferImmediate(reinterpret_cast<InstancedViewConstantShaderParameters&>(*view.mCachedViewConstantShaderParameters));
+			}
+			mCachedView = &view;
+			return true;
+		}
+		return false;
 	}
 }

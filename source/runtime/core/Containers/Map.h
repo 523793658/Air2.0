@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "Template/TypeHash.h"
 #include "Template/RefCounting.h"
+#include "Containers/Array.h"
 namespace Air
 {
 	template<typename T>
@@ -132,6 +133,20 @@ namespace Air
 		FORCEINLINE ValueType& findOrAdd(KeyType&& key)
 		{
 			return findOrAddImpl(std::move(key));
+		}
+
+		template<typename Allocator> void generateKeyArray(TArray<KeyType, Allocator>& outArray) const
+		{
+			outArray.empty(size());
+			for (auto it : *this)
+			{
+				new(outArray)KeyType(it.first);
+			}
+		}
+
+		bool contains(KeyType key) const
+		{
+			return find(key) != end();
 		}
 	};
 

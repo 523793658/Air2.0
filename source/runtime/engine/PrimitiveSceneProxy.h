@@ -20,6 +20,8 @@ namespace Air
 
 		ENGINE_API void setTransform(const Matrix& inLocalToWorld, const BoxSphereBounds& inBounds, const BoxSphereBounds& inLocalBounds, float3 inActorPosition);
 
+		ENGINE_API virtual size_t getTypeHash() const = 0;
+
 		virtual void createRenderThreadResources() {}
 
 		inline const BoxSphereBounds& getBounds() const { return mBounds; }
@@ -73,6 +75,11 @@ namespace Air
 		ENGINE_API bool isShown(const SceneView* view) const;
 
 		inline bool isStaticPathAvailable() const { return !bDisableStaticPath; }
+
+		inline bool hasStaticLighting() const { return bStaticLighting; }
+
+		inline bool castsDynamicShadow() const { return bCastDynamicShadow; }
+		inline bool castsStaticShadow() const { return bCastStaticShadow; }
 	private:
 		friend class Scene;
 		Matrix mLocalToWorld;
@@ -97,6 +104,9 @@ namespace Air
 		uint32 bDrawInGame : 1;
 		uint32 bStaticElementsAlwaysUseProxyPrimitiveConstantBuffer : 1;
 		uint32 bDisableStaticPath : 1;
+		uint32 bCastDynamicShadow : 1;
+		uint32 bCastStaticShadow : 1;
+		uint32 bStaticLighting : 1;
 	};
 
 	class SimpleLightEntry
@@ -128,4 +138,8 @@ namespace Air
 		TArray<SimpleLightPerViewEntry, TMemStackAllocator<>> mPerViewData;
 		TArray<SimpleLightInstancePerViewIndexData, TMemStackAllocator<>> mInstancePerViewDataIndices;
 	};
+
+	ENGINE_API extern bool supportsCachingMeshDrawCommands(const PrimitiveSceneProxy* RESTRICT primitiveSceneProxy, const MeshBatch& meshBatch, ERHIFeatureLevel::Type featureLevel);
+
+	ENGINE_API extern bool supportsCachingMeshDrawCommands(const PrimitiveSceneProxy* RESTRICT primitiveSceneProxy, const MeshBatch& meshBatch);
 }

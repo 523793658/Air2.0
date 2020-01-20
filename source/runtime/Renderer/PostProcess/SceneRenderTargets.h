@@ -8,28 +8,30 @@ namespace Air
 {
 	class ViewInfo;
 
-	BEGIN_CONSTANT_BUFFER_STRUCT(GBufferResourceStruct, )
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D, GBufferATexture)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D, GBufferBTexture)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D, GBufferCTexture)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D, GBufferDTexture)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D, GBufferETexture)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D<float4>, GBufferATextureNonMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D<float4>, GBufferBTextureNonMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D<float4>, GBufferCTextureNonMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D<float4>, GBufferDTextureNonMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2D<float4>, GBufferETextureNonMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2DMS<float4>, GBufferATextureMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2DMS<float4>, GBufferBTextureMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2DMS<float4>, GBufferCTextureMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2DMS<float4>, GBufferDTextureMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_TEXTURE(Texture2DMS<float4>, GBufferETextureMS)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, GBufferATextureSampler)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, GBufferBTextureSampler)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, GBufferCTextureSampler)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, GBufferDTextureSampler)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_SAMPLER(SamplerState, GBufferETextureSampler)
-	END_CONSTANT_BUFFER_STRUCT(GBufferResourceStruct)
+	class SceneRenderer;
+
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(GBufferResourceStruct, )
+		SHADER_PARAMETER_TEXTURE(Texture2D, GBufferATexture)
+		SHADER_PARAMETER_TEXTURE(Texture2D, GBufferBTexture)
+		SHADER_PARAMETER_TEXTURE(Texture2D, GBufferCTexture)
+		SHADER_PARAMETER_TEXTURE(Texture2D, GBufferDTexture)
+		SHADER_PARAMETER_TEXTURE(Texture2D, GBufferETexture)
+		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, GBufferATextureNonMS)
+		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, GBufferBTextureNonMS)
+		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, GBufferCTextureNonMS)
+		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, GBufferDTextureNonMS)
+		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, GBufferETextureNonMS)
+		SHADER_PARAMETER_TEXTURE(Texture2DMS<float4>, GBufferATextureMS)
+		SHADER_PARAMETER_TEXTURE(Texture2DMS<float4>, GBufferBTextureMS)
+		SHADER_PARAMETER_TEXTURE(Texture2DMS<float4>, GBufferCTextureMS)
+		SHADER_PARAMETER_TEXTURE(Texture2DMS<float4>, GBufferDTextureMS)
+		SHADER_PARAMETER_TEXTURE(Texture2DMS<float4>, GBufferETextureMS)
+		SHADER_PARAMETER_SAMPLER(SamplerState, GBufferATextureSampler)
+		SHADER_PARAMETER_SAMPLER(SamplerState, GBufferBTextureSampler)
+		SHADER_PARAMETER_SAMPLER(SamplerState, GBufferCTextureSampler)
+		SHADER_PARAMETER_SAMPLER(SamplerState, GBufferDTextureSampler)
+		SHADER_PARAMETER_SAMPLER(SamplerState, GBufferETextureSampler)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT(GBufferResourceStruct)
 
 	enum class ESceneColorFormatType
 	{
@@ -38,6 +40,14 @@ namespace Air
 		HighEndWithAlpha,
 		Num
 	};
+
+	inline int32 getTranslucencyLightingVolumeDim()
+	{
+		extern int32 GTranslucencyLightingVolumeDim;
+		return Math::clamp(GTranslucencyLightingVolumeDim, 4, 2048);
+	}
+
+	static const int32 NumTranslucentVolumeRenderTargetSets = (TVC_Max + 1);
 
 	class RENDERER_API SceneRenderTargets : public RenderResource
 	{
@@ -50,7 +60,7 @@ namespace Air
 
 		void releaseSceneColor();
 
-		void allocate(RHICommandList& RHICmdList, const SceneViewFamily& viewFamily);
+		void allocate(RHICommandList& RHICmdList, const SceneRenderer* sceneRenderer);
 
 		void setBufferSize(int32 width, int32 height);
 
@@ -81,6 +91,12 @@ namespace Air
 			BOOST_ASSERT(!GSupportsDepthFetchDuringDepthTest);
 			return (const Texture2DRHIRef&)mAuxiliarySceneDepthZ->getRenderTargetItem().mTargetableTexture;
 		}
+
+		const Texture2DRHIRef& getAuxiliarySceneDepthTexture() const
+		{
+			BOOST_ASSERT(!GSupportsDepthFetchDuringDepthTest);
+			return (const Texture2DRHIRef&)mAuxiliarySceneDepthZ->getRenderTargetItem().mShaderResourceTexture;
+		}
 		bool isSeparateTranslucencyPass() { return bSeparateTranslucencyPass; }
 
 		bool isSeparateTranslucencyDepthValid()
@@ -107,7 +123,9 @@ namespace Air
 
 		void destroyAllSnapshots();
 
-		void beginRenderingGBuffer(RHICommandList& RHICmdList, ERenderTargetLoadAction colorLoadAction, ERenderTargetLoadAction depthLoadAction, bool bBindQuadOverdrawBuffers, const LinearColor& clearColor = LinearColor(0, 0, 0, 1));
+		void beginRenderingGBuffer(RHICommandList& RHICmdList, ERenderTargetLoadAction colorLoadAction, ERenderTargetLoadAction depthLoadAction, FExclusiveDepthStencil::Type depthStencilAccess, bool bBindQuadOverdrawBuffers, bool bClearQuadOverdrawBuffers = false, const LinearColor& clearColor = LinearColor(0, 0, 0, 1), bool bIsWireframe = false);
+		void finishGBufferPassAndResolve(RHICommandListImmediate& RHICmdList);
+
 
 		void beginRenderingSceneColor(RHICommandList& RHICmdList, ESimpleRenderTargetMode renderTargetMode = ESimpleRenderTargetMode::EUninitializedColorExistingDepth, FExclusiveDepthStencil depthStencilAccess = FExclusiveDepthStencil::DepthWrite_StencilWrite, bool bTransitionWritable = true);
 
@@ -124,19 +142,36 @@ namespace Air
 
 		void allocateReflectionTargets(RHICommandList& RHICmdList, int32 targetSize);
 
-		ConstantBufferRHIParamRef getGBufferResourcesConstantBuffer() const
+		RHIConstantBuffer* getGBufferResourcesConstantBuffer() const
 		{
 			return mGBufferResourcesConstantBuffer;
 		}
 
 		//前面多个视图都渲染到了同一个renderTarget上，后处理之前需要把各自的部分拷贝出来
-		void resolveSceneColor(RHICommandList& RHICmdList, const ResolveRect& resolveRect = ResolveRect());
+
+		ERHIFeatureLevel::Type getCurrentFeatureLevel() const { return mCurrentFeatureLevel; }
 
 		bool isSceneColorAllocated() const;
 		
 		void setSceneColor(IPooledRenderTarget* in);
 
 		void adjustGBufferRefCount(RHICommandList& RHICmdList, int delta);
+
+		void resolveSceneDepthTexture(RHICommandList& RHICmdList, const ResolveRect& resolveRect);
+
+		void resolveSceneDepthToAuxiliaryTexture(RHICommandList& RHICmdList);
+
+		bool isDownsampleTranslucencyDepthValid()
+		{
+			return mDownsampledTranslucencyDepthRT != nullptr;
+		}
+
+		void clearTranslucentVolumeLighting(RHICommandListImmediate& RHICmdList, int32 viewIndex);
+
+		const Texture2DRHIRef& getDownsampledTranslucencyDepthSurface()
+		{
+			return (const Texture2DRHIRef&)mDownsampledTranslucencyDepthRT->getRenderTargetItem().mTargetableTexture;
+		}
 	public:
 		int2 computeDesiredSize(const SceneViewFamily& viewFamily);
 		void updateRHI();
@@ -182,9 +217,20 @@ namespace Air
 
 		void setLightAttenuationMode(bool bEnabled) { bLightAttenuationEnabled = bEnabled; }
 
+		void setLightAttenuation(IPooledRenderTarget* in)
+		{
+			mLightAttenuation = in;
+		}
+
 		void finishRenderingLightAttenuation(RHICommandList& RHICmdList);
+
+		template<int32 NumRenderTargets>
+		static void clearVolumeTextures(RHICommandList& RHICmdList, ERHIFeatureLevel::Type featureLevel, RHITexture** renderTargets, const LinearColor* clearColors);
 	private:
 		void releaseGBufferTargets();
+
+		int32 fillGBufferRenderPassInfo(ERenderTargetLoadAction colorLoadAction, RHIRenderPassInfo& outRenderPassInfo, int32& outVelocityRTIndex);
+		void setQuadOverdrawUAV(RHICommandList& RHICmdList, bool bBindQuadOverdrawBuffers, bool bClearQuadOverdrawBuffers, RHIRenderPassInfo& info);
 	public:
 		TRefCountPtr<IPooledRenderTarget> mSceneColor[(int32)ESceneColorFormatType::Num];
 
@@ -200,6 +246,8 @@ namespace Air
 		TRefCountPtr<IPooledRenderTarget> mSeparateTranslucencyRT;
 		TRefCountPtr<IPooledRenderTarget> mSeparateTranslucencyDepthRT;
 
+		TRefCountPtr<IPooledRenderTarget> mDownsampledTranslucencyDepthRT;
+
 		TRefCountPtr<IPooledRenderTarget> mGBufferA;
 		TRefCountPtr<IPooledRenderTarget> mGBufferB;
 		TRefCountPtr<IPooledRenderTarget> mGBufferC;
@@ -212,6 +260,15 @@ namespace Air
 		TRefCountPtr<IPooledRenderTarget> mDiffuseIrradianceScratchCubemap[2];
 
 		TRefCountPtr<IPooledRenderTarget> mSkySHIrradianceMap;
+
+		TRefCountPtr<IPooledRenderTarget> mSceneVelocity;
+
+		TArray<TRefCountPtr<IPooledRenderTarget>, TInlineAllocator<NumTranslucentVolumeRenderTargetSets>> mTranslucencyLightingVolumeAmbient;
+		TArray<TRefCountPtr<IPooledRenderTarget>, TInlineAllocator<NumTranslucentVolumeRenderTargetSets>> mTranslucencyLightingVolumeDirectional;
+
+		
+
+		TRefCountPtr<IPooledRenderTarget> mScreenSpaceAO;
 
 		ConstantBufferRHIRef mGBufferResourcesConstantBuffer;
 
@@ -230,6 +287,7 @@ namespace Air
 		bool bAllowStaticLighting{ false };
 		bool bSceneDepthCleared;
 		bool bSeparateTranslucencyPass{ false };
+		bool bScreenSpaceAOIsValid{ false };
 		uint32 mThisFrameNumber;
 		int32 mCurrentSceneColorFormat{ 0 };
 		int32 mCurrentMSAACount;
@@ -250,6 +308,8 @@ namespace Air
 	private:
 		bool bLightAttenuationEnabled;
 		int32 mGBufferRefCount{ 0 };
-
+		int32 mQuadOverdrawIndex;
 	};
+
+
 }

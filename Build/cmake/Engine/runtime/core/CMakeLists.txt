@@ -55,7 +55,11 @@ SET(CORE_HAL_FILE
     ${CORE_SOURCE_DIR}/HAL/PlatformFileManager.h 
     ${CORE_SOURCE_DIR}/HAL/PlatformFileManager.cpp 
     ${CORE_SOURCE_DIR}/HAL/ThreadSingleton.h 
-    ${CORE_SOURCE_DIR}/HAL/TIsAutoCleanup.h)
+    ${CORE_SOURCE_DIR}/HAL/PreprocessorHelper.h 
+    ${CORE_SOURCE_DIR}/HAL/TIsAutoCleanup.h
+    ${CORE_SOURCE_DIR}/HAL/ConsoleManager.h
+    ${CORE_SOURCE_DIR}/HAL/ConsoleManager.cpp
+	)
 SOURCE_GROUP("HAL" FILES ${CORE_HAL_FILE})
 
 SET(CORE_MISC_FILE
@@ -115,7 +119,10 @@ SET(CORE_MISC_FILE
     ${CORE_SOURCE_DIR}/Misc/Util.h 
     ${CORE_SOURCE_DIR}/Misc/Util.cpp 
     ${CORE_SOURCE_DIR}/Misc/DateTime.h 
-    ${CORE_SOURCE_DIR}/Misc/DateTime.cpp)
+    ${CORE_SOURCE_DIR}/Misc/DateTime.cpp
+    ${CORE_SOURCE_DIR}/Misc/OutputDevice.h
+    ${CORE_SOURCE_DIR}/Misc/CommandLine.h
+    ${CORE_SOURCE_DIR}/Misc/CommandLine.cpp)
 SOURCE_GROUP("Misc" FILES ${CORE_MISC_FILE})
     
 SET(WINDOWS_FILE
@@ -199,7 +206,9 @@ SET(CONTAINERS_FILE
     ${CORE_SOURCE_DIR}/Containers/IndirectArray.h 
     ${CORE_SOURCE_DIR}/Containers/LockFreeList.cpp 
     ${CORE_SOURCE_DIR}/Containers/DynamicRHIResourceArray.h 
-    ${CORE_SOURCE_DIR}/Containers/DynamicRHIResourceArray.cpp)
+    ${CORE_SOURCE_DIR}/Containers/DynamicRHIResourceArray.cpp
+    ${CORE_SOURCE_DIR}/Containers/ChunkedArray.h
+	)
 SOURCE_GROUP("Containers" FILES ${CONTAINERS_FILE})
     
 SET(GenericPlatform_File 
@@ -247,8 +256,11 @@ SET(Delegates_File
     ${CORE_SOURCE_DIR}/Delegates/Delegate.h 
     ${CORE_SOURCE_DIR}/Delegates/Delegate.cpp 
     ${CORE_SOURCE_DIR}/Delegates/DelegateSignatureImpl.inl 
+    ${CORE_SOURCE_DIR}/Delegates/IntegerSequence.h 
     ${CORE_SOURCE_DIR}/Delegates/DelegateBase.h 
-    ${CORE_SOURCE_DIR}/Delegates/DelegateBase.cpp)
+    ${CORE_SOURCE_DIR}/Delegates/DelegateBase.cpp
+    ${CORE_SOURCE_DIR}/Delegates/DelegateInstanceInterface.h
+	)
 SOURCE_GROUP("Delegates" FILES ${Delegates_File})
     
 SET(Async_File 
@@ -283,7 +295,8 @@ SET(Template_File
     ${CORE_SOURCE_DIR}/Template/TypeHash.h 
     ${CORE_SOURCE_DIR}/Template/Sorting.h 
     ${CORE_SOURCE_DIR}/Template/Less.h 
-    ${CORE_SOURCE_DIR}/Template/PointerIsConvertibleFromTo.h)
+    ${CORE_SOURCE_DIR}/Template/PointerIsConvertibleFromTo.h
+    ${CORE_SOURCE_DIR}/Template/IsArrayOrRefOfType.h)
 SOURCE_GROUP("Template" FILES ${Template_File})
     
 SET(Math_File 

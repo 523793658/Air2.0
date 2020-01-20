@@ -46,6 +46,30 @@ namespace Air
 
 	}
 
+	void D3D11TextureDeleted(D3D11Texture3D& texture)
+	{
+		ID3D11Texture3D* d3d11Texture3D = texture.getResource();
+
+		if (d3d11Texture3D)
+		{
+			D3D11_TEXTURE3D_DESC desc;
+
+			d3d11Texture3D->GetDesc(&desc);
+
+			int64 textureSize = calcTextureSize3D(desc.Width, desc.Height, desc.Depth, texture.getFormat(), desc.MipLevels);
+			updateD3D11TextureStats(desc.BindFlags, desc.MiscFlags, -textureSize, true);
+
+#if PLATFORM_WINDOWS
+			//LLM
+			
+#endif
+		}
+	}
+
+	
+
+	
+
 
 	template<typename BaseResourceType>
 	void D3D11TextureAllocated(TD3D11Texture2D<BaseResourceType>& texture)
@@ -453,15 +477,15 @@ namespace Air
 		mD3DRHI->mOutstandingLocks.erase(it);
 	}
 
-	void* D3D11DynamicRHI::RHILockTexture2D(Texture2DRHIParamRef textureRHI, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
+	void* D3D11DynamicRHI::RHILockTexture2D(RHITexture2D* textureRHI, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
 	{
 		BOOST_ASSERT(textureRHI);
 		D3D11Texture2D* texture = ResourceCast(textureRHI);
-		conditionalClearShaderResource(texture);
+		conditionalClearShaderResource(texture, false);
 		return texture->lock(mipIndex, 0, lockMode, destStride);
 	}
 
-	void D3D11DynamicRHI::RHIUnlockTexture2D(Texture2DRHIParamRef textureRHI, uint32 mipIndex, bool bLockWithinMiptail)
+	void D3D11DynamicRHI::RHIUnlockTexture2D(RHITexture2D* textureRHI, uint32 mipIndex, bool bLockWithinMiptail)
 	{
 		BOOST_ASSERT(textureRHI);
 		D3D11Texture2D* texture = ResourceCast(textureRHI);
@@ -478,23 +502,23 @@ namespace Air
 		return new D3D11TextureReference(this, lastRenderTime);
 	}
 
-	void* D3D11DynamicRHI::RHILockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
+	void* D3D11DynamicRHI::RHILockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
 	{
 		D3D11TextureCube* textureCube = ResourceCast(texture);
-		conditionalClearShaderResource(textureCube);
+		conditionalClearShaderResource(textureCube, false);
 		uint32 d3dFace = getD3D11CubeFace((ECubeFace)faceIndex);
 		return textureCube->lock(mipIndex, d3dFace + arrayIndex * 6, lockMode, destStride);
 	}
 
 
-	void D3D11DynamicRHI::RHIUnlockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail)
+	void D3D11DynamicRHI::RHIUnlockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail)
 	{
 		D3D11TextureCube* textureCube = ResourceCast(texture);
 		uint32 d3dFace = getD3D11CubeFace((ECubeFace)faceIndex);
 		textureCube->unlock(mipIndex, d3dFace + arrayIndex * 6);
 	}
 
-	void D3D11DynamicRHI::RHIUpdateTextureReference(TextureReferenceRHIParamRef textureRHI, TextureRHIParamRef newTextureRHI)
+	void D3D11DynamicRHI::RHIUpdateTextureReference(RHITextureReference* textureRHI, RHITexture* newTextureRHI)
 	{
 		D3D11TextureReference* textureRef = (D3D11TextureReference*)textureRHI;
 		if (textureRef)
@@ -513,7 +537,7 @@ namespace Air
 		}
 	}
 
-	void D3D11DynamicRHI::RHIBindDebugLabelName(TextureRHIParamRef texture, const TCHAR* name)
+	void D3D11DynamicRHI::RHIBindDebugLabelName(RHITexture* texture, const TCHAR* name)
 	{
 		texture->setName(name);
 
@@ -529,4 +553,8 @@ namespace Air
 #endif
 	}
 	
+	D3D11Texture3D::~D3D11Texture3D()
+	{
+		D3D11TextureDeleted(*this);
+	}
 }

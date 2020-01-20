@@ -515,10 +515,18 @@ namespace Air
 		};
 	};
 
-	//template<uint32 Alignment>
-	//struct TAllocatorTraits<TAlignedHeapAllocator<Alignment>> : TAllocatorTraitsBase<TAlignedHeapAllocator<Alignment>>
-	//{
-	//	enum { SupportsMove = true };
-	//	enum { IsZeroConstruct = true };
-	//};
+	template <typename AllocatorType>
+	struct TAllocatorTraintsBase
+	{
+		enum{SupportsMove = false};
+		enum{IsZeroConstruct = false};
+	};
+
+	template<typename AllocatorType>
+	struct TAllocatorTraits : TAllocatorTraintsBase<AllocatorType>
+	{
+
+	};
+
+
 }

@@ -115,7 +115,10 @@ namespace Air
 
 		static const PlatformMemoryConstants& getConstants();
 
-
+		static FORCEINLINE bool supportsFastVRAMemory()
+		{
+			return false;
+		}
 
 		static EMemoryAllocatorToUse mAllocatorToUse;
 	private:

@@ -8,10 +8,13 @@
 #include "DynamicRHI.h"
 #include "Math/Float16Color.h"
 #include "Containers/StaticArray.h"
+#include "RHIContext.h"
+#include "PipelineStateCache.h"
 namespace Air
 {
 	class IRHICommandContext;
 	class IRHIComputeContext;
+	class GraphicsPipelineState;
 	struct RHICommandBase;
 
 	enum class ECmdList
@@ -19,7 +22,21 @@ namespace Air
 		EGfx,
 		ECompute,
 	};
+	class RHICommandListBase;
 
+	struct RHICommandListDebugContext
+	{};
+
+	struct RHICommandBase
+	{
+		RHICommandBase* mNext = nullptr;
+
+		virtual void executeAndDestruct(RHICommandListBase& cmdList, RHICommandListDebugContext& debugContext) = 0;
+
+	};
+
+
+	
 
 
 	class RHI_API RHICommandListBase : public boost::noncopyable
@@ -57,6 +74,27 @@ namespace Air
 		inline bool isImmediateAsyncCompute();
 
 		inline bool bypass();
+
+		inline bool isInsideRenderPass() const
+		{
+			return mData.bInsideRenderPass;
+		}
+
+		inline bool isOutsideRenderPass() const
+		{
+			return !mData.bInsideRenderPass;
+		}
+
+		inline bool isInsideComputePass() const
+		{
+			return mData.bInsideComputePass;
+		}
+
+		void resetSubpass(ESubpassHint subpassHint)
+		{
+			mPSOContext.mSubpassHint = subpassHint;
+			mPSOContext.mSubpassIndex = 0;
+		}
 
 		void reset();
 
@@ -103,31 +141,65 @@ namespace Air
 			return mMemManager.alloc(allocSize, alignment);
 		}
 
+		void addDispatchPrerequisite(const GraphEventRef& prereq);
+
 		template<typename T>
 		FORCEINLINE_DEBUGGABLE void* alloc()
 		{
 			return alloc(sizeof(T), ALIGNOF(T));
 		}
 
-		template<typename TCmd>
-		FORCEINLINE_DEBUGGABLE void* allocCommand()
+		FORCEINLINE_DEBUGGABLE TCHAR* allocString(const TCHAR* name)
+		{
+			int32 len = CString::strlen(name) + 1;
+			TCHAR* nameCopy = (TCHAR*)alloc(len * (int32)sizeof(TCHAR), (int32)sizeof(TCHAR));
+			CString::strcpy(nameCopy, len, name);
+			return nameCopy;
+		}
+
+		FORCEINLINE_DEBUGGABLE void* allocCommand(int32 allocSize, int32 alignment)
 		{
 			BOOST_ASSERT(!isExecuting());
-			TCmd* result = (TCmd*)alloc<TCmd>();
+			RHICommandBase* result = (RHICommandBase*)mMemManager.alloc(allocSize, alignment);
 			++mNumCommands;
 			*mCommandLink = result;
 			mCommandLink = &result->mNext;
 			return result;
 		}
 
+		template<typename TCmd>
+		FORCEINLINE_DEBUGGABLE void* allocCommand()
+		{
+			return allocCommand(sizeof(TCmd), alignof(TCmd));
+		}
+
+#define ALLOC_COMMAND(...) new(allocCommand(sizeof(__VA_ARGS__), alignof(__VA_ARGS__)) ) __VA_ARGS__
+
+
+		struct PSOContext
+		{
+			uint32 mCachedNumSimultanousRenderTargets = 0;
+			TStaticArray<RHIRenderTargetView, MaxSimultaneousRenderTargets> mCachedRenderTargets;
+			RHIDepthRenderTargetView mCachedDepthStencilTarget;
+			ESubpassHint mSubpassHint = ESubpassHint::None;
+			uint8 mSubpassIndex = 0;
+		}mPSOContext;
+
 		void cacheActiveRenderTargets(uint32 newNumSimultaneousRenderTargets, const RHIRenderTargetView* newRenderTargetsRHI, const RHIDepthRenderTargetView* newDepthStencilTargetRHI)
 		{
-			mCachedNumSimultanousRenderTargets = newNumSimultaneousRenderTargets;
-			for (uint32 rtIdx = 0; rtIdx < mCachedNumSimultanousRenderTargets; ++rtIdx)
+			mPSOContext.mCachedNumSimultanousRenderTargets = newNumSimultaneousRenderTargets;
+			for (uint32 RTIdx = 0; RTIdx < mPSOContext.mCachedNumSimultanousRenderTargets; ++RTIdx)
 			{
-				mCachedRenderTargets[rtIdx] = newRenderTargetsRHI[rtIdx];
+				mPSOContext.mCachedRenderTargets[RTIdx] = newRenderTargetsRHI[RTIdx];
 			}
-			mCachedDepthStencilTarget = (newDepthStencilTargetRHI) ? *newDepthStencilTargetRHI : RHIDepthRenderTargetView();
+			mPSOContext.mCachedDepthStencilTarget = (newDepthStencilTargetRHI) ? *newDepthStencilTargetRHI : RHIDepthRenderTargetView();
+		}
+
+		void cacheActiveRenderTargets(const RHIRenderPassInfo& info)
+		{
+			RHISetRenderTargetsInfo RTInfo;
+			info.convertToRenderTargetsInfo(RTInfo);
+			cacheActiveRenderTargets(RTInfo.mNumColorRenderTargets, RTInfo.mColorRenderTarget, &RTInfo.mDepthStencilRenderTarget);
 		}
 
 		FORCEINLINE_DEBUGGABLE void exchangeCmdList(RHICommandListBase& other)
@@ -160,6 +232,8 @@ namespace Air
 			mCachedDepthStencilState = nullptr;
 		}
 
+		void handleRTThreadTaskCompletion(const GraphEventRef& myComplitionGraphEvent);
+
 	public:
 		enum class ERenderThreadContext
 		{
@@ -187,16 +261,13 @@ namespace Air
 		RHICommandBase** mCommandLink;
 
 		uint32 mUID;
-		uint32 mCachedNumSimultanousRenderTargets;
 		GraphEventArray mRTTasks;
 
 		MemStackBase mMemManager;
 
 		IRHICommandContext* mContext{ nullptr };
 		IRHIComputeContext* mComputeContext{ nullptr };
-		TStaticArray<RHIRenderTargetView, MaxSimultaneousRenderTargets> mCachedRenderTargets;
-		RHIDepthRenderTargetView mCachedDepthStencilTarget;
-
+		
 		bool mExecuting{ false };
 
 	
@@ -211,61 +282,41 @@ namespace Air
 		struct RHICommandSetDepthStencilState* mCachedDepthStencilState;
 		struct RHICommandSetRasterizerState* mCachedRasterizerState;
 		DrawUpData mDrawUPData;
-	};
 
-	struct RHICommandBase
-	{
-		RHICommandBase* mNext;
+	public:
 
-		void(*ExecuteAndDestructPtr)(RHICommandListBase& cmdList, RHICommandBase* cmd);
-
-		void CallExecuteAndDestruct(RHICommandListBase& cmdList)
+		struct CommonData
 		{
-			ExecuteAndDestructPtr(cmdList, this);
-		}
+			class RHICommandListBase* mParent = nullptr;
 
-		FORCEINLINE RHICommandBase(void(*inExecuteAndDestructPtr)(RHICommandListBase& cmdList, RHICommandBase* cmd))
-			:mNext(nullptr)
-			, ExecuteAndDestructPtr(inExecuteAndDestructPtr)
-		{}
+			enum class ECmdListType
+			{
+				Immediate = 1,
+				Regular,
+			};
+
+			ECmdListType mType = ECmdListType::Regular;
+			bool bInsideRenderPass = false;
+			bool bInsideComputePass = false;
+		};
+
+		CommonData mData;
 	};
 
+	
 
 	template <typename TCmd>
 	struct RHICommand : public RHICommandBase
 	{
-		FORCEINLINE RHICommand()
-			: RHICommandBase(&executeAndDestruct)
-		{}
-
-		static FORCEINLINE void executeAndDestruct(RHICommandListBase& cmdList, RHICommandBase* cmd)
+		void executeAndDestruct(RHICommandListBase& cmdList, RHICommandListDebugContext& context) override final
 		{
-			TCmd* thisCmd = (TCmd*)cmd;
+			TCmd* thisCmd = static_cast<TCmd*>(this);
 			thisCmd->execute(cmdList);
 			thisCmd->~TCmd();
 		}
 	};
 
-	struct RHICommandSetRasterizerState : public RHICommand<RHICommandSetRasterizerState>
-	{
-		RasterizerStateRHIParamRef mState;
-		FORCEINLINE_DEBUGGABLE RHICommandSetRasterizerState(RasterizerStateRHIParamRef inState)
-			:mState(inState)
-		{}
-
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
-
-	struct RHICommandSetDepthStencilState : public RHICommand<RHICommandSetDepthStencilState>
-	{
-		DepthStencilStateRHIParamRef mState;
-		uint32	mStencilRef;
-		FORCEINLINE_DEBUGGABLE RHICommandSetDepthStencilState(DepthStencilStateRHIParamRef inState, uint32 stencilRef = 0)
-			:mState(inState)
-			,mStencilRef(stencilRef)
-		{}
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
+	
 
 	struct RHICommandSetStencilRef : public RHICommand<RHICommandSetStencilRef>
 	{
@@ -290,11 +341,41 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
+	struct RHICommandSetStereoViewport final : public RHICommand< RHICommandSetStereoViewport>
+	{
+		uint32 mLeftMinX;
+		uint32 mRightMinX;
+		uint32 mLeftMinY;
+		uint32 mRightMinY;
+
+		float mMinZ;
+		uint32 mLeftMaxX;
+		uint32 mRightMaxX;
+		uint32 mLeftMaxY;
+		uint32 mRightMaxY;
+		float mMaxZ;
+
+		FORCEINLINE_DEBUGGABLE RHICommandSetStereoViewport(uint32 inLeftMinX, uint32 inRightMinX, uint32 inLeftMinY, uint32 inRightMinY, float inMinZ, uint32 inLeftMaxX, uint32 inRightMaxX, uint32 inLeftMaxY, uint32 inRightMaxY, float inMaxZ)
+			:mLeftMinX(inLeftMinX)
+			,mRightMinX(inRightMinX)
+			,mLeftMinY(inLeftMinY)
+			,mRightMinY(inRightMinY)
+			,mMinZ(inMinZ)
+			,mLeftMaxX(inLeftMaxX)
+			,mRightMaxX(inRightMaxX)
+			,mLeftMaxY(inLeftMaxY)
+			,mRightMaxY(inRightMaxY)
+			,mMaxZ(inMaxZ)
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
 	struct RHICommandTransitionTexturesArray : public RHICommand<RHICommandTransitionTexturesArray>
 	{
-		TArray<TextureRHIParamRef>& mTextures;
+		TArray<RHITexture*>& mTextures;
 		EResourceTransitionAccess mTransitionType;
-		FORCEINLINE_DEBUGGABLE RHICommandTransitionTexturesArray(EResourceTransitionAccess inTransitionType, TArray<TextureRHIParamRef>& inTextures)
+		FORCEINLINE_DEBUGGABLE RHICommandTransitionTexturesArray(EResourceTransitionAccess inTransitionType, TArray<RHITexture*>& inTextures)
 			:mTextures(inTextures)
 			, mTransitionType(inTransitionType)
 		{}
@@ -305,9 +386,9 @@ namespace Air
 	{
 		static const int32 maxTexturesToTransition = 16;
 		int32 numTextures;
-		TextureRHIParamRef textures[maxTexturesToTransition];
+		RHITexture* textures[maxTexturesToTransition];
 		EResourceTransitionAccess transitionType;
-		FORCEINLINE_DEBUGGABLE RHICommandTransitionTextures(EResourceTransitionAccess inTranstionType, TextureRHIParamRef* inTextures, int32 inNumTextures)
+		FORCEINLINE_DEBUGGABLE RHICommandTransitionTextures(EResourceTransitionAccess inTranstionType, RHITexture** inTextures, int32 inNumTextures)
 			:numTextures(inNumTextures),
 			transitionType(inTranstionType)
 		{
@@ -319,13 +400,33 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
+	template<ECmdList CmdListType>
+	struct RHICommandTransitionUAVs final : public RHICommand<RHICommandTransitionUAVs< CmdListType>>
+	{
+		int32 mNumUAVs;
+		RHIUnorderedAccessView** mUAVs;
+		EResourceTransitionAccess mTransitionType;
+		EResourceTransitionPipeline mTransitionPipeline;
+		RHIComputeFence* mWriteFence;
 
+		FORCEINLINE_DEBUGGABLE RHICommandTransitionUAVs(EResourceTransitionAccess inTransitionType, EResourceTransitionPipeline inTransitionPipeline, RHIUnorderedAccessView** inUAVs, int32 inNumUAVs, RHIComputeFence* inWriteFence)
+			:mNumUAVs(inNumUAVs)
+			, mUAVs(inUAVs)
+			, mTransitionType(inTransitionType)
+			, mTransitionPipeline(inTransitionPipeline)
+			, mWriteFence(inWriteFence)
+		{
+
+		}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
 
 	struct RHICommandBeginDrawingViewport : public RHICommand<RHICommandBeginDrawingViewport>
 	{
-		ViewportRHIParamRef mViewport;
-		TextureRHIParamRef	mRenderTargetRHI;
-		FORCEINLINE_DEBUGGABLE RHICommandBeginDrawingViewport(ViewportRHIParamRef inViewport, TextureRHIParamRef inRenderTargetRHI)
+		RHIViewport* mViewport;
+		RHITexture*	mRenderTargetRHI;
+		FORCEINLINE_DEBUGGABLE RHICommandBeginDrawingViewport(RHIViewport* inViewport, RHITexture* inRenderTargetRHI)
 			:mViewport(inViewport),
 			mRenderTargetRHI(inRenderTargetRHI)
 		{}
@@ -334,11 +435,11 @@ namespace Air
 
 	struct RHICommandEndDrawingViewport : public RHICommand<RHICommandEndDrawingViewport>
 	{
-		ViewportRHIParamRef viewport;
+		RHIViewport* viewport;
 		bool bPresent;
 		bool bLockToVsync;
 
-		FORCEINLINE_DEBUGGABLE RHICommandEndDrawingViewport(ViewportRHIParamRef inViewport, bool inPresent, bool inbLockToVsync)
+		FORCEINLINE_DEBUGGABLE RHICommandEndDrawingViewport(RHIViewport* inViewport, bool inPresent, bool inbLockToVsync)
 			:viewport(inViewport),
 			bPresent(inPresent),
 			bLockToVsync(inbLockToVsync)
@@ -433,9 +534,9 @@ namespace Air
 		RHIRenderTargetView mNewRenderTargetsRHI[MaxSimultaneousRenderTargets];
 		RHIDepthRenderTargetView mNewDepthStencilTarget;
 		uint32 mNumUAVs;
-		UnorderedAccessViewRHIParamRef mUAVs[MaxSimultaneousUAVs];
+		RHIUnorderedAccessView* mUAVs[MaxSimultaneousUAVs];
 
-		FORCEINLINE_DEBUGGABLE RHICommandSetRenderTargets(uint32 inNumSimultaneousRenderTargets, const RHIRenderTargetView* inNewRenderTargetsRHI, const RHIDepthRenderTargetView * inNewDepthStencilTarget, uint32 inNumUVAs, const UnorderedAccessViewRHIParamRef* inUAVs)
+		FORCEINLINE_DEBUGGABLE RHICommandSetRenderTargets(uint32 inNumSimultaneousRenderTargets, const RHIRenderTargetView* inNewRenderTargetsRHI, const RHIDepthRenderTargetView * inNewDepthStencilTarget, uint32 inNumUVAs, RHIUnorderedAccessView* const* inUAVs)
 			:mNewNumSimultaneousRenderTargets(inNumSimultaneousRenderTargets)
 			,mNumUAVs(inNumUVAs)
 		{
@@ -457,57 +558,7 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
-	struct RHICommandClearColorTextures : public RHICommand<RHICommandClearColorTextures>
-	{
-		LinearColor mColorArray[MaxSimultaneousRenderTargets];
-		TextureRHIParamRef mTextures[MaxSimultaneousRenderTargets];
-		IntRect mExcludeRect;
-		int32 mNumClearColors;
-
-		FORCEINLINE_DEBUGGABLE RHICommandClearColorTextures(
-			int32 inNumClearColors,
-			TextureRHIParamRef* inTextures,
-			const LinearColor* inColorArray,
-			IntRect inExcludeRect
-		)
-			:mExcludeRect(inExcludeRect)
-			, mNumClearColors(inNumClearColors)
-		{
-			BOOST_ASSERT(inNumClearColors <= MaxSimultaneousRenderTargets);
-			for (int32 index = 0; index < inNumClearColors; index++)
-			{
-				mTextures[index] = inTextures[index];
-				mColorArray[index] = inColorArray[index];
-			}
-		}
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
-
-	struct RHICommandClearDepthStencilTexture : public RHICommand<RHICommandClearDepthStencilTexture>
-	{
-		TextureRHIParamRef mTexture;
-		IntRect mExcludeRect;
-		float mDepth;
-		uint32 mStencil;
-		EClearDepthStencil mClearDepthStencil;
-		FORCEINLINE_DEBUGGABLE RHICommandClearDepthStencilTexture(
-			TextureRHIParamRef inTexture,
-			EClearDepthStencil inClearFlags,
-			float depth,
-			uint32 stencil,
-			IntRect inExcludeRect
-		)
-			:mTexture(inTexture)
-			, mClearDepthStencil(inClearFlags)
-			, mDepth(depth)
-			, mStencil(stencil)
-			, mExcludeRect(inExcludeRect)
-		{
-
-		}
-
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
+	
 
 	struct RHICommandSetScissorRect : public RHICommand<RHICommandSetScissorRect>
 	{
@@ -523,6 +574,53 @@ namespace Air
 			,mMinY(inMinY)
 			,mMaxX(inMaxX)
 			,mMaxY(inMaxY)
+		{
+
+		}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<ECmdList CmdListType>
+	struct RHICommandSetComputeShader final : RHICommand<RHICommandSetComputeShader<CmdListType>>
+	{
+		RHIComputeShader* mShader;
+		FORCEINLINE_DEBUGGABLE RHICommandSetComputeShader(RHIComputeShader* shader)
+			:mShader(shader)
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<ECmdList CmdListType>
+	struct RHICommandDispatchComputeShader final : public RHICommand<RHICommandDispatchComputeShader<CmdListType>>
+	{
+		uint32 mThreadGroupCountX;
+		uint32 mThreadGroupCountY;
+		uint32 mThreadGroupCountZ;
+
+		FORCEINLINE_DEBUGGABLE RHICommandDispatchComputeShader(uint32 inThreadGroupCountX, uint32 inThreadGroupCountY, uint32 inThreadGroupCountZ)
+			:mThreadGroupCountX(inThreadGroupCountX)
+			,mThreadGroupCountY(inThreadGroupCountY)
+			,mThreadGroupCountZ(inThreadGroupCountZ)
+
+		{
+
+		}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<typename TRHIShader, ECmdList CmdListType>
+	struct RHICommandSetShaderResourceViewParameter final : public RHICommand<RHICommandSetShaderResourceViewParameter<TRHIShader, CmdListType>>
+	{
+		TRHIShader* mShader;
+		uint32 mSamplerIndex;
+		RHIShaderResourceView* mSRV;
+		FORCEINLINE_DEBUGGABLE RHICommandSetShaderResourceViewParameter(TRHIShader* inShader, uint32 inSamplerIndex, RHIShaderResourceView* inSRV)
+			:mShader(inShader)
+			, mSamplerIndex(inSamplerIndex)
+			, mSRV(inSRV)
 		{
 
 		}
@@ -547,35 +645,38 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
-	struct RHICommandSetBlendState : public RHICommand<RHICommandSetBlendState>
-	{
-		BlendStateRHIParamRef mState;
-		LinearColor mBlendFactor;
-		FORCEINLINE_DEBUGGABLE RHICommandSetBlendState(BlendStateRHIParamRef inState, const LinearColor& inBlendFactory)
-			:mState(inState)
-			,mBlendFactor(inBlendFactory)
-		{}
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
+	
 
 	struct RHICommandSetStreamSource : public RHICommand<RHICommandSetStreamSource> 
 	{
 		uint32 mStreamIndex;
-		VertexBufferRHIParamRef mVertexBuffer;
-		uint32 mStride;
+		RHIVertexBuffer* mVertexBuffer;
 		uint32 mOffset;
 		FORCEINLINE_DEBUGGABLE RHICommandSetStreamSource(
 			uint32 inStreamIndex,
-			VertexBufferRHIParamRef inVertexBuffer,
-			uint32 inStride,
+			RHIVertexBuffer* inVertexBuffer,
 			uint32 inOffset)
 			:mStreamIndex(inStreamIndex),
 			mVertexBuffer(inVertexBuffer),
-			mStride(inStride),
 			mOffset(inOffset)
 		{
 
 		}
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	struct RHICommandAutomaticCacheFlushAfterComputeShader final : public RHICommand< RHICommandAutomaticCacheFlushAfterComputeShader>
+	{
+		bool bEnable;
+		FORCEINLINE_DEBUGGABLE RHICommandAutomaticCacheFlushAfterComputeShader(bool inbEnable)
+			:bEnable(inbEnable)
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	struct RHICommandFlushComputeShaderCache final : public RHICommand< RHICommandFlushComputeShaderCache>
+	{
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
@@ -620,50 +721,7 @@ namespace Air
 		{}
 	};
 
-	struct LocalBoundShaderStateWorkArea
-	{
-		BoundShaderStateInput mArgs;
-		ComputedBSS* mComputedBSS;
-#if DO_CHECK
-		RHICommandListBase* mCheckCmdList;
-		int32 UID;
-#endif
-		FORCEINLINE_DEBUGGABLE LocalBoundShaderStateWorkArea(
-			RHICommandListBase* inCheckCmdList,
-			VertexDeclarationRHIParamRef vertexDecalarationRHI,
-			VertexShaderRHIParamRef vertexShaderRHI,
-			HullShaderRHIParamRef hullShaderRHI,
-			DomainShaderRHIParamRef domainShaderRHI,
-			PixelShaderRHIParamRef pixelShaderRHI,
-			GeometryShaderRHIParamRef geometryShaderRHI
-		)
-			:mArgs(vertexDecalarationRHI, vertexShaderRHI, hullShaderRHI, domainShaderRHI, geometryShaderRHI, pixelShaderRHI)
-#if DO_CHECK
-			, mCheckCmdList(inCheckCmdList)
-			, UID(0)
-#endif
-		{
-			mComputedBSS = new (inCheckCmdList->alloc<ComputedBSS>())ComputedBSS;
-		}
-	};
 
-	struct LocalBoundShaderState 
-	{
-		LocalBoundShaderStateWorkArea * mWorkArea;
-		BoundShaderStateRHIRef mBypassBSS;
-		LocalBoundShaderState()
-			:mWorkArea(nullptr)
-		{}
-		LocalBoundShaderState(const LocalBoundShaderState& other)
-			:mWorkArea(other.mWorkArea)
-			,mBypassBSS(other.mBypassBSS)
-		{}
-	};
-
-	struct LocalGraphicsPipelineStateWorkArea
-	{
-
-	};
 
 
 	struct LocalGraphicsPipelineState
@@ -677,48 +735,24 @@ namespace Air
 		}
 	};
 
-	struct RHICommandBuildLocalBoundShaderState : public RHICommand<RHICommandBuildLocalBoundShaderState>
-	{
-		LocalBoundShaderStateWorkArea mWorkArea;
-		FORCEINLINE_DEBUGGABLE RHICommandBuildLocalBoundShaderState(RHICommandListBase* checkCmdList, VertexDeclarationRHIParamRef vertexDeclarationRHI, VertexShaderRHIParamRef vertexShaderRHI,
-			HullShaderRHIParamRef hullShaderRHI,
-			DomainShaderRHIParamRef domainShaderRHI,
-			GeometryShaderRHIParamRef geometryShaderRHI,
-			PixelShaderRHIParamRef pixelShaderRHI)
-			:mWorkArea(checkCmdList, vertexDeclarationRHI, vertexShaderRHI, hullShaderRHI, domainShaderRHI, pixelShaderRHI, geometryShaderRHI)
-		{}
-
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
 	
-
-	struct RHICommandSetLocalBoundShaderState : public RHICommand<RHICommandSetLocalBoundShaderState>
-	{
-		LocalBoundShaderState mLocalBoundShaderState;
-		FORCEINLINE_DEBUGGABLE RHICommandSetLocalBoundShaderState(RHICommandListBase* checkCmdList, LocalBoundShaderState& inLocalBoundShaderState)
-			:mLocalBoundShaderState(inLocalBoundShaderState)
-		{
-			mLocalBoundShaderState.mWorkArea->mComputedBSS->mUseCount++;
-		}
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
-
+	
 	struct RHICommandSetBoundShaderState : public RHICommand<RHICommandSetBoundShaderState>
 	{
-		BoundShaderStateRHIParamRef mBoundShaderState;
-		FORCEINLINE_DEBUGGABLE RHICommandSetBoundShaderState(BoundShaderStateRHIParamRef inBoundShaderState)
+		RHIBoundShaderState* mBoundShaderState;
+		FORCEINLINE_DEBUGGABLE RHICommandSetBoundShaderState(RHIBoundShaderState* inBoundShaderState)
 			:mBoundShaderState(inBoundShaderState)
 		{}
 		RHI_API void execute(RHICommandListBase & cmdList);
 	};
 
-	template<typename TShaderRHIParamRef, ECmdList cmdListType>
-	struct RHICommandSetShaderConstantBuffer : public RHICommand<RHICommandSetShaderConstantBuffer<TShaderRHIParamRef, cmdListType>>
+	template<typename TRHIShader, ECmdList cmdListType>
+	struct RHICommandSetShaderConstantBuffer : public RHICommand<RHICommandSetShaderConstantBuffer<TRHIShader, cmdListType>>
 	{
-		TShaderRHIParamRef mShader;
+		TRHIShader* mShader;
 		uint32 mBaseIndex;
-		ConstantBufferRHIParamRef mConstantBuffer;
-		FORCEINLINE_DEBUGGABLE RHICommandSetShaderConstantBuffer(TShaderRHIParamRef inShader, uint32 inBaseIndex, ConstantBufferRHIParamRef inConstantBuffer)
+		RHIConstantBuffer* mConstantBuffer;
+		FORCEINLINE_DEBUGGABLE RHICommandSetShaderConstantBuffer(TRHIShader* inShader, uint32 inBaseIndex, RHIConstantBuffer* inConstantBuffer)
 			:mShader(inShader),
 			mBaseIndex(inBaseIndex),
 			mConstantBuffer(inConstantBuffer)
@@ -728,13 +762,13 @@ namespace Air
 	};
 
 
-	template<typename TShaderRHIParamRef>
-	struct RHICommandSetLocalConstantBuffer : public RHICommand<RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>>
+	template<typename TRHIShader>
+	struct RHICommandSetLocalConstantBuffer : public RHICommand<RHICommandSetLocalConstantBuffer<TRHIShader>>
 	{
-		TShaderRHIParamRef mShader;
+		TRHIShader* mShader;
 		uint32 mBaseIndex;
 		LocalConstantBuffer mLocalConstantBuffer;
-		FORCEINLINE_DEBUGGABLE RHICommandSetLocalConstantBuffer(RHICommandListBase* checkCmdList, TShaderRHIParamRef inShader, uint32 inBaseIndex, const LocalConstantBuffer& inLocalConstantBuffer)
+		FORCEINLINE_DEBUGGABLE RHICommandSetLocalConstantBuffer(RHICommandListBase* checkCmdList, TRHIShader* inShader, uint32 inBaseIndex, const LocalConstantBuffer& inLocalConstantBuffer)
 			:mShader(inShader),
 			mBaseIndex(inBaseIndex),
 			mLocalConstantBuffer(inLocalConstantBuffer)
@@ -745,56 +779,11 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
-	struct RHICommandEndDrawIndexedPrimitiveUP : public RHICommand<RHICommandEndDrawIndexedPrimitiveUP>
-	{
-		uint32 mPrimitiveType;
-		uint32 mNumPrimitive;
-		uint32 mNumVertices;
-		uint32 mVertexDataStride;
-		void* mOutVertexData;
-		uint32 mMinVertexIndex;
-		uint32 mNumIndices;
-		uint32 mIndexDataStride;
-		void* mOutIndexData;
-		FORCEINLINE_DEBUGGABLE RHICommandEndDrawIndexedPrimitiveUP(uint32 inPrimitiveType, uint32 numPrimitive, uint32 numVertex, uint32 vertexDataStride, void* inOutVertexData, uint32 inMinVertexInddex, uint32 inNumIndices, uint32 inIndexDataStride, void* inOutIndexData)
-			:mPrimitiveType(inPrimitiveType)
-			,mNumPrimitive(numPrimitive)
-			,mNumVertices(numVertex)
-			,mVertexDataStride(vertexDataStride)
-			,mOutVertexData(inOutVertexData)
-			,mMinVertexIndex(inMinVertexInddex)
-			,mNumIndices(inNumIndices)
-			,mIndexDataStride(inIndexDataStride)
-			,mOutIndexData(inOutIndexData)
-		{
-
-		}
-
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
-
-	struct RHICommandEndDrawPrimitiveUP : public RHICommand<RHICommandEndDrawPrimitiveUP>
-	{
-		uint32 mPrimitiveType;
-		uint32 mNumPrimitives;
-		uint32 mNumVertices;
-		uint32 mVertexDataStride;
-		void* mOutVertexData;
-
-		RHICommandEndDrawPrimitiveUP(uint32 inPrimitiveType, uint32 inNumPrimitives, uint32 inNumVertices, uint32 inVertexDataStride, void* inOutVertexData)
-			:mPrimitiveType(inPrimitiveType)
-			,mNumPrimitives(inNumPrimitives)
-			,mNumVertices(inNumVertices)
-			,mVertexDataStride(inVertexDataStride)
-			,mOutVertexData(inOutVertexData)
-		{}
-
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
+	
 
 	struct RHICommandDrawIndexedPrimitive : public RHICommand<RHICommandDrawIndexedPrimitive>
 	{
-		IndexBufferRHIParamRef mIndexBuffer;
+		RHIIndexBuffer* mIndexBuffer;
 		uint32	mPrimitiveType;
 		uint32	mBaseVertexIndex;
 		uint32	mFirstInstance;
@@ -802,7 +791,7 @@ namespace Air
 		uint32	mStartIndex;
 		uint32	mNumPrimitives;
 		uint32	mNumInstances;
-		RHICommandDrawIndexedPrimitive(IndexBufferRHIParamRef inIndexBuffer, uint32 inPrimitiveType, uint32 inBaseVertexIndex, uint32 inFirstInstance, uint32 inNumVertex, uint32 inStartIndex, uint32 inNumPrimitive, uint32 inNumInstances)
+		RHICommandDrawIndexedPrimitive(RHIIndexBuffer* inIndexBuffer, uint32 inPrimitiveType, uint32 inBaseVertexIndex, uint32 inFirstInstance, uint32 inNumVertex, uint32 inStartIndex, uint32 inNumPrimitive, uint32 inNumInstances)
 			:mIndexBuffer(inIndexBuffer)
 			,mPrimitiveType(inPrimitiveType)
 			,mBaseVertexIndex(inBaseVertexIndex)
@@ -819,13 +808,11 @@ namespace Air
 
 	struct RHICommandDrawPrimitive : public RHICommand<RHICommandDrawPrimitive>
 	{
-		uint32 mPrimitiveType;
 		uint32 mBaseVertexIndex;
 		uint32 mNumPrimitives;
 		uint32 mNumInstances;
-		RHICommandDrawPrimitive(uint32 inPrimitiveType, uint32 inBaseVertexIndex, uint32 inNumPrimitives, uint32 inNumInstances)
-			:mPrimitiveType(inPrimitiveType)
-			,mBaseVertexIndex(inBaseVertexIndex)
+		RHICommandDrawPrimitive(uint32 inBaseVertexIndex, uint32 inNumPrimitives, uint32 inNumInstances)
+			:mBaseVertexIndex(inBaseVertexIndex)
 			,mNumPrimitives(inNumPrimitives)
 			,mNumInstances(inNumInstances)
 		{
@@ -839,15 +826,13 @@ namespace Air
 		RHICommand<RHICommandCopyToResolveTarget>
 	{
 		ResolveParams mResolveParams;
-		TextureRHIParamRef mSourceTexture;
-		TextureRHIParamRef mDestTexture;
-		bool bKeepOriginalSurface;
+		RHITexture* mSourceTexture;
+		RHITexture* mDestTexture;
 
-		FORCEINLINE_DEBUGGABLE RHICommandCopyToResolveTarget(TextureRHIParamRef sourceTexture, TextureRHIParamRef destTexture, bool bInKeepOriginalSurface, const ResolveParams& inResolveParams)
+		FORCEINLINE_DEBUGGABLE RHICommandCopyToResolveTarget(RHITexture* sourceTexture, RHITexture* destTexture, const ResolveParams& inResolveParams)
 			:mResolveParams(inResolveParams)
 			,mSourceTexture(sourceTexture)
 			,mDestTexture(destTexture)
-			,bKeepOriginalSurface(bInKeepOriginalSurface)
 		{
 			BOOST_ASSERT(sourceTexture);
 			BOOST_ASSERT(destTexture);
@@ -860,13 +845,13 @@ namespace Air
 
 	
 
-	template<typename TShaderRHIParamRef, ECmdList cmdListType>
-	struct RHICommandSetShaderSampler : public RHICommand<RHICommandSetShaderSampler<TShaderRHIParamRef, cmdListType>>
+	template<typename TRHIShader, ECmdList cmdListType>
+	struct RHICommandSetShaderSampler : public RHICommand<RHICommandSetShaderSampler<TRHIShader, cmdListType>>
 	{
-		TShaderRHIParamRef mShader;
+		TRHIShader* mShader;
 		uint32 mSamplerIndex;
-		SamplerStateRHIParamRef mState;
-		FORCEINLINE_DEBUGGABLE RHICommandSetShaderSampler(TShaderRHIParamRef inShader, uint32 inSamplerIndex, SamplerStateRHIParamRef inState)
+		RHISamplerState* mState;
+		FORCEINLINE_DEBUGGABLE RHICommandSetShaderSampler(TRHIShader* inShader, uint32 inSamplerIndex, RHISamplerState* inState)
 			:mShader(inShader)
 			, mSamplerIndex(inSamplerIndex)
 			, mState(inState)
@@ -874,15 +859,15 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
-	template<typename TShaderRHIParamRef, ECmdList cmdListType>
-	struct RHICommandSetShaderParameter : public RHICommand<RHICommandSetShaderParameter<TShaderRHIParamRef, cmdListType>>
+	template<typename TRHIShader, ECmdList cmdListType>
+	struct RHICommandSetShaderParameter : public RHICommand<RHICommandSetShaderParameter<TRHIShader, cmdListType>>
 	{
-		TShaderRHIParamRef mShader;
+		TRHIShader* mShader;
 		const void * newValue;
 		uint32 mBufferIndex;
 		uint32 mBaseIndex;
 		uint32 mNumBytes;
-		FORCEINLINE_DEBUGGABLE RHICommandSetShaderParameter(TShaderRHIParamRef inShader, uint32 inBufferIndex, uint32 inBaseIndex, uint32 inNumBytes, const void* inNewValue)
+		FORCEINLINE_DEBUGGABLE RHICommandSetShaderParameter(TRHIShader* inShader, uint32 inBufferIndex, uint32 inBaseIndex, uint32 inNumBytes, const void* inNewValue)
 			:mShader(inShader)
 			,mBufferIndex(inBufferIndex)
 			,mBaseIndex(inBaseIndex)
@@ -893,13 +878,13 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
-	template<typename TShaderRHIParamRef, ECmdList cmdListType>
-	struct RHICommandSetShaderTexture : public RHICommand<RHICommandSetShaderTexture<TShaderRHIParamRef, cmdListType>>
+	template<typename TRHIShader, ECmdList cmdListType>
+	struct RHICommandSetShaderTexture : public RHICommand<RHICommandSetShaderTexture<TRHIShader, cmdListType>>
 	{
-		TShaderRHIParamRef mShader;
+		TRHIShader* mShader;
 		uint32 mTextureIndex;
-		TextureRHIParamRef mTexture;
-		FORCEINLINE_DEBUGGABLE RHICommandSetShaderTexture(TShaderRHIParamRef inShader, uint32 inTextureIndex, TextureRHIParamRef inTexture)
+		RHITexture* mTexture;
+		FORCEINLINE_DEBUGGABLE RHICommandSetShaderTexture(TRHIShader* inShader, uint32 inTextureIndex, RHITexture* inTexture)
 			:mShader(inShader)
 			,mTextureIndex(inTextureIndex)
 			,mTexture(inTexture)
@@ -909,13 +894,111 @@ namespace Air
 
 	struct RHICommandUpdateTextureReference : public RHICommand<RHICommandUpdateTextureReference>
 	{
-		TextureReferenceRHIParamRef mTextureRef;
-		TextureRHIParamRef mNewTexture;
+		RHITextureReference* mTextureRef;
+		RHITexture* mNewTexture;
 		FORCEINLINE_DEBUGGABLE RHICommandUpdateTextureReference(
-			TextureReferenceRHIParamRef inTextureRef, TextureRHIParamRef inNewTexture)
+			RHITextureReference* inTextureRef, RHITexture* inNewTexture)
 			:mTextureRef(inTextureRef)
 			,mNewTexture(inNewTexture)
 		{}
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<typename TRHIShader, ECmdList CmdListType>
+	struct RHICommandSetUAVParameter final : public RHICommand<RHICommandSetUAVParameter<TRHIShader, CmdListType>>
+	{
+		TRHIShader* mShader;
+		uint32 mUAVIndex;
+		RHIUnorderedAccessView* mUAV;
+
+		FORCEINLINE_DEBUGGABLE RHICommandSetUAVParameter(TRHIShader* inShader, uint32 inUAVIndex, RHIUnorderedAccessView* inUAV)
+			:mShader(inShader)
+			,mUAVIndex(inUAVIndex)
+			,mUAV(inUAV)
+		{
+
+		}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<typename TRHIShader, ECmdList CmdListType>
+	struct RHICommandSetUAVParameter_InitialCount final : public RHICommand< RHICommandSetUAVParameter_InitialCount<TRHIShader, CmdListType>>
+	{
+		TRHIShader* mShader;
+		uint32 mUAVIndex;
+		RHIUnorderedAccessView* mUAV;
+		uint32 mInitialCount;
+
+		FORCEINLINE_DEBUGGABLE RHICommandSetUAVParameter_InitialCount(TRHIShader* shader, uint32 inUAVIndex, RHIUnorderedAccessView* inUAV, uint32 inInitialCount)
+			:mShader(shader)
+			,mUAVIndex(inUAVIndex)
+			,mUAV(inUAV)
+			,mInitialCount(inInitialCount)
+		{
+
+		}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	struct RHICommandSetGraphicsPipelineState final : public RHICommand< RHICommandSetGraphicsPipelineState>
+	{
+		GraphicsPipelineState* mGraphicsPipelineState;
+		FORCEINLINE_DEBUGGABLE RHICommandSetGraphicsPipelineState(GraphicsPipelineState* inGraphicsPipelineState)
+			:mGraphicsPipelineState(inGraphicsPipelineState)
+		{}
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	struct RHICommandBeginRenderPass final : public RHICommand<RHICommandBeginRenderPass>
+	{
+		RHIRenderPassInfo mInfo;
+		const TCHAR* mName;
+		RHICommandBeginRenderPass(const RHIRenderPassInfo& inInfo, const TCHAR* inName)
+			:mInfo(inInfo)
+			,mName(inName)
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	struct RHICommandEndRenderPass final : public RHICommand<RHICommandEndRenderPass>
+	{
+		RHICommandEndRenderPass()
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	struct RHICommandSetBlendFactor final : public RHICommand<RHICommandSetBlendFactor>
+	{
+		LinearColor mBlendFactor;
+		FORCEINLINE_DEBUGGABLE RHICommandSetBlendFactor(const LinearColor& inBlendFactor)
+			:mBlendFactor(inBlendFactor)
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<ECmdList CmdListType>
+	struct RHICommandWaitComputeFence final : public RHICommand< RHICommandWaitComputeFence<CmdListType>>
+	{
+		RHIComputeFence* mWaitFence;
+
+		FORCEINLINE_DEBUGGABLE RHICommandWaitComputeFence(RHIComputeFence* inWaitFence)
+			:mWaitFence(inWaitFence)
+		{}
+
+		RHI_API void execute(RHICommandListBase& cmdList);
+	};
+
+	template<ECmdList CmdListType>
+	struct RHICommandSubmitCommandsHint final : public RHICommand<RHICommandSubmitCommandsHint<CmdListType>>
+	{
+		FORCEINLINE_DEBUGGABLE RHICommandSubmitCommandsHint()
+		{}
+
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
@@ -929,75 +1012,76 @@ namespace Air
 		void* operator new(size_t size);
 		void operator delete(void* rawMemory);
 
-		void beginDrawingViewport(ViewportRHIParamRef viewport, TextureRHIParamRef renderTargetRHI);
+		void beginDrawingViewport(RHIViewport* viewport, RHITexture* renderTargetRHI);
 
-		void endDrawingViewport(ViewportRHIParamRef viewport, bool bPreset, bool bLockToVsync);
+		void endDrawingViewport(RHIViewport* viewport, bool bPreset, bool bLockToVsync);
 
-		FORCEINLINE_DEBUGGABLE void beginDrawIndexedPrimitiveUP(uint32 primitiveType, uint32 numPrimitive, uint32 numVertices, uint32 vertexDataStride, void*& outVertexData, uint32 minVertexIndex, uint32 numIndices, uint32 indexDataStride, void*& outIndexData)
+		FORCEINLINE_DEBUGGABLE void beginRenderPass(const RHIRenderPassInfo& inInfo, const TCHAR* name)
+		{
+			BOOST_ASSERT(!isInsideRenderPass());
+			BOOST_ASSERT(!isInsideComputePass());
+
+			if (inInfo.bTooManyUAVs)
+			{
+				AIR_LOG(logRHI, Warning, TEXT("RenderPass has too many UVAs"));
+			}
+			inInfo.validate();
+			if (bypass())
+			{
+				getContext().RHIBeginRenderPass(inInfo, name);
+			}
+			else
+			{
+				TCHAR* nameCopy = allocString(name);
+				ALLOC_COMMAND(RHICommandBeginRenderPass)(inInfo, nameCopy);
+			}
+
+			mData.bInsideRenderPass = true;
+			cacheActiveRenderTargets(inInfo);
+			resetSubpass(inInfo.mSubpassHint);
+			mData.bInsideRenderPass = true;
+		}
+
+		void endRenderPass()
+		{
+			BOOST_ASSERT(isInsideRenderPass());
+			BOOST_ASSERT(!isInsideComputePass());
+			if (bypass())
+			{
+				getContext().RHIEndRenderPass();
+			}
+			else
+			{
+				ALLOC_COMMAND(RHICommandEndRenderPass)();
+			}
+
+			mData.bInsideRenderPass = false;
+			resetSubpass(ESubpassHint::None);
+		}
+
+		FORCEINLINE_DEBUGGABLE void setGraphicsPipelineState(class GraphicsPipelineState* graphicsPipelineState)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHIBeginDrawIndexedPrimitiveUP)(primitiveType, numPrimitive, numVertices, vertexDataStride, outVertexData, minVertexIndex, numIndices, indexDataStride, outIndexData);
+				
+				RHIGraphicsPipelineState* rhiGraphicsPipelineState = executeSetGraphicsPipelineState(graphicsPipelineState);
+				getContext().RHISetGraphicsPipelineState(rhiGraphicsPipelineState);
 				return;
 			}
-			BOOST_ASSERT(!mDrawUPData.mOutIndexData && !mDrawUPData.mOutIndexData && numVertices * vertexDataStride > 0 && numIndices * indexDataStride > 0);
-			outVertexData = alloc(numVertices * vertexDataStride, 16);
-			outIndexData = alloc(numIndices * indexDataStride, 16);
-			mDrawUPData.mPrimitiveType = primitiveType;
-			mDrawUPData.mNumPrimitives = numPrimitive;
-			mDrawUPData.mNumVertices = numVertices;
-			mDrawUPData.mVertexDataStride = vertexDataStride;
-			mDrawUPData.mOutVertexData = outVertexData;
-			mDrawUPData.mMinVertexIndex = minVertexIndex;
-			mDrawUPData.mNumIndices = numIndices;
-			mDrawUPData.mIndexDataStride = indexDataStride;
-			mDrawUPData.mOutIndexData = outIndexData;
+			ALLOC_COMMAND(RHICommandSetGraphicsPipelineState)(graphicsPipelineState);
 		}
-
-		FORCEINLINE_DEBUGGABLE void endDrawIndexedPrimitiveUP()
+		
+		FORCEINLINE_DEBUGGABLE void waitComputeFence(RHIComputeFence* waitFence)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHIEndDrawIndexedPrimitiveUP)();
+				getContext().RHIWaitComputeFence(waitFence);
 				return;
 			}
-			BOOST_ASSERT(mDrawUPData.mOutVertexData && mDrawUPData.mOutIndexData && mDrawUPData.mNumIndices && mDrawUPData.mNumVertices);
-			new (allocCommand<RHICommandEndDrawIndexedPrimitiveUP>())RHICommandEndDrawIndexedPrimitiveUP(mDrawUPData.mPrimitiveType, mDrawUPData.mNumPrimitives, mDrawUPData.mNumVertices, mDrawUPData.mVertexDataStride, mDrawUPData.mOutVertexData, mDrawUPData.mMinVertexIndex, mDrawUPData.mNumIndices, mDrawUPData.mIndexDataStride, mDrawUPData.mOutIndexData);
-			mDrawUPData.mOutVertexData = nullptr;
-			mDrawUPData.mOutIndexData = nullptr;
-			mDrawUPData.mNumIndices = 0;
-			mDrawUPData.mNumVertices = 0;
+			ALLOC_COMMAND(RHICommandWaitComputeFence<ECmdList::EGfx>)(waitFence);
 		}
 
-		FORCEINLINE_DEBUGGABLE void beginDrawPrimitiveUP(uint32 primitiveType, uint32 numPrimitive, uint32 numVertex, uint32 vertexDataStride, void* & outVertexData)
-		{
-			if (bypass())
-			{
-				CMD_CONTEXT(RHIBeginDrawPrimitiveUP)(primitiveType, numPrimitive, numVertex, vertexDataStride, outVertexData);
-			}
-			BOOST_ASSERT(!mDrawUPData.mOutVertexData && numVertex * vertexDataStride > 0);
-			outVertexData = alloc(numVertex * vertexDataStride, 16);
-			mDrawUPData.mPrimitiveType = primitiveType;
-			mDrawUPData.mNumPrimitives = numPrimitive;
-			mDrawUPData.mNumVertices = numVertex;
-			mDrawUPData.mVertexDataStride = vertexDataStride;
-			mDrawUPData.mOutVertexData = outVertexData;
-		}
-
-		FORCEINLINE_DEBUGGABLE void endDrawPrimitiveUP()
-		{
-			if (bypass())
-			{
-				CMD_CONTEXT(RHIEndDrawPrimitiveUP)();
-				return;
-			}
-			BOOST_ASSERT(mDrawUPData.mOutVertexData && mDrawUPData.mNumVertices);
-			new (allocCommand<RHICommandEndDrawPrimitiveUP>())RHICommandEndDrawPrimitiveUP(mDrawUPData.mPrimitiveType, mDrawUPData.mNumPrimitives, mDrawUPData.mNumVertices, mDrawUPData.mVertexDataStride, mDrawUPData.mOutVertexData);
-			mDrawUPData.mOutVertexData = nullptr;
-			mDrawUPData.mNumVertices = 0;
-		}
-
-		FORCEINLINE_DEBUGGABLE void drawIndexedPrimitive(IndexBufferRHIParamRef indexBuffer, uint32 primitiveType, int32 baseVertexIndex, int32 firstInstance, uint32 numVertices, uint32 startIndex, uint32 numPrimitive, uint32 numInstances)
+		FORCEINLINE_DEBUGGABLE void drawIndexedPrimitive(RHIIndexBuffer* indexBuffer, uint32 primitiveType, int32 baseVertexIndex, int32 firstInstance, uint32 numVertices, uint32 startIndex, uint32 numPrimitive, uint32 numInstances)
 		{
 			if (bypass())
 			{
@@ -1007,32 +1091,18 @@ namespace Air
 			new (allocCommand<RHICommandDrawIndexedPrimitive>())RHICommandDrawIndexedPrimitive(indexBuffer, primitiveType, baseVertexIndex, firstInstance, numVertices, startIndex, numPrimitive, numInstances);
 		}
 
-		FORCEINLINE_DEBUGGABLE void drawPrimitive(uint32 primitiveType, uint32 baseVertexIndex, uint32 numPrimitives, uint32 numInstances)
+		FORCEINLINE_DEBUGGABLE void drawPrimitive(uint32 baseVertexIndex, uint32 numPrimitives, uint32 numInstances)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHIDrawPrimitive)(primitiveType, baseVertexIndex, numPrimitives, numInstances);
+				CMD_CONTEXT(RHIDrawPrimitive)(baseVertexIndex, numPrimitives, numInstances);
 				return;
 			}
-			new (allocCommand<RHICommandDrawPrimitive>())RHICommandDrawPrimitive(primitiveType, baseVertexIndex, numPrimitives, numInstances);
+			new (allocCommand<RHICommandDrawPrimitive>())RHICommandDrawPrimitive(baseVertexIndex, numPrimitives, numInstances);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setRasterizerState(RasterizerStateRHIParamRef state)
-		{
-			BOOST_ASSERT(StrictGraphicsPipelineStateUse == 0);
-			if (bypass())
-			{
-				CMD_CONTEXT(RHISetRasterizerState)(state);
-				return;
-			}
-			if (mStateCacheEnabled && mCachedRasterizerState && mCachedRasterizerState->mState == state)
-			{
-				return;
-			}
-			mCachedRasterizerState = new (allocCommand<RHICommandSetRasterizerState>())RHICommandSetRasterizerState(state);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResourceArrayNoCopy(EResourceTransitionAccess transitionType, TArray<TextureRHIParamRef>& inTextures)
+		
+		FORCEINLINE_DEBUGGABLE void transitionResourceArrayNoCopy(EResourceTransitionAccess transitionType, TArray<RHITexture*>& inTextures)
 		{
 			if (bypass())
 			{
@@ -1042,9 +1112,9 @@ namespace Air
 			new (allocCommand<RHICommandTransitionTexturesArray>()) RHICommandTransitionTexturesArray(transitionType, inTextures);
 		}
 
-		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, TextureRHIParamRef inTexture)
+		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, RHITexture* inTexture)
 		{
-			TextureRHIParamRef texture = inTexture;
+			RHITexture* texture = inTexture;
 			if (bypass())
 			{
 				CMD_CONTEXT(RHITransitionResources)(transitionType, &texture, 1);
@@ -1053,17 +1123,57 @@ namespace Air
 			new (allocCommand<RHICommandTransitionTextures>())RHICommandTransitionTextures(transitionType, &texture, 1);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setStreamSource(uint32 streadIndex, VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint32 offset)
+		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView* inUAV, RHIComputeFence* writeFence)
+		{
+			BOOST_ASSERT(inUAV == nullptr || inUAV->isCommitted());
+			RHIUnorderedAccessView* uav = inUAV;
+			if (bypass())
+			{
+				getContext().RHITransitionResources(transitionType, transitionPipeline, &uav, 1, writeFence);
+				return;
+			}
+
+			RHIUnorderedAccessView** uavArray = (RHIUnorderedAccessView * *)alloc(sizeof(RHIUnorderedAccessView*), alignof(RHIUnorderedAccessView*));
+			uavArray[0] = uav;
+			ALLOC_COMMAND(RHICommandTransitionUAVs<ECmdList::EGfx>)(transitionType, transitionPipeline, uavArray, 1, writeFence);
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView* inUAV)
+		{
+			transitionResource(transitionType, transitionPipeline, inUAV, nullptr);
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAV, int32 numUAVs, RHIComputeFence* writeFence)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHISetStreamSource)(streadIndex, vertexBuffer, stride, offset);
+				getContext().RHITransitionResources(transitionType, transitionPipeline, inUAV, numUAVs, writeFence);
 				return;
 			}
-			new (allocCommand<RHICommandSetStreamSource>())RHICommandSetStreamSource(streadIndex, vertexBuffer, stride, offset);
+			RHIUnorderedAccessView** uavArray = (RHIUnorderedAccessView * *)alloc(sizeof(RHIUnorderedAccessView*) * numUAVs, alignof(RHIUnorderedAccessView*));
+			for (int32 index = 0; index < numUAVs; ++index)
+			{
+				uavArray[index] = inUAV[index];
+			}
+			ALLOC_COMMAND(RHICommandTransitionUAVs<ECmdList::EGfx>)(transitionType, transitionPipeline, uavArray, numUAVs, writeFence);
 		}
 
-		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, TextureRHIParamRef* inTextures, int32 numTextures)
+		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAV, int32 numUAVs)
+		{
+			transitionResources(transitionType, transitionPipeline, inUAV, numUAVs, nullptr);
+		}
+
+		FORCEINLINE_DEBUGGABLE void setStreamSource(uint32 streadIndex, RHIVertexBuffer* vertexBuffer, uint32 offset)
+		{
+			if (bypass())
+			{
+				CMD_CONTEXT(RHISetStreamSource)(streadIndex, vertexBuffer, offset);
+				return;
+			}
+			new (allocCommand<RHICommandSetStreamSource>())RHICommandSetStreamSource(streadIndex, vertexBuffer, offset);
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, RHITexture** inTextures, int32 numTextures)
 		{
 			if (bypass())
 			{
@@ -1102,7 +1212,7 @@ namespace Air
 			new (allocCommand<RHICommandSetRenderTargetsAndClear>())RHICommandSetRenderTargetsAndClear(renderTargetInfo);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setRenderTargets(uint32 newNumSimultanieusRenderTargets, const RHIRenderTargetView* newRenderTargetsRHI, const RHIDepthRenderTargetView* newDepthStencilTargetRHI, uint32 newNumUAVs, const UnorderedAccessViewRHIParamRef* UAVs)
+		FORCEINLINE_DEBUGGABLE void setRenderTargets(uint32 newNumSimultanieusRenderTargets, const RHIRenderTargetView* newRenderTargetsRHI, const RHIDepthRenderTargetView* newDepthStencilTargetRHI, uint32 newNumUAVs, RHIUnorderedAccessView* const* UAVs)
 		{
 			cacheActiveRenderTargets(newNumSimultanieusRenderTargets, newRenderTargetsRHI, newDepthStencilTargetRHI);
 			if (bypass())
@@ -1112,20 +1222,26 @@ namespace Air
 			}
 			new (allocCommand<RHICommandSetRenderTargets>())RHICommandSetRenderTargets(newNumSimultanieusRenderTargets, newRenderTargetsRHI, newDepthStencilTargetRHI, newNumUAVs, UAVs);
 		}
+		
 
-		FORCEINLINE_DEBUGGABLE void clearColorTexture(TextureRHIParamRef texture, const LinearColor& clearColor, IntRect excludeRect)
-		{
-			clearColorTextures(1, &texture, &clearColor, excludeRect);
-		}
-
-		FORCEINLINE_DEBUGGABLE void clearColorTextures(int32 numTextures, TextureRHIParamRef* textures, const LinearColor* clearColorArray, IntRect excludeRect)
+		FORCEINLINE_DEBUGGABLE void automaticCacheFlushAfterComputeShader(bool bEnable)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHIClearColorTextures)(numTextures, textures, clearColorArray, excludeRect);
+				getContext().RHIAutomaticCacheFlushAfterComputeShader(bEnable);
 				return;
 			}
-			new (allocCommand<RHICommandClearColorTextures>())RHICommandClearColorTextures(numTextures, textures, clearColorArray, excludeRect);
+			ALLOC_COMMAND(RHICommandAutomaticCacheFlushAfterComputeShader)(bEnable);
+		}
+
+		FORCEINLINE_DEBUGGABLE void flushComputeShaderCache()
+		{
+			if (bypass())
+			{
+				getContext().RHIFlushComputeShaderCache();
+				return;
+			}
+			ALLOC_COMMAND(RHICommandFlushComputeShaderCache)();
 		}
 
 		FORCEINLINE_DEBUGGABLE void bindClearMRTValues(bool bClearColor, bool bClearDepth, bool bClearStencil)
@@ -1139,29 +1255,17 @@ namespace Air
 			new (allocCommand<RHICommandBindClearMRTValues>())RHICommandBindClearMRTValues(bClearColor, bClearDepth, bClearStencil);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setBlendState(BlendStateRHIParamRef state, const LinearColor& blendFactor = LinearColor::White)
+		FORCEINLINE_DEBUGGABLE void setBlendFactor(const LinearColor& blendFactor = LinearColor::White)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHISetBlendState)(state, blendFactor);
+				getContext().RHISetBlendFactor(blendFactor);
 				return;
 			}
-			new (allocCommand<RHICommandSetBlendState>())RHICommandSetBlendState(state, blendFactor);
+			ALLOC_COMMAND(RHICommandSetBlendFactor)(blendFactor);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setDepthStencilState(DepthStencilStateRHIParamRef state, uint32 stecilRef = 0)
-		{
-			if (bypass())
-			{
-				CMD_CONTEXT(RHISetDepthStencilState)(state, stecilRef);
-				return;
-			}
-			if (mStateCacheEnabled && mCachedDepthStencilState && mCachedDepthStencilState->mState == state && mCachedDepthStencilState->mStencilRef == stecilRef)
-			{
-				return;
-			}
-			mCachedDepthStencilState = new (allocCommand<RHICommandSetDepthStencilState>())RHICommandSetDepthStencilState(state, stecilRef);
-		}
+		
 
 		FORCEINLINE_DEBUGGABLE void setStencilRef(uint32 stencilRef)
 		{
@@ -1170,11 +1274,8 @@ namespace Air
 				CMD_CONTEXT(RHISetStencilRef)(stencilRef);
 				return;
 			}
-			if (mStateCacheEnabled && mCachedDepthStencilState && mCachedDepthStencilState->mStencilRef == stencilRef)
-			{
-				return;
-			}
-			new (allocCommand<RHICommandSetStencilRef>())RHICommandSetStencilRef(stencilRef);
+			
+			ALLOC_COMMAND(RHICommandSetStencilRef)(stencilRef);
 		}
 		FORCEINLINE_DEBUGGABLE void setViewport(uint32 x, uint32 y, float z, uint32 width, uint32 height, float depth)
 		{
@@ -1183,98 +1284,79 @@ namespace Air
 				CMD_CONTEXT(RHISetViewport)(x, y, z, width, height, depth);
 				return;
 			}
-			new (allocCommand<RHICommandSetViewport>())RHICommandSetViewport(x, y, z, width, height, depth);
+			ALLOC_COMMAND(RHICommandSetViewport)(x, y, z, width, height, depth);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setStereoViewport(uint32 leftX, uint32 leftY, float z, uint32 width, uint32 height, float depth)
-		{}
-
-		FORCEINLINE_DEBUGGABLE LocalBoundShaderState buildLocalBoundShaderState(
-			VertexDeclarationRHIParamRef vertexDecalarationRHI,
-			VertexShaderRHIParamRef vertexShaderRHI,
-			HullShaderRHIParamRef hullShaderRHI,
-			DomainShaderRHIParamRef domainShaderRHI,
-			GeometryShaderRHIParamRef geometryShaderRHI,
-			PixelShaderRHIParamRef pixelShaderRHI
-		)
+		FORCEINLINE_DEBUGGABLE void setStereoViewport(uint32 leftMinX, uint32 rightMinX, uint32 leftMinY, uint32 rightMinY, float z, uint32 leftMaxX, uint32 rightMaxX, uint32 leftMaxY, uint32 rightMaxY, float maxZ)
 		{
-			LocalBoundShaderState result;
 			if (bypass())
 			{
-				result.mBypassBSS = RHICreateBoundShaderState(vertexDecalarationRHI, vertexShaderRHI, hullShaderRHI, domainShaderRHI, geometryShaderRHI, pixelShaderRHI);
+				getContext().RHISetStereoViewport(leftMinX, rightMinX, leftMinY, rightMinY, z, leftMaxX, rightMaxX, leftMaxY, rightMaxY, maxZ);
 			}
-			else
-			{
-				auto* cmd = new (allocCommand<RHICommandBuildLocalBoundShaderState>())RHICommandBuildLocalBoundShaderState(this, vertexDecalarationRHI, vertexShaderRHI, hullShaderRHI, domainShaderRHI, geometryShaderRHI, pixelShaderRHI);
-				result.mWorkArea = &cmd->mWorkArea;
-			}
-			return result;
+			ALLOC_COMMAND(RHICommandSetStereoViewport)(leftMinX, rightMinX, leftMinY, rightMaxY, z, leftMaxX, rightMaxX, leftMaxY, rightMaxY, maxZ);
 		}
 
-		FORCEINLINE_DEBUGGABLE void setLocalBoundShaderState(LocalBoundShaderState localBoundShaderState)
-		{
-			BOOST_ASSERT(StrictGraphicsPipelineStateUse == 0);
-			if (bypass())
-			{
-				CMD_CONTEXT(RHISetBoundShaderState)(localBoundShaderState.mBypassBSS);
-				return;
-			}
-			new (allocCommand<RHICommandSetLocalBoundShaderState>())RHICommandSetLocalBoundShaderState(this, localBoundShaderState);
-		}
 
-		FORCEINLINE_DEBUGGABLE void buildAndSetLocalBoundShaderState(const BoundShaderStateInput& boundShaderStateInput)
-		{
-			setLocalBoundShaderState(buildLocalBoundShaderState(boundShaderStateInput.mVertexDeclarationRHI, boundShaderStateInput.mVertexShaderRHI, boundShaderStateInput.mHullShaderRHI, boundShaderStateInput.mDomainShaderRHI, boundShaderStateInput.mGeometryShaderRHI, boundShaderStateInput.mPixelShaderRHI));
-		}
-
+		
 		void applyCachedRenderTargets(GraphicsPipelineStateInitializer & GraphicsPSOInit)
 		{
-			GraphicsPSOInit.mRenderTargetsEnabled = mCachedNumSimultanousRenderTargets;
-			for (uint32 i = 0; i < GraphicsPSOInit.mRenderTargetsEnabled; ++i)
+			GraphicsPSOInit.mRenderTargetsEnabled = mPSOContext.mCachedNumSimultanousRenderTargets;
+			for (int32 i = 0; i < GraphicsPSOInit.mRenderTargetsEnabled; ++i)
 			{
-				if (mCachedRenderTargets[i].mTexture)
+				if (mPSOContext.mCachedRenderTargets[i].mTexture)
 				{
-					GraphicsPSOInit.mRenderTargetFormats[i] = mCachedRenderTargets[i].mTexture->getFormat();
-					GraphicsPSOInit.mRenderTargetFlags[i] = mCachedRenderTargets[i].mTexture->getFlags();
+					GraphicsPSOInit.mRenderTargetFormats[i] = mPSOContext.mCachedRenderTargets[i].mTexture->getFormat();
+					GraphicsPSOInit.mRenderTargetFlags[i] = mPSOContext.mCachedRenderTargets[i].mTexture->getFlags();
+					const RHITexture2DArray* textureArray = mPSOContext.mCachedRenderTargets[i].mTexture->getTextureArray();
+					GraphicsPSOInit.bMultiView = textureArray && textureArray->getDepth() > 1;
 				}
 				else
 				{
 					GraphicsPSOInit.mRenderTargetFormats[i] = PF_Unknown;
 				}
-				GraphicsPSOInit.mRenderTargetLoadActions[i] = mCachedRenderTargets[i].mLoadAction;
-				GraphicsPSOInit.mRenderTargetStoreActions[i] = mCachedRenderTargets[i].mStoreAction;
-				if (GraphicsPSOInit.mRenderTargetFormats[i] != PF_Unknown)
+				if (GraphicsPSOInit.mRenderTargetFlags[i] != PF_Unknown)
 				{
-					GraphicsPSOInit.mNumSamples = mCachedRenderTargets[i].mTexture->getNumSamples();
+					GraphicsPSOInit.mNumSamples = mPSOContext.mCachedRenderTargets[i].mTexture->getNumSamples();
 				}
 			}
-			if (mCachedDepthStencilTarget.mTexture)
+
+			if (mPSOContext.mCachedDepthStencilTarget.mTexture)
 			{
-				GraphicsPSOInit.mDepthStencilTargetFormat = mCachedDepthStencilTarget.mTexture->getFormat();
-				GraphicsPSOInit.mDepthStencilTargetFlags = mCachedDepthStencilTarget.mTexture->getFlags();
+				GraphicsPSOInit.mDepthStencilTargetFormat = mPSOContext.mCachedDepthStencilTarget.mTexture->getFormat();
+				GraphicsPSOInit.mDepthStencilTargetFlags = mPSOContext.mCachedDepthStencilTarget.mTexture->getFlags();
+				const RHITexture2DArray* textureArray = mPSOContext.mCachedDepthStencilTarget.mTexture->getTextureArray();
+				GraphicsPSOInit.bMultiView = textureArray && textureArray->getDepth() > 1;
 			}
 			else
 			{
 				GraphicsPSOInit.mDepthStencilTargetFormat = PF_Unknown;
 			}
-			GraphicsPSOInit.mDepthStencilTargetLoadAction = mCachedDepthStencilTarget.mDepthLoadAction;
-			GraphicsPSOInit.mDepthStencilTargetStoreAction = mCachedDepthStencilTarget.mDepthStoreAction;
+
+			GraphicsPSOInit.mDepthTargetLoadAction = mPSOContext.mCachedDepthStencilTarget.mDepthLoadAction;
+			GraphicsPSOInit.mDepthTargetStoreAction = mPSOContext.mCachedDepthStencilTarget.mDepthStoreAction;
+			GraphicsPSOInit.mStencilTargetLoadAction = mPSOContext.mCachedDepthStencilTarget.mStencialLoadAction;
+			GraphicsPSOInit.mStencilTargetStoreAction = mPSOContext.mCachedDepthStencilTarget.mStencialStoreAction;
+			GraphicsPSOInit.mDepthStencilAccess = mPSOContext.mCachedDepthStencilTarget.getDepthStencilAccess();
 
 			if (GraphicsPSOInit.mDepthStencilTargetFormat != PF_Unknown)
 			{
-				GraphicsPSOInit.mNumSamples = mCachedDepthStencilTarget.mTexture->getNumSamples();
+				GraphicsPSOInit.mNumSamples = mPSOContext.mCachedDepthStencilTarget.mTexture->getNumSamples();
 			}
+
+			GraphicsPSOInit.mSubpassHint = mPSOContext.mSubpassHint;
+			GraphicsPSOInit.mSubpassIndex = mPSOContext.mSubpassIndex;
+
 		}
 
-		template<typename TShaderRHIParamRef>
-		FORCEINLINE_DEBUGGABLE void setLocalShaderConstantBuffer(TShaderRHIParamRef shader, uint32 baseIndex, const LocalConstantBuffer& constantBuffer)
+		template<typename TRHIShader>
+		FORCEINLINE_DEBUGGABLE void setLocalShaderConstantBuffer(TRHIShader* shader, uint32 baseIndex, const LocalConstantBuffer& constantBuffer)
 		{
 			if (bypass())
 			{
 				CMD_CONTEXT(RHISetShaderConstantBuffer)(shader, baseIndex, constantBuffer.mBypassConstant);
 				return;
 			}
-			new (allocCommand<RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>>())RHICommandSetLocalConstantBuffer<TShaderRHIParamRef>(this, shader, baseIndex, constantBuffer);
+			new (allocCommand<RHICommandSetLocalConstantBuffer<TRHIShader>>())RHICommandSetLocalConstantBuffer<TRHIShader>(this, shader, baseIndex, constantBuffer);
 		}
 
 		template<typename TShaderRHI>
@@ -1284,17 +1366,17 @@ namespace Air
 		}
 
 		template<typename TShaderRHI>
-		FORCEINLINE_DEBUGGABLE void setShaderConstantBuffer(TShaderRHI* shader, uint32 baseIndex, ConstantBufferRHIParamRef constantBuffer)
+		FORCEINLINE_DEBUGGABLE void setShaderConstantBuffer(TShaderRHI* shader, uint32 baseIndex, RHIConstantBuffer* constantBuffer)
 		{
 			if (bypass())
 			{
 				CMD_CONTEXT(RHISetShaderConstantBuffer)(shader, baseIndex, constantBuffer);
 				return;
 			}
-			new (allocCommand<RHICommandSetShaderConstantBuffer<TShaderRHI*, ECmdList::EGfx>>())RHICommandSetShaderConstantBuffer<TShaderRHI*, ECmdList::EGfx>(shader, baseIndex, constantBuffer);
+			new (allocCommand<RHICommandSetShaderConstantBuffer<TShaderRHI, ECmdList::EGfx>>())RHICommandSetShaderConstantBuffer<TShaderRHI, ECmdList::EGfx>(shader, baseIndex, constantBuffer);
 		}
 		template<typename TShaderRHI>
-		FORCEINLINE void setShaderConstantBuffer(TRefCountPtr<TShaderRHI>& shader, uint32 baseIndex, ConstantBufferRHIParamRef constantBuffer)
+		FORCEINLINE void setShaderConstantBuffer(TRefCountPtr<TShaderRHI>& shader, uint32 baseIndex, RHIConstantBuffer* constantBuffer)
 		{
 			setShaderConstantBuffer(shader.getReference(), baseIndex, constantBuffer);
 		}
@@ -1304,12 +1386,12 @@ namespace Air
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHISetShaderParameter)(shader, BufferIndex, baseIndex, numBytes, newValue);
+				getContext().RHISetShaderParameter(shader, BufferIndex, baseIndex, numBytes, newValue);
 				return;
 			}
 			void * useValue = alloc(numBytes, 16);
 			Memory::memcpy(useValue, newValue, numBytes);
-			new (allocCommand<RHICommandSetShaderParameter<TShaderRHI*, ECmdList::EGfx>>())RHICommandSetShaderParameter<TShaderRHI*, ECmdList::EGfx>(shader, BufferIndex, baseIndex, numBytes, useValue);
+			new (allocCommand<RHICommandSetShaderParameter<TShaderRHI, ECmdList::EGfx>>())RHICommandSetShaderParameter<TShaderRHI, ECmdList::EGfx>(shader, BufferIndex, baseIndex, numBytes, useValue);
 		}
 
 		template<typename TShaderRHI>
@@ -1319,35 +1401,26 @@ namespace Air
 		}
 
 
-		FORCEINLINE_DEBUGGABLE void setBoundShaderState(BoundShaderStateRHIParamRef boundShaderState)
-		{
-			BOOST_ASSERT(StrictGraphicsPipelineStateUse == 0);
-			if (bypass())
-			{
-				CMD_CONTEXT(RHISetBoundShaderState)(boundShaderState);
-				return;
-			}
-			new (allocCommand < RHICommandSetLocalBoundShaderState>())RHICommandSetBoundShaderState(boundShaderState);
-		}
+		
 
-		template<typename TShaderRHIParamRef>
-		FORCEINLINE_DEBUGGABLE void setShaderTexture(TShaderRHIParamRef shader, uint32 textureIndex, TextureRHIParamRef texture)
+		template<typename TRHIShader>
+		FORCEINLINE_DEBUGGABLE void setShaderTexture(TRHIShader* shader, uint32 textureIndex, RHITexture* texture)
 		{
 			if (bypass())
 			{
 				CMD_CONTEXT(RHISetShaderTexture)(shader, textureIndex, texture);
 				return;
 			}
-			new (allocCommand<RHICommandSetShaderTexture<TShaderRHIParamRef, ECmdList::EGfx>>())RHICommandSetShaderTexture<TShaderRHIParamRef, ECmdList::EGfx>(shader, textureIndex, texture);
+			new (allocCommand<RHICommandSetShaderTexture<TRHIShader, ECmdList::EGfx>>())RHICommandSetShaderTexture<TRHIShader, ECmdList::EGfx>(shader, textureIndex, texture);
 		}
 		template<typename TShaderRHI>
-		FORCEINLINE_DEBUGGABLE void setShaderTexture(TRefCountPtr<TShaderRHI>& shader, uint32 textureIndex, TextureRHIParamRef texture)
+		FORCEINLINE_DEBUGGABLE void setShaderTexture(TRefCountPtr<TShaderRHI>& shader, uint32 textureIndex, RHITexture* texture)
 		{
 			setShaderTexture(shader.getReference(), textureIndex, texture);
 		}
 
-		template<typename TShaderRHIParamRef>
-		FORCEINLINE_DEBUGGABLE void setShaderSampler(TShaderRHIParamRef shader, uint32 samplerIndex, SamplerStateRHIParamRef state)
+		template<typename TRHIShader>
+		FORCEINLINE_DEBUGGABLE void setShaderSampler(TRHIShader* shader, uint32 samplerIndex, RHISamplerState* state)
 		{
 			if (bypass())
 			{
@@ -1355,35 +1428,47 @@ namespace Air
 				return;
 			}
 
-			new (allocCommand<RHICommandSetShaderSampler<TShaderRHIParamRef, ECmdList::EGfx>>())RHICommandSetShaderSampler<TShaderRHIParamRef, ECmdList::EGfx>(shader, samplerIndex, state);
+			ALLOC_COMMAND(RHICommandSetShaderSampler<TRHIShader, ECmdList::EGfx>)(shader, samplerIndex, state);
 		}
 
 		template<typename TShaderRHI>
-		FORCEINLINE_DEBUGGABLE void setShaderSampler(TRefCountPtr<TShaderRHI> shader, uint32 samplerIndex, SamplerStateRHIParamRef state)
+		FORCEINLINE_DEBUGGABLE void setShaderSampler(TRefCountPtr<TShaderRHI> shader, uint32 samplerIndex, RHISamplerState* state)
 		{
 			setShaderSampler(shader.getReference(), samplerIndex, state);
 		}
 
-		FORCEINLINE_DEBUGGABLE void copyToResolveTarget(TextureRHIParamRef sourteTExtureRHI, TextureRHIParamRef destTextureRHI, bool bKeepOriginalSurface, const ResolveParams& resolveParams)
+		FORCEINLINE_DEBUGGABLE void setUAVParameter(RHIComputeShader* shader, uint32 uavIndex, RHIUnorderedAccessView* view)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHICopyToResolveTarget)(sourteTExtureRHI, destTextureRHI, bKeepOriginalSurface, resolveParams);
+				getComputeContext().RHISetUAVParameter(shader, uavIndex, view);
 				return;
 			}
-
-			new (allocCommand<RHICommandCopyToResolveTarget>())RHICommandCopyToResolveTarget(sourteTExtureRHI, destTextureRHI, bKeepOriginalSurface, resolveParams);
+			ALLOC_COMMAND(RHICommandSetUAVParameter<RHIComputeShader, ECmdList::ECompute>)(shader, uavIndex, view);
 		}
 
-		FORCEINLINE_DEBUGGABLE void clearDepthStencilTexture(TextureRHIParamRef texture, EClearDepthStencil clearDepthStencil, float depth, uint32 stencil, IntRect excludeRect)
+		FORCEINLINE_DEBUGGABLE void setUAVParameter(RHIComputeShader* shader, uint32 uavIndex, RHIUnorderedAccessView* view, uint32 initialCount)
 		{
 			if (bypass())
 			{
-				CMD_CONTEXT(RHIClearDepthStencilTexture)(texture, clearDepthStencil, depth, stencil, excludeRect);
+				getComputeContext().RHISetUAVParameter(shader, uavIndex, view, initialCount);
 				return;
 			}
-			new(allocCommand<RHICommandClearDepthStencilTexture>())RHICommandClearDepthStencilTexture(texture, clearDepthStencil, depth, stencil, excludeRect);
+			ALLOC_COMMAND(RHICommandSetUAVParameter_InitialCount<RHIComputeShader, ECmdList::ECompute>)(shader, uavIndex, view, initialCount);
 		}
+
+		FORCEINLINE_DEBUGGABLE void copyToResolveTarget(RHITexture* sourteTExtureRHI, RHITexture* destTextureRHI, const ResolveParams& resolveParams)
+		{
+			if (bypass())
+			{
+				CMD_CONTEXT(RHICopyToResolveTarget)(sourteTExtureRHI, destTextureRHI, resolveParams);
+				return;
+			}
+
+			new (allocCommand<RHICommandCopyToResolveTarget>())RHICommandCopyToResolveTarget(sourteTExtureRHI, destTextureRHI, resolveParams);
+		}
+
+		
 
 		FORCEINLINE_DEBUGGABLE void setScissorRect(bool bEnable, uint32 minX, uint32 minY, uint32 maxX, uint32 maxY)
 		{
@@ -1395,17 +1480,176 @@ namespace Air
 			new (allocCommand<RHICommandSetScissorRect>())RHICommandSetScissorRect(bEnable, minX, minY, maxX, maxY);
 		}
 
+		FORCEINLINE_DEBUGGABLE void setComputeShader(RHIComputeShader* computeShader)
+		{
+			computeShader->updateStats();
+			if (bypass())
+			{
+				getContext().RHISetComputeShader(computeShader);
+				return;
+			}
+			ALLOC_COMMAND(RHICommandSetComputeShader<ECmdList::EGfx>)(computeShader);
+		}
+
+		FORCEINLINE_DEBUGGABLE void dispatchComputeShader(uint32 threadGroupCountX, uint32 threadGroupCountY, uint32 threadGroupCountZ)
+		{
+			if (bypass())
+			{
+				getContext().RHIDispatchComputeShader(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+			}
+			ALLOC_COMMAND(RHICommandDispatchComputeShader<ECmdList::EGfx>)(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+		}
+
+		template<typename TRHIShader>
+		FORCEINLINE_DEBUGGABLE void setShaderResourceViewParameter(TRHIShader* shader, uint32 samplerIndex, RHIShaderResourceView* srv)
+		{
+			if (bypass())
+			{
+				getContext().RHISetShaderResourceViewParameter(shader, samplerIndex, srv);
+				return;
+			}
+			ALLOC_COMMAND(RHICommandSetShaderResourceViewParameter<TRHIShader, ECmdList::EGfx>)(shader, samplerIndex, srv);
+		}
+
+		template<typename TShaderRHI>
+		FORCEINLINE_DEBUGGABLE void setShaderResourceViewParameter(TRefCountPtr<TShaderRHI>& shader, uint32 samplerIndex, RHIShaderResourceView* srv)
+		{
+			setShaderResourceViewParameter(shader.getReference(), samplerIndex, srv)
+		}
 		void beginFrame();
 		void endFrame();
 		void beginScene();
 		void endScene();
 	};
 
-	
+	class RHI_API RHIAsyncComputeCommandList : public RHICommandListBase
+	{
+	public:
+		FORCEINLINE_DEBUGGABLE void setShaderSampler(RHIComputeShader* shader, uint32 samplerIndex, RHISamplerState* state)
+		{
+			if (bypass())
+			{
+				COMPUTE_CONTEXT(RHISetShaderSampler)(shader, samplerIndex, state);
+				return;
+			}
+			new(allocCommand<RHICommandSetShaderSampler<RHIComputeShader, ECmdList::ECompute>>())RHICommandSetShaderSampler<RHIComputeShader, ECmdList::ECompute>(shader, samplerIndex, state);
+		}
+
+		FORCEINLINE_DEBUGGABLE void setShaderParameter(RHIComputeShader* shader, uint32 BufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+		{
+			if (bypass())
+			{
+				COMPUTE_CONTEXT(RHISetShaderParameter)(shader, BufferIndex, baseIndex, numBytes, newValue);
+				return;
+			}
+			void* useValue = alloc(numBytes, 16);
+			Memory::memcpy(useValue, newValue, numBytes);
+			new (allocCommand<RHICommandSetShaderSampler<RHIComputeShader, ECmdList::ECompute>>())RHICommandSetShaderParameter<RHIComputeShader, ECmdList::ECompute>(shader, BufferIndex, baseIndex, numBytes, useValue);
+		}
+
+		FORCEINLINE_DEBUGGABLE void setShaderTexture(RHIComputeShader* shader, uint32 textureIndex, RHITexture* tex)
+		{
+			if (bypass())
+			{
+				COMPUTE_CONTEXT(RHISetShaderTexture)(shader, textureIndex, tex);
+				return;
+			}
+			new (allocCommand<RHICommandSetShaderTexture<RHIComputeShader, ECmdList::ECompute>>())RHICommandSetShaderTexture<RHIComputeShader, ECmdList::ECompute>(shader, textureIndex, tex);
+		}
+
+		FORCEINLINE_DEBUGGABLE void setShaderResourceViewParameter(RHIComputeShader* shader, uint32 samplerIndex, RHIShaderResourceView* srv)
+		{
+			if (bypass())
+			{
+				getComputeContext().RHISetShaderResourceViewParameter(shader, samplerIndex, srv);
+				return;
+			}
+			ALLOC_COMMAND(RHICommandSetShaderResourceViewParameter<RHIComputeShader, ECmdList::ECompute>)(shader, samplerIndex, srv);
+
+		}
+
+		FORCEINLINE_DEBUGGABLE void waitComputeFence(RHIComputeFence* waitFence)
+		{
+			if (bypass())
+			{
+				getComputeContext().RHIWaitComputeFence(waitFence);
+				return;
+			}
+
+			ALLOC_COMMAND(RHICommandWaitComputeFence<ECmdList::ECompute>)(waitFence);
+		}
+
+		FORCEINLINE_DEBUGGABLE void setComputeShader(RHIComputeShader* computeShader)
+		{
+			computeShader->updateStats();
+			if (bypass())
+			{
+				getComputeContext().RHISetComputeShader(computeShader);
+				return;
+			}
+			ALLOC_COMMAND(RHICommandSetComputeShader<ECmdList::ECompute>)(computeShader);
+		}
+
+		FORCEINLINE_DEBUGGABLE void dispatchComputeShader(uint32 threadGroupCountX, uint32 threadGroupCountY, uint32 threadGroupCountZ)
+		{
+			if (bypass())
+			{
+				getComputeContext().RHIDispatchComputeShader(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+			}
+			ALLOC_COMMAND(RHICommandDispatchComputeShader<ECmdList::ECompute>)(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAVs, int32 numUAVs, RHIComputeFence* writeFence)
+		{
+			if (bypass())
+			{
+				getComputeContext().RHITransitionResources(transitionType, transitionPipeline, inUAVs, numUAVs, writeFence);
+				return;
+			}
+
+			RHIUnorderedAccessView** uavArray = (RHIUnorderedAccessView**)alloc(sizeof(RHIUnorderedAccessView*) * numUAVs, alignof(RHIUnorderedAccessView*));
+			for (int32 index = 0; index < numUAVs; ++index)
+			{
+				uavArray[index] = inUAVs[index];
+			}
+
+			ALLOC_COMMAND(RHICommandTransitionUAVs<ECmdList::ECompute>)(transitionType, transitionPipeline, uavArray, numUAVs, writeFence);
+		}
+
+		FORCEINLINE_DEBUGGABLE void submitCommandsHint()
+		{
+			if (bypass())
+			{
+				getComputeContext().RHISubmitCommandsHint();
+				return;
+			}
+
+			ALLOC_COMMAND(RHICommandSubmitCommandsHint<ECmdList::ECompute>)();
+		}
+	};
 
 	class RHI_API RHICommandListImmediate : public RHICommandList
 	{
 	public:
+		template<typename LAMBDA>
+		struct TRHILambdaCommand final : public RHICommandBase
+		{
+			LAMBDA mLambda;
+
+			TRHILambdaCommand(LAMBDA&& inLambda)
+				:mLambda(inLambda)
+			{}
+
+			void executeAndDestruct(RHICommandListBase& cmdList, RHICommandListDebugContext&) override final
+			{
+				mLambda(*static_cast<RHICommandListImmediate*>(&cmdList));
+				mLambda.~LAMBDA();
+			}
+		};
+
+		void queueAsyncCompute(RHIAsyncComputeCommandList& RHIComputeList);
+
+
 		void immediateFlush(EImmediateFlushType::Type flushType);
 
 		FORCEINLINE void flushResource()
@@ -1440,20 +1684,53 @@ namespace Air
 			return GDynamicRHI->RHICreateTextureCube_RenderThread(*this, size, format, numMips, flags, createInfo);
 		}
 
-		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint8 mipLevel)
+		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(RHITexture* texture, const RHITextureSRVCreateInfo& createInfo)
 		{
-			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, texture2DRHI, mipLevel);
+			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, texture, createInfo);
 		}
 
-		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint8 mipLevel, uint8 numMipLevel, uint8 format)
+		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(RHITexture* texture, uint8 mipLevel)
 		{
-			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, texture2DRHI, mipLevel, numMipLevel, format);
+			const RHITextureSRVCreateInfo createInfo(mipLevel, 1, texture->getFormat());
+			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, texture, createInfo);
 		}
 
-		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint8 format)
+		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(RHIStructuredBuffer* structuredBuffer)
+		{
+			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, structuredBuffer);
+		}
+
+		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(RHITexture* texture, uint8 mipLevel, uint8 numMipLevels, uint8 format)
+		{
+			const RHITextureSRVCreateInfo createInfo(mipLevel, numMipLevels, format);
+			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, texture, createInfo);
+		}
+
+		FORCEINLINE ShaderResourceViewRHIRef createShaderResourceView(RHIVertexBuffer* vertexBuffer, uint32 stride, uint8 format)
 		{
 			return GDynamicRHI->RHICreateShaderResourceView_RenderThread(*this, vertexBuffer, stride, format);
 		}
+
+		FORCEINLINE UnorderedAccessViewRHIRef createUnorderedAccessView(RHIStructuredBuffer* structuredBuffer, bool bUseUAVCounter, bool bAppendBuffer)
+		{
+			return GDynamicRHI->RHICreateUnorderredAccessView_RenderThread(*this, structuredBuffer, bUseUAVCounter, bAppendBuffer);
+		}
+
+		FORCEINLINE UnorderedAccessViewRHIRef createUnorderedAccessView(RHITexture* texture, uint32 mipLevel)
+		{
+			return GDynamicRHI->RHICreateUnorderredAccessView_RenderThread(*this, texture, mipLevel);
+		}
+
+		FORCEINLINE UnorderedAccessViewRHIRef createUnorderedAccessView(RHIVertexBuffer* vertexBuffer, uint8 format)
+		{
+			return GDynamicRHI->RHICreateUnorderredAccessView_RenderThread(*this, vertexBuffer, format);
+		}
+
+		FORCEINLINE UnorderedAccessViewRHIRef createUnorderedAccessView(RHIIndexBuffer* indexBuffer, uint8 format)
+		{
+			return GDynamicRHI->RHICreateUnorderredAccessView_RenderThread(*this, indexBuffer, format);
+		}
+
 
 		
 		FORCEINLINE VertexShaderRHIRef RHICreateVertexShader(const TArray<uint8>& code)
@@ -1486,17 +1763,22 @@ namespace Air
 			return GDynamicRHI->RHICreateComputeShader(code);
 		}
 
+		FORCEINLINE ComputeFenceRHIRef createComputeFence(const wstring& name)
+		{
+			return GDynamicRHI->RHICreateComputeFence(name);
+		}
+
 		FORCEINLINE GeometryShaderRHIRef RHICreateGeometryShaderWithStreamOutput(const TArray<uint8>& code, const StreamOutElementList& elementList, uint32 numStrides, const uint32* strides, int32 rasterizedStream)
 		{
 			return GDynamicRHI->RHICreateGeometryShaderWithStreamOutput(code, elementList, numStrides, strides, rasterizedStream);
 		}
 
-		FORCEINLINE void* lockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, EResourceLockMode lockMode, uint32 & destStride, bool bLockWithinMiptail, bool bFlushRHIThread = true)
+		FORCEINLINE void* lockTexture2D(RHITexture2D* texture, uint32 mipIndex, EResourceLockMode lockMode, uint32 & destStride, bool bLockWithinMiptail, bool bFlushRHIThread = true)
 		{
 			return GDynamicRHI->lockTexture2D_RenderThread(*this, texture, mipIndex, lockMode, destStride, bLockWithinMiptail, bFlushRHIThread);
 		}
 
-		FORCEINLINE void unLockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, bool bLockWithinMiptail, bool bFlushRHIThread = false)
+		FORCEINLINE void unLockTexture2D(RHITexture2D* texture, uint32 mipIndex, bool bLockWithinMiptail, bool bFlushRHIThread = false)
 		{
 			GDynamicRHI->unlockTexture2D_RenderThread(*this, texture, mipIndex, bLockWithinMiptail, bFlushRHIThread);
 		}
@@ -1516,7 +1798,12 @@ namespace Air
 			return GDynamicRHI->createIndexBuffer_RenderThread(*this, stride, size, inUsage, createInfo);
 		}
 
-		FORCEINLINE void unlockVertexBuffer(VertexBufferRHIParamRef vertexBuffer)
+		FORCEINLINE void* lockVertexBuffer(RHIVertexBuffer* vertexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
+		{
+			return GDynamicRHI->lockVertexBuffer_RenderThread(*this, vertexBuffer, offset, sizeRHI, lockMode);
+		}
+
+		FORCEINLINE void unlockVertexBuffer(RHIVertexBuffer* vertexBuffer)
 		{
 			GDynamicRHI->unlockVertexBuffer_RenderThread(*this, vertexBuffer);
 		}
@@ -1526,12 +1813,12 @@ namespace Air
 			return GDynamicRHI->createAndLockIndexBuffer_RenderThread(*this, stride, size, inUsage, createInfo, outDataBuffer);
 		}
 
-		FORCEINLINE void* lockIndexBuffer(IndexBufferRHIParamRef indexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
+		FORCEINLINE void* lockIndexBuffer(RHIIndexBuffer* indexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
 		{
 			return GDynamicRHI->lockIndexBuffer_RenderThread(*this, indexBuffer, offset, sizeRHI, lockMode);
 		}
 
-		FORCEINLINE void unlockIndexBuffer(IndexBufferRHIParamRef indexBuffer)
+		FORCEINLINE void unlockIndexBuffer(RHIIndexBuffer* indexBuffer)
 		{
 			GDynamicRHI->unlockIndexBuffer_RenderThread(*this, indexBuffer);
 		}
@@ -1541,13 +1828,13 @@ namespace Air
 			return GDynamicRHI->createVertexDeclaration_RenderThread(*this, elements);
 		}
 
-		FORCEINLINE void* lockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
+		FORCEINLINE void* lockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
 		{
 			immediateFlush(EImmediateFlushType::FlushRHIThread);
 			return GDynamicRHI->RHILockTextureCubeFace(texture, faceIndex, arrayIndex, mipIndex, lockMode, destStride, bLockWithinMiptail);
 		}
 
-		FORCEINLINE void unlockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail)
+		FORCEINLINE void unlockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail)
 		{
 			immediateFlush(EImmediateFlushType::FlushRHIThread);
 			GDynamicRHI->RHIUnlockTextureCubeFace(texture, faceIndex, arrayIndex, mipIndex, bLockWithinMiptail);
@@ -1558,53 +1845,120 @@ namespace Air
 			return GDynamicRHI->RHICreateTextureReference(lastRenderTime);
 		}
 
-		FORCEINLINE void readSurfaceFloatData(TextureRHIParamRef texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex)
+		FORCEINLINE StructuredBufferRHIRef createStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
+		{
+			return GDynamicRHI->RHICreateStructuredBuffer_RenderThread(*this, stride, size, inUsage, createInfo);
+		}
+
+		FORCEINLINE void discardTransientResource_RenderThread(RHIStructuredBuffer* buffer)
+		{
+			if (buffer->isCommitted())
+			{
+				if (GSupportsTransientResourceAliasing)
+				{
+					GDynamicRHI->RHIDiscardTransientResource_RenderThread(buffer);
+				}
+				buffer->setCommitted(false);
+			}
+		}
+
+		FORCEINLINE void acquireTransientResource_RenderThread(RHIStructuredBuffer* buffer)
+		{
+			if (!buffer->isCommitted())
+			{
+				if (GSupportsTransientResourceAliasing)
+				{
+					GDynamicRHI->RHIAcquireTransientResource_RenderThread(buffer);
+				}
+				buffer->setCommitted(true);
+			}
+		}
+
+		FORCEINLINE void discardTransientResource_RenderThread(RHIVertexBuffer* buffer)
+		{
+			if (buffer->isCommitted())
+			{
+				if (GSupportsTransientResourceAliasing)
+				{
+					GDynamicRHI->RHIDiscardTransientResource_RenderThread(buffer);
+				}
+				buffer->setCommitted(false);
+			}
+		}
+
+		FORCEINLINE void acquireTransientResource_RenderThread(RHIVertexBuffer* buffer)
+		{
+			if (!buffer->isCommitted())
+			{
+				if (GSupportsTransientResourceAliasing)
+				{
+					GDynamicRHI->RHIAcquireTransientResource_RenderThread(buffer);
+				}
+				buffer->setCommitted(true);
+			}
+		}
+
+
+		FORCEINLINE void discardTransientResource_RenderThread(RHITexture* texture)
+		{
+			if (texture->isCommitted())
+			{
+				if (GSupportsTransientResourceAliasing)
+				{
+					GDynamicRHI->RHIDiscardTransientResource_RenderThread(texture);
+				}
+				texture->setCommitted(false);
+			}
+		}
+
+		FORCEINLINE void acquireTransientResource_RenderThread(RHITexture* texture)
+		{
+			if (!texture->isCommitted())
+			{
+				if (GSupportsTransientResourceAliasing)
+				{
+					GDynamicRHI->RHIAcquireTransientResource_RenderThread(texture);
+				}
+				texture->setCommitted(true);
+			}
+		}
+
+		FORCEINLINE void readSurfaceFloatData(RHITexture* texture, IntRect rect, TArray<Float16Color>& outData, ECubeFace cubeface, int32 arrayIndex, int32 mipIndex)
 		{
 			immediateFlush(EImmediateFlushType::FlushRHIThread);
 			GDynamicRHI->RHIReadSurfaceFloatData(texture, rect, outData, cubeface, arrayIndex, mipIndex);
 		}
 
-		void updateTextureReference(TextureReferenceRHIParamRef textureRef, TextureRHIParamRef newTexture);
-	};
+		void updateTextureReference(RHITextureReference* textureRef, RHITexture* newTexture);
 
-	class RHI_API RHIAsyncComputeCommandList : public RHICommandListBase
-	{
-	public:
-		FORCEINLINE_DEBUGGABLE void setShaderSampler(ComputeShaderRHIParamRef shader, uint32 samplerIndex, SamplerStateRHIParamRef state)
+		template<typename LAMBDA>
+		FORCEINLINE_DEBUGGABLE bool enqueueLambda(bool bRunOnCurrentThread, LAMBDA&& lambda)
 		{
-			if (bypass())
+			if (bRunOnCurrentThread)
 			{
-				COMPUTE_CONTEXT(RHISetShaderSampler)(shader, samplerIndex, state);
-				return;
+				lambda(*this);
+				return false;
 			}
-			new(allocCommand<RHICommandSetShaderSampler<ComputeShaderRHIParamRef, ECmdList::ECompute>>())RHICommandSetShaderSampler<ComputeShaderRHIParamRef, ECmdList::ECompute>(shader, samplerIndex, state);
+			else
+			{
+				ALLOC_COMMAND(TRHILambdaCommand<LAMBDA>)(std::forward<LAMBDA>(lambda));
+				return true;
+			}
 		}
 
-		FORCEINLINE_DEBUGGABLE void setShaderParameter(ComputeShaderRHIParamRef shader, uint32 BufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+		template<typename LAMBDA>
+		FORCEINLINE_DEBUGGABLE bool enqueueLambda(LAMBDA&& lambda)
 		{
-			if (bypass())
-			{
-				COMPUTE_CONTEXT(RHISetShaderParameter)(shader, BufferIndex, baseIndex, numBytes, newValue);
-				return;
-			}
-			void * useValue = alloc(numBytes, 16);
-			Memory::memcpy(useValue, newValue, numBytes);
-			new (allocCommand<RHICommandSetShaderSampler<ComputeShaderRHIParamRef, ECmdList::ECompute>>())RHICommandSetShaderParameter<ComputeShaderRHIParamRef, ECmdList::ECompute>(shader, BufferIndex, baseIndex, numBytes, useValue);
-		}
-
-		FORCEINLINE_DEBUGGABLE void setShaderTexture(ComputeShaderRHIParamRef shader, uint32 textureIndex, TextureRHIParamRef tex)
-		{
-			if (bypass())
-			{
-				COMPUTE_CONTEXT(RHISetShaderTexture)(shader, textureIndex, tex);
-				return;
-			}
-			new (allocCommand<RHICommandSetShaderTexture<ComputeShaderRHIParamRef, ECmdList::ECompute>>())RHICommandSetShaderTexture<ComputeShaderRHIParamRef, ECmdList::ECompute>(shader, textureIndex, tex);
+			return enqueueLambda(bypass(), std::forward<LAMBDA>(lambda));
 		}
 	};
+
+	
 
 	class RHI_API RHIAsyncComputeCommandListImmediate : public RHIAsyncComputeCommandList
 	{
+	public:
+		static void immediateDispatch(RHIAsyncComputeCommandListImmediate& RHIComputeCmdList);
 
 	};
 
@@ -1649,6 +2003,13 @@ namespace Air
 #endif
 		}
 
+		FORCEINLINE_DEBUGGABLE bool useParallelAlgorithms()
+		{
+#if 1
+			return bLatchedUseParallelAlgorithms;
+#endif
+		}
+
 		static void waitOnRHIThreadFence(GraphEventRef& fence);
 
 		static void checkNoOutstandingCmdLists();
@@ -1659,6 +2020,7 @@ namespace Air
 		friend class RHICommandListBase;
 		friend class ExecuteRHIThreadTask;
 		bool bLatchedBypass;
+		bool bLatchedUseParallelAlgorithms;
 		ThreadSafeCounter mUIDCounter;
 		ThreadSafeCounter mOutstandingCmdListCount;
 		RHICommandListImmediate mCommandListImmediate;
@@ -1676,12 +2038,22 @@ namespace Air
 	};
 
 	
+	extern RHI_API AutoConsoleTaskPriority CPrio_SceneRenderingTask;
 	
-
+	class RenderTask
+	{
+	public:
+		FORCEINLINE static ENamedThreads::Type getDesiredThread()
+		{
+			return CPrio_SceneRenderingTask.get();
+		}
+	};
 
 	
 
 	extern RHI_API RHICommandListExecutor GRHICommandList;
+
+	extern RHI_API bool GEnableAsyncCompute;
 
 	FORCEINLINE void RHIFlushResource()
 	{
@@ -1703,19 +2075,49 @@ namespace Air
 		return RHICommandListExecutor::getImmediateCommandList().createTexture2D(width, height, format, numMips, numSamplers, flags, createInfo);
 	}
 	
-	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint8 mipLevel)
-	{
-		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(texture2DRHI, mipLevel);
-	}
-
-	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(Texture2DRHIParamRef texture2DRHI, uint8 mipLevel, uint8 numMipLevel, uint8 format)
-	{
-		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(texture2DRHI, mipLevel, numMipLevel, format);
-	}
-
-	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(VertexBufferRHIParamRef vertexBuffer, uint32 stride, uint8 format)
+	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(RHIVertexBuffer* vertexBuffer, uint32 stride, uint8 format)
 	{
 		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(vertexBuffer, stride, format);
+	}
+
+	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(RHITexture* texture, uint8 mipLevel)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(texture, mipLevel);
+	}
+
+	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(RHITexture* texture, uint8 mipLevel, uint8 numMipLevels, uint8 format)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(texture, mipLevel, numMipLevels, format);
+	}
+
+	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(RHITexture* texture, const RHITextureSRVCreateInfo& createInfo)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(texture, createInfo);
+	}
+
+	FORCEINLINE ShaderResourceViewRHIRef RHICreateShaderResourceView(RHIStructuredBuffer* structuredBuffer)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createShaderResourceView(structuredBuffer);
+	}
+
+	FORCEINLINE UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIStructuredBuffer* structuredBuffer, bool bUseUAVCounter, bool bAppendBuffer)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createUnorderedAccessView(structuredBuffer, bUseUAVCounter, bAppendBuffer);
+	}
+
+	FORCEINLINE UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHITexture* texture, uint32 mipLevel)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createUnorderedAccessView(texture, mipLevel);
+	}
+
+	FORCEINLINE UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIVertexBuffer* vertexBuffer, uint8 format)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createUnorderedAccessView(vertexBuffer, format);
+	}
+
+	FORCEINLINE UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIIndexBuffer* indexBuffer, uint8 format)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createUnorderedAccessView(indexBuffer, format);
 	}
 
 	FORCEINLINE VertexShaderRHIRef RHICreateVertexShader(const TArray<uint8>& code)
@@ -1753,12 +2155,12 @@ namespace Air
 		return RHICommandListExecutor::getImmediateCommandList().RHICreateGeometryShaderWithStreamOutput(code, elementList, numStrides, strides, rasterizedStream);
 	}
 
-	FORCEINLINE void* RHILockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail, bool bFulshRHIThread = true)
+	FORCEINLINE void* RHILockTexture2D(RHITexture2D* texture, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail, bool bFulshRHIThread = true)
 	{
 		return RHICommandListExecutor::getImmediateCommandList().lockTexture2D(texture, mipIndex, lockMode, destStride, bLockWithinMiptail, bFulshRHIThread);
 	}
 
-	FORCEINLINE void RHIUnlockTexture2D(Texture2DRHIParamRef texture, uint32 mipIndex, bool bLockWithinMiptail, bool bFlushRHIThread = true)
+	FORCEINLINE void RHIUnlockTexture2D(RHITexture2D* texture, uint32 mipIndex, bool bLockWithinMiptail, bool bFlushRHIThread = true)
 	{
 		RHICommandListExecutor::getImmediateCommandList().unLockTexture2D(texture, mipIndex, bLockWithinMiptail, bFlushRHIThread);
 	}
@@ -1776,7 +2178,7 @@ namespace Air
 	{
 		return RHICommandListExecutor::getImmediateCommandList().createAndLockVertexBuffer(size, inUsage, createInfo, outDataBuffer);
 	}
-	FORCEINLINE void RHIUnlockVertexBuffer(VertexBufferRHIParamRef vertexBuffer)
+	FORCEINLINE void RHIUnlockVertexBuffer(RHIVertexBuffer* vertexBuffer)
 	{
 		RHICommandListExecutor::getImmediateCommandList().unlockVertexBuffer(vertexBuffer);
 	}
@@ -1786,7 +2188,7 @@ namespace Air
 		return RHICommandListExecutor::getImmediateCommandList().createAndLockIndexBuffer(stride, size, inUsage, createInfo, outDataBuffer);
 	}
 
-	FORCEINLINE void RHIUnlockIndexBuffer(IndexBufferRHIParamRef indexBuffer)
+	FORCEINLINE void RHIUnlockIndexBuffer(RHIIndexBuffer* indexBuffer)
 	{
 		RHICommandListExecutor::getImmediateCommandList().unlockIndexBuffer(indexBuffer);
 	}
@@ -1801,18 +2203,18 @@ namespace Air
 		return RHICommandListExecutor::getImmediateCommandList().createTextureCube(size, format, numMips, flags, createInfo);
 	}
 
-	FORCEINLINE void RHIUpdateTextureReference(TextureReferenceRHIParamRef textureRHI, TextureRHIParamRef newTexture)
+	FORCEINLINE void RHIUpdateTextureReference(RHITextureReference* textureRHI, RHITexture* newTexture)
 	{
 		RHICommandListExecutor::getImmediateCommandList().updateTextureReference(textureRHI, newTexture);
 	}
 
-	FORCEINLINE void* RHILockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
+	FORCEINLINE void* RHILockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, EResourceLockMode lockMode, uint32& destStride, bool bLockWithinMiptail)
 	{
 		return RHICommandListExecutor::getImmediateCommandList().lockTextureCubeFace(texture, faceIndex, arrayIndex, mipIndex, lockMode, destStride, bLockWithinMiptail);
 	}
 
 
-	FORCEINLINE void RHIUnlockTextureCubeFace(TextureCubeRHIParamRef texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail)
+	FORCEINLINE void RHIUnlockTextureCubeFace(RHITextureCube* texture, uint32 faceIndex, uint32 arrayIndex, uint32 mipIndex, bool bLockWithinMiptail)
 	{
 		RHICommandListExecutor::getImmediateCommandList().unlockTextureCubeFace(texture, faceIndex, arrayIndex, mipIndex, bLockWithinMiptail);
 	}
@@ -1821,6 +2223,53 @@ namespace Air
 	{
 		return RHICommandListExecutor::getImmediateCommandList().createTextureReference(lastRenderTime);
 	}
+
+	FORCEINLINE StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().createStructuredBuffer(stride, size, inUsage, createInfo);
+	}
+
+	FORCEINLINE void RHIAcquireTransientResource(RHIStructuredBuffer* resource)
+	{
+		RHICommandListExecutor::getImmediateCommandList().acquireTransientResource_RenderThread(resource);
+	}
+
+	FORCEINLINE void RHIDiscardTransientResource(RHIStructuredBuffer* resource)
+	{
+		RHICommandListExecutor::getImmediateCommandList().discardTransientResource_RenderThread(resource);
+	}
+
+	FORCEINLINE void RHIAcquireTransientResource(RHIVertexBuffer* resource)
+	{
+		RHICommandListExecutor::getImmediateCommandList().acquireTransientResource_RenderThread(resource);
+	}
+
+	FORCEINLINE void RHIDiscardTransientResource(RHIVertexBuffer* resource)
+	{
+		RHICommandListExecutor::getImmediateCommandList().discardTransientResource_RenderThread(resource);
+	}
+
+	FORCEINLINE void RHIAcquireTransientResource(RHITexture* resource)
+	{
+		RHICommandListExecutor::getImmediateCommandList().acquireTransientResource_RenderThread(resource);
+	}
+
+	FORCEINLINE void RHIDiscardTransientResource(RHITexture* resource)
+	{
+		RHICommandListExecutor::getImmediateCommandList().discardTransientResource_RenderThread(resource);
+	}
+
+	FORCEINLINE void* RHILockVertexBuffer(RHIVertexBuffer* vertexBuffer, uint32 offset, uint32 sizeRHI, EResourceLockMode lockMode)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().lockVertexBuffer(vertexBuffer, offset, sizeRHI, lockMode);
+	}
+
+	FORCEINLINE void* RHILockIndexBuffer(RHIIndexBuffer* indexBuffer, uint32 offset, uint32 size, EResourceLockMode lockMode)
+	{
+		return RHICommandListExecutor::getImmediateCommandList().lockIndexBuffer(indexBuffer, offset, size, lockMode);
+	}
+
+
 }
 
 

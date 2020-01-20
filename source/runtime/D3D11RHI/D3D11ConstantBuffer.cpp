@@ -3,6 +3,13 @@
 #include "D3D11Util.h"
 namespace Air
 {
+
+#if _DEBUG
+	constexpr EConstantBufferValidation ConstantBufferValidation = EConstantBufferValidation::ValidateResources;
+#else
+	constexpr EConstantBufferValidation ConstantBufferValidation = EConstantBufferValidation::None;
+#endif
+
 	const int32 NumPoolBuckets = 17;
 	const int32 NumSafeFrames = 3;
 	struct PooledConstantBuffer
@@ -21,7 +28,7 @@ namespace Air
 		return false;
 	}
 
-	ConstantBufferRHIRef D3D11DynamicRHI::RHICreateConstantBuffer(const void* contents, const RHIConstantBufferLayout& layout, EConstantBufferUsage usage)
+	ConstantBufferRHIRef D3D11DynamicRHI::RHICreateConstantBuffer(const void* contents, const RHIConstantBufferLayout& layout, EConstantBufferUsage usage, EConstantBufferValidation validation)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		D3D11ConstantBuffer* newConstantBuffer = nullptr;
@@ -57,15 +64,19 @@ namespace Air
 		{
 			newConstantBuffer = new D3D11ConstantBuffer(this, layout, nullptr, RingAllocation());
 		}
-		if (layout.mResource.size())
+		if (layout.mResources.size())
 		{
-			int32 numResource = layout.mResource.size();
-			RHIResource** inResources = (RHIResource**)((uint8*)contents + layout.mResourceOffset);
+			int32 numResource = layout.mResources.size();
 			newConstantBuffer->mResourceTable.empty(numResource);
 			newConstantBuffer->mResourceTable.addZeroed(numResource);
 			for (int i = 0; i < numResource; ++i)
 			{
-				newConstantBuffer->mResourceTable[i] = inResources[i];
+				RHIResource* resource = *(RHIResource * *)((uint8*)contents + layout.mResources[i].mMemberOffset);
+				if (!(GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1 && (layout.mResources[i].mMemberType == CBMT_SRV || layout.mResources[i].mMemberType == CBMT_RDG_TEXTURE_SRV || layout.mResources[i].mMemberType == CBMT_RDG_BUFFER_SRV)) && validation == EConstantBufferValidation::ValidateResources)
+				{
+					BOOST_ASSERT(resource);
+				}
+				newConstantBuffer->mResourceTable[i] = resource;
 			}
 		}
 		return newConstantBuffer;
@@ -101,5 +112,85 @@ namespace Air
 			mSafeConstantBufferPools[safeFrameIndex][bucketIndex].reset();
 		}
 	}
+	void updateConstantBufferContents(ID3D11Device* device, ID3D11DeviceContext* context, D3D11ConstantBuffer* constantBuffer, const void* contents, uint32 constantBufferSize)
+	{
+		if (constantBufferSize > 0)
+		{
+			BOOST_ASSERT(align(contents, 16) == contents);
+			D3D11_MAPPED_SUBRESOURCE mappedSubresource;
+			VERIFYD3D11RESULT_EX(context->Map(constantBuffer->mResource.getReference(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedSubresource), device);
+			BOOST_ASSERT(mappedSubresource.RowPitch >= constantBufferSize);
+			Memory::memcpy(mappedSubresource.pData, contents, constantBufferSize);
+			context->Unmap(constantBuffer->mResource.getReference(), 0);
+		}
+	}
 
+	void D3D11DynamicRHI::RHIUpdateConstantBuffer(RHIConstantBuffer* constantBufferRHI, const void* contents) 
+	{
+		BOOST_ASSERT(isInRenderingThread());
+		BOOST_ASSERT(constantBufferRHI);
+
+		D3D11ConstantBuffer* constantBuffer = ResourceCast(constantBufferRHI);
+		const RHIConstantBufferLayout& layout = constantBufferRHI->getLayout();
+
+		const uint32 constantBufferSize = layout.mConstantBufferSize;
+		const int32 numResources = layout.mResources.size();
+
+		BOOST_ASSERT(constantBuffer->mResourceTable.size() == numResources);
+
+		RHICommandListImmediate& RHICmdList = RHICommandListExecutor::getImmediateCommandList();
+
+		if (RHICmdList.bypass())
+		{
+			updateConstantBufferContents(mD3D11Device, mD3D11Context, constantBuffer, contents, constantBufferSize);
+
+			for (int32 resourceIndex = 0; resourceIndex < numResources; resourceIndex++)
+			{
+				RHIResource* resource = *(RHIResource * *)((uint8*)contents + layout.mResources[resourceIndex].mMemberOffset);
+
+				if (!(GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1 && (layout.mResources[resourceIndex].mMemberType == CBMT_SRV || layout.mResources[resourceIndex].mMemberType == CBMT_RDG_TEXTURE_SRV || layout.mResources[resourceIndex].mMemberType == CBMT_RDG_BUFFER_SRV)) && ConstantBufferValidation == EConstantBufferValidation::ValidateResources)
+				{
+					BOOST_ASSERT(resource);
+				}
+				constantBuffer->mResourceTable[resourceIndex] = resource;
+			}
+		}
+		else
+		{
+			RHIResource** cmdListResources = nullptr;
+			void* cmdListConstantBufferData = nullptr;
+
+			if (numResources > 0)
+			{
+				cmdListResources = (RHIResource * *)RHICmdList.alloc(sizeof(RHIResource*) * numResources, alignof(RHIResource*));
+
+				for (int32 resourceIndex = 0; resourceIndex < numResources; ++resourceIndex)
+				{
+					RHIResource* resource = *(RHIResource * *)((uint8*)contents + layout.mResources[resourceIndex].mMemberOffset);
+					if (!(GMaxRHIFeatureLevel <= ERHIFeatureLevel::ES3_1 && (layout.mResources[resourceIndex].mMemberType == CBMT_SRV || layout.mResources[resourceIndex].mMemberType == CBMT_RDG_TEXTURE_SRV || layout.mResources[resourceIndex].mMemberType == CBMT_RDG_BUFFER_SRV)) && ConstantBufferValidation == EConstantBufferValidation::ValidateResources)
+					{
+						BOOST_ASSERT(resource);
+					}
+					cmdListResources[resourceIndex] = resource;
+				}
+			}
+			if (constantBufferSize > 0)
+			{
+				cmdListConstantBufferData = (void*)RHICmdList.alloc(constantBufferSize, 16);
+
+				Memory::memcpy(cmdListConstantBufferData, contents, constantBufferSize);
+			}
+
+			RHICmdList.enqueueLambda([direct3DDeviceContext = mD3D11Context.getReference(),
+				direct3DDevice = mD3D11Device.getReference(),
+				constantBuffer, cmdListResources, numResources, cmdListConstantBufferData, constantBufferSize](RHICommandList&){
+				updateConstantBufferContents(direct3DDevice, direct3DDeviceContext, constantBuffer, cmdListConstantBufferData, constantBufferSize);
+				for (int32 resourceIndex = 0; resourceIndex < numResources; ++resourceIndex)
+				{
+					constantBuffer->mResourceTable[resourceIndex] = cmdListResources[resourceIndex];
+				}
+			});
+			RHICmdList.RHIThreadFence(true);
+		}
+	}
 }

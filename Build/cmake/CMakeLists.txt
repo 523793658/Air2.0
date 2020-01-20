@@ -30,5 +30,6 @@ add_compile_definitions(WITH_EDITOR)
 
 
 add_compile_definitions(BUILD_DEBUG=$<CONFIG:DEBUG>)
+add_compile_definitions(OVERRIDE_PLATFORM_HEADER_NAME=${CMAKE_HOST_SYSTEM_NAME})
 
 ADD_SUBDIRECTORY("Engine")

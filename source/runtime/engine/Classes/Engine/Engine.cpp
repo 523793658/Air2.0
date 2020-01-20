@@ -65,11 +65,11 @@ namespace Air
 			worldContext.getWorld()->bIsLevelStreamingFrozen = false;
 		}
 
-		ENQUEUE_UNIQUE_RENDER_COMMAND(FlushCommand, 
+		ENQUEUE_RENDER_COMMAND(FlushCommand)([](RHICommandListImmediate& RHICmdList)
 		{
 			GRHICommandList.getImmediateCommandList().immediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
-		RHIFlushResource();
-		GRHICommandList.getImmediateCommandList().immediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
+			RHIFlushResource();
+			GRHICommandList.getImmediateCommandList().immediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
 		});
 		flushRenderingCommands();
 

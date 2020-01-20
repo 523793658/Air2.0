@@ -106,4 +106,13 @@ namespace Air
 		}
 		return false;
 	}
+
+	void ThreadHeartBeat::suspendHeartBeat(bool bAllThreads /* = false */)
+	{
+	}
+
+	void ThreadHeartBeat::resumeHeartBeat(bool bAllThreads)
+	{
+
+	}
 }

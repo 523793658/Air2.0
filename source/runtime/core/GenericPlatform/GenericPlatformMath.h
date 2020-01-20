@@ -115,6 +115,16 @@ namespace Air
 
 		static FORCEINLINE float exp(float value) { return expf(value); }
 
+		static CONSTEXPR FORCEINLINE int32 truncToInt(float f)
+		{
+			return (int32)f;
+		}
+
+		static CONSTEXPR FORCEINLINE float truncToFloat(float f)
+		{
+			return (float)truncToInt(f);
+		}
+
 	};
 
 	template<> 
@@ -164,4 +174,6 @@ namespace Air
 	}
 
 	
+
+
 }

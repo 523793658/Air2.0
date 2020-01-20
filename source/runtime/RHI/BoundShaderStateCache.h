@@ -7,12 +7,12 @@ namespace Air
 	{
 	public:
 		BoundShaderStateKey(
-			VertexDeclarationRHIParamRef inVertexDeclaration,
-			VertexShaderRHIParamRef inVertexShader,
-			PixelShaderRHIParamRef inPixelShader,
-			HullShaderRHIParamRef inHullShader = nullptr,
-			DomainShaderRHIParamRef inDomainShader = nullptr,
-			GeometryShaderRHIParamRef inGeometryShader = nullptr
+			RHIVertexDeclaration* inVertexDeclaration,
+			RHIVertexShader* inVertexShader,
+			RHIPixelShader* inPixelShader,
+			RHIHullShader* inHullShader = nullptr,
+			RHIDomainShader* inDomainShader = nullptr,
+			RHIGeometryShader* inGeometryShader = nullptr
 		)
 			:mVertexDeclaration(inVertexDeclaration),
 			mVertexShader(inVertexShader),
@@ -42,27 +42,27 @@ namespace Air
 				getTypeHash(key.mGeometryShader);
 		}
 
-		FORCEINLINE VertexShaderRHIParamRef getVertexShader() const
+		FORCEINLINE RHIVertexShader* getVertexShader() const
 		{
 			return mVertexShader;
 		}
 
-		FORCEINLINE PixelShaderRHIParamRef getPixelShader() const
+		FORCEINLINE RHIPixelShader* getPixelShader() const
 		{
 			return mPixelShader;
 		}
 
-		FORCEINLINE HullShaderRHIParamRef getHullShader() const
+		FORCEINLINE RHIHullShader* getHullShader() const
 		{
 			return mHullShader;
 		}
 
-		FORCEINLINE DomainShaderRHIParamRef getDomainShader() const
+		FORCEINLINE RHIDomainShader* getDomainShader() const
 		{
 			return mDomainShader;
 		}
 
-		FORCEINLINE GeometryShaderRHIParamRef getGeometryShader() const
+		FORCEINLINE RHIGeometryShader* getGeometryShader() const
 		{
 			return mGeometryShader;
 		}
@@ -93,48 +93,48 @@ namespace Air
 	class RHI_API CachedBoundShaderStateLink
 	{
 	public:
-		BoundShaderStateRHIParamRef mBoundShaderState;
+		RHIBoundShaderState* mBoundShaderState;
 		CachedBoundShaderStateLink(
-			VertexDeclarationRHIParamRef vertexDeclaration,
-			VertexShaderRHIParamRef vertexShader,
-			PixelShaderRHIParamRef pixelShader,
-			BoundShaderStateRHIParamRef inBoundShaderState,
+			RHIVertexDeclaration* vertexDeclaration,
+			RHIVertexShader* vertexShader,
+			RHIPixelShader* pixelShader,
+			RHIBoundShaderState* inBoundShaderState,
 			bool bAddToSingleThreadedCache = true);
 
 		CachedBoundShaderStateLink(
-			VertexDeclarationRHIParamRef vertexDeclaration,
-			VertexShaderRHIParamRef vertexShader,
-			PixelShaderRHIParamRef pixelShader,
-			HullShaderRHIParamRef hullShader,
-			DomainShaderRHIParamRef domainShader,
-			GeometryShaderRHIParamRef geometryShader,
-			BoundShaderStateRHIParamRef inBoundShaderState,
+			RHIVertexDeclaration* vertexDeclaration,
+			RHIVertexShader* vertexShader,
+			RHIPixelShader* pixelShader,
+			RHIHullShader* hullShader,
+			RHIDomainShader* domainShader,
+			RHIGeometryShader* geometryShader,
+			RHIBoundShaderState* inBoundShaderState,
 			bool bAddToSingleThreadedCached = true
 		);
 
 		~CachedBoundShaderStateLink();
 
-		FORCEINLINE VertexShaderRHIParamRef getVertexShader() const
+		FORCEINLINE RHIVertexShader* getVertexShader() const
 		{
 			return mKey.getVertexShader();
 		}
 
-		FORCEINLINE PixelShaderRHIParamRef getPixelShader() const
+		FORCEINLINE RHIPixelShader* getPixelShader() const
 		{
 			return mKey.getPixelShader();
 		}
 
-		FORCEINLINE HullShaderRHIParamRef getHullShader() const
+		FORCEINLINE RHIHullShader* getHullShader() const
 		{
 			return mKey.getHullShader();
 		}
 
-		FORCEINLINE DomainShaderRHIParamRef getDomainShader() const
+		FORCEINLINE RHIDomainShader* getDomainShader() const
 		{
 			return mKey.getDomainShader();
 		}
 
-		FORCEINLINE GeometryShaderRHIParamRef getGeometryShader() const
+		FORCEINLINE RHIGeometryShader* getGeometryShader() const
 		{
 			return mKey.getGeometryShader();
 		}
@@ -147,22 +147,22 @@ namespace Air
 	{
 	public:
 		CachedBoundShaderStateLink_ThreadSafe(
-			VertexDeclarationRHIParamRef vertexDeclaration,
-			VertexShaderRHIParamRef vertexShader,
-			PixelShaderRHIParamRef pixelShader,
-			BoundShaderStateRHIParamRef inBoundShaderState
+			RHIVertexDeclaration* vertexDeclaration,
+			RHIVertexShader* vertexShader,
+			RHIPixelShader* pixelShader,
+			RHIBoundShaderState* inBoundShaderState
 		)
 			:CachedBoundShaderStateLink(vertexDeclaration, vertexShader, pixelShader, inBoundShaderState, false)
 		{
 
 		}
-		CachedBoundShaderStateLink_ThreadSafe(VertexDeclarationRHIParamRef vertexDeclaration,
-			VertexShaderRHIParamRef vertexShader,
-			PixelShaderRHIParamRef pixelShader,
-			HullShaderRHIParamRef hullShader,
-			DomainShaderRHIParamRef domainShader,
-			GeometryShaderRHIParamRef geometryShader,
-			BoundShaderStateRHIParamRef inBoundShaderState)
+		CachedBoundShaderStateLink_ThreadSafe(RHIVertexDeclaration* vertexDeclaration,
+			RHIVertexShader* vertexShader,
+			RHIPixelShader* pixelShader,
+			RHIHullShader* hullShader,
+			RHIDomainShader* domainShader,
+			RHIGeometryShader* geometryShader,
+			RHIBoundShaderState* inBoundShaderState)
 			:
 			CachedBoundShaderStateLink(vertexDeclaration, vertexShader, pixelShader, hullShader, domainShader, geometryShader, inBoundShaderState, false)
 		{}
@@ -172,19 +172,21 @@ namespace Air
 
 
 	extern RHI_API 	CachedBoundShaderStateLink* getCachedBoundShaderState(
-		VertexDeclarationRHIParamRef vertexDeclaration,
-		VertexShaderRHIParamRef vertexShader,
-		PixelShaderRHIParamRef pixelShader,
-		HullShaderRHIParamRef hullShader,
-		DomainShaderRHIParamRef domainShader,
-		GeometryShaderRHIParamRef geometryShader
+		RHIVertexDeclaration* vertexDeclaration,
+		RHIVertexShader* vertexShader,
+		RHIPixelShader* pixelShader,
+		RHIHullShader* hullShader,
+		RHIDomainShader* domainShader,
+		RHIGeometryShader* geometryShader
 	);
 
-	extern RHI_API BoundShaderStateRHIRef getCachedBoundShaderState_ThreadSafe(VertexDeclarationRHIParamRef vertexDeclaration,
-		VertexShaderRHIParamRef vertexShader,
-		PixelShaderRHIParamRef pixelShader,
-		HullShaderRHIParamRef hullShader,
-		DomainShaderRHIParamRef domainShader,
-		GeometryShaderRHIParamRef geometryShader);
+	extern RHI_API BoundShaderStateRHIRef getCachedBoundShaderState_ThreadSafe(RHIVertexDeclaration* vertexDeclaration,
+		RHIVertexShader* vertexShader,
+		RHIPixelShader* pixelShader,
+		RHIHullShader* hullShader,
+		RHIDomainShader* domainShader,
+		RHIGeometryShader* geometryShader);
+
+	extern RHI_API void emptyCachedBoundShaderStates();
 }
 

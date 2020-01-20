@@ -319,6 +319,35 @@ namespace Air
 			return index;
 		}
 
+		int32 add(const bool value, int32 numToAdd)
+		{
+			const int32 index = mNumBits;
+
+			if (numToAdd > 0)
+			{
+				reserve(index + numToAdd);
+				mNumBits += numToAdd;
+				for (int32 it = index, end = it + numToAdd; it != end; ++it)
+				{
+					(*this)[it] = value;
+				}
+			}
+			return index;
+		}
+
+		void reserve(int32 number)
+		{
+			if (number > mMaxBits)
+			{
+				const uint32 maxDWORDs = mAllocatorInstance.calculateSlackGrow(
+					Math::divideAndRoundUp(number, NumBitsPerDWORD),
+					Math::divideAndRoundUp(mMaxBits, NumBitsPerDWORD),
+					sizeof(uint32)
+				);
+				mMaxBits = maxDWORDs * NumBitsPerDWORD;
+				realloc(mNumBits);
+			}
+		}
 
 		FORCEINLINE void realloc(int32 previousNumBits)
 		{

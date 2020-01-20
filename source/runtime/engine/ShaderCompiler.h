@@ -40,14 +40,16 @@ namespace Air
 	public:
 		VertexFactoryType* mVFType;
 		ShaderType* mShaderType;
+		int32 mPermutationId;
 		ShaderCompilerInput mInput;
 		ShaderCompilerOutput mOutput;
 		TMap<const VertexFactoryType*, TArray<const ShaderPipelineType*>> mSharingPipelines;
 
-		ShaderCompileJob(uint32 inId, VertexFactoryType* inVFType, ShaderType* inShaderType)
+		ShaderCompileJob(uint32 inId, VertexFactoryType* inVFType, ShaderType* inShaderType, int32 inPermutationId)
 			:ShaderCommonCompileJob(inId)
 			,mVFType(inVFType)
 			,mShaderType(inShaderType)
+			, mPermutationId(inPermutationId)
 		{}
 		virtual ShaderCompileJob* getSingleShaderJob() override { return this; }
 		virtual const ShaderCompileJob* getSingleShaderJob() const override { return this; }
@@ -266,7 +268,15 @@ namespace Air
 		}
 	};
 
+	class GlobalShaderTypeCompiler
+	{
+	public:
+		ENGINE_API static class ShaderCompileJob* beginCompileShader(GlobalShaderType* shaderType, int32 permutationId, EShaderPlatform platform, const ShaderPipelineType* shaderPipeline, TArray<ShaderCommonCompileJob*>& newJobs);
 
+		ENGINE_API static void beginCompileShaderPipeline(EShaderPlatform platform, const ShaderPipelineType* shaderPipeline, const TArray<GlobalShaderType*>& shaderStages, TArray<ShaderCommonCompileJob*>& newJobs);
+
+		static Shader* finishCompileShader(GlobalShaderType* shaderType, const ShaderCompileJob& compileJob, const ShaderPipelineType* shaderPipelineType);
+	};
 
 	extern void globalBeginCompileShader(
 		const wstring & debugGroupName,

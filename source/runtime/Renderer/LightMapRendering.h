@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "DrawingPolicy.h"
+#include "MeshMaterialShaderType.h"
 namespace Air
 {
 	class IndirectLightingCacheAllocation;
@@ -12,24 +12,24 @@ namespace Air
 		LMP_NO_LIGHTMAP,
 	};
 
-	BEGIN_CONSTANT_BUFFER_STRUCT(PrecomputedLightingParameters, )
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, mIndirectLightingCachePrimitiveAdd)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, mIndirectLightingCachePrimitiveScale)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, mIndirectLightingCacheMinUV)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float3, mIndirectLightingCacheMaxUV)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, mPointSkyBentNormal)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(float, mDirectinalLightShadowing, EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, mStaticShadowMapMask)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, mInvConstantPenumbraSizes)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_ARRAY(float4, mIndirectLightingSHCoefficients0, [3])
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_ARRAY(float4, mIndirectLightingSHCoefficients1, [3])
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, mIndirectLightingSHCOefficents2)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_EX(float4, mIndrectLightingSHSingleCoefficient, EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, mLightMapCoordinateScaleBias)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER(float4, mShadowMapCoordinateScaleBias)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_ARRAY_EX(float4, mLightMapScale, [MAX_NUM_LIGHTMAP_COEF], EShaderPrecisionModifier::Half)
-		DECLARE_CONSTANT_BUFFER_STRUCT_MEMBER_ARRAY_EX(float4, mLightMapAdd, [MAX_NUM_LIGHTMAP_COEF], EShaderPrecisionModifier::Half)
-	END_CONSTANT_BUFFER_STRUCT(PrecomputedLightingParameters)
+	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(PrecomputedLightingParameters, )
+		SHADER_PARAMETER(float3, mIndirectLightingCachePrimitiveAdd)
+		SHADER_PARAMETER(float3, mIndirectLightingCachePrimitiveScale)
+		SHADER_PARAMETER(float3, mIndirectLightingCacheMinUV)
+		SHADER_PARAMETER(float3, mIndirectLightingCacheMaxUV)
+		SHADER_PARAMETER(float4, mPointSkyBentNormal)
+		SHADER_PARAMETER_EX(float, mDirectinalLightShadowing, EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER(float4, mStaticShadowMapMask)
+		SHADER_PARAMETER(float4, mInvConstantPenumbraSizes)
+		SHADER_PARAMETER_ARRAY(float4, mIndirectLightingSHCoefficients0, [3])
+		SHADER_PARAMETER_ARRAY(float4, mIndirectLightingSHCoefficients1, [3])
+		SHADER_PARAMETER(float4, mIndirectLightingSHCOefficents2)
+		SHADER_PARAMETER_EX(float4, mIndrectLightingSHSingleCoefficient, EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER(float4, mLightMapCoordinateScaleBias)
+		SHADER_PARAMETER(float4, mShadowMapCoordinateScaleBias)
+		SHADER_PARAMETER_ARRAY_EX(float4, mLightMapScale, [MAX_NUM_LIGHTMAP_COEF], EShaderPrecisionModifier::Half)
+		SHADER_PARAMETER_ARRAY_EX(float4, mLightMapAdd, [MAX_NUM_LIGHTMAP_COEF], EShaderPrecisionModifier::Half)
+	END_GLOBAL_SHADER_PARAMETER_STRUCT(PrecomputedLightingParameters)
 
 
 	class EmptyPrecomputedLightingConstantBuffer : public TConstantBuffer<PrecomputedLightingParameters>
@@ -70,21 +70,18 @@ namespace Air
 		typedef ConstantLightMapPolicyShaderParametersType PixelParametersType;
 		typedef ConstantLightMapPolicyShaderParametersType VertexParametersType;
 
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameter)
 		{
 			return false;
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameter, ShaderCompilerEnvironment& outEnvironment)
 		{}
 
 		ConstantLightMapPolicy(ELightMapPolicyType inIndirectPolicy) :
 			mIndirectPolicy(inIndirectPolicy) {}
 
-		void set(RHICommandList& RHICmdList, const VertexParametersType* vertexShaderParameters, const PixelParametersType* pixelShaderParameters, Shader* vertexShader,
-			Shader* pixelShader, const VertexFactory* vertexFactory, const MaterialRenderProxy* materialRenderProxy, const SceneView* view) const;
-
-		void setMesh(RHICommandList& RHICmdList, const SceneView& view, const PrimitiveSceneProxy* primitiveSceneProxy, const VertexParametersType* vertexShaderParameter, const PixelParametersType* pixelShaderParameters, Shader* vertexShader, Shader* pixelShader, const VertexFactory* vertexFactory, const MaterialRenderProxy* materialRenderProxy, const LightCacheInterface* LCI) const;
+		
 
 		friend bool operator == (const ConstantLightMapPolicy A, const ConstantLightMapPolicy B)
 		{
@@ -106,39 +103,40 @@ namespace Air
 
 	struct NoLightMapPolicy
 	{
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
 			return true;
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{}
 	};
 
 	template<ELightMapPolicyType Policy>
 	class TConstantLightMapPolicy : public ConstantLightMapPolicy
 	{
+	
 	public:
 		TConstantLightMapPolicy(): ConstantLightMapPolicy(Policy) {}
-		static bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType)
+		static bool shouldCompilePermutation(const MeshMaterialShaderPermutationParameters& parameters)
 		{
 			switch (Policy)
 			{
 			case Air::LMP_NO_LIGHTMAP:
-				return NoLightMapPolicy::shouldCache(platform, material, vertexFactoryType);
+				return NoLightMapPolicy::shouldCompilePermutation(parameters);
 			default:
 				return false;
 				break;
 			}
 		}
 
-		static void modifyCompilationEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& outEnvironment)
+		static void modifyCompilationEnvironment(const MaterialShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
 		{
 			outEnvironment.setDefine(TEXT("MAX_NUM_LIGHTMAP_COEF"), MAX_NUM_LIGHTMAP_COEF);
 			switch (Policy)
 			{
 			case Air::LMP_NO_LIGHTMAP:
-				NoLightMapPolicy::modifyCompilationEnvironment(platform, material, outEnvironment);
+				NoLightMapPolicy::modifyCompilationEnvironment(parameters, outEnvironment);
 				break;
 			default:
 				break;

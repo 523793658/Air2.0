@@ -32,6 +32,9 @@ SET(SOURCE_FILE
     ${D3D11RHI_SOURCE_DIR}/D3D11UniformBuffer.h
     ${D3D11RHI_SOURCE_DIR}/D3D11UniformBuffer.cpp
     ${D3D11RHI_SOURCE_DIR}/D3D11VertexDeclaration.cpp
+    ${D3D11RHI_SOURCE_DIR}/D3D11Commands.cpp
+    ${D3D11RHI_SOURCE_DIR}/D3D11StructuredBuffer.cpp
+    ${D3D11RHI_SOURCE_DIR}/D3D11RenderTarget.cpp
 )
 
 link_directories(
@@ -47,7 +50,7 @@ SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES FOLDER Engine/Runtime)
 
 add_compile_definitions(WITH_D3DX_LIBS)
 
-target_link_libraries(${LIB_NAME} LINK_PUBLIC core RHI engine RenderCore ShaderCore UtilityShader)
+target_link_libraries(${LIB_NAME} LINK_PUBLIC core RHI engine RenderCore UtilityShader)
 
 target_include_directories(${LIB_NAME} PUBLIC ${AIR_EXTERNAL_SOURCE_DIR}/dxsdk/Include)
 

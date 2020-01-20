@@ -170,7 +170,7 @@ namespace Air
 						moduleInfo->mHandle = PlatformProcess::getDllHandle(ModuleFileToLoad.c_str());
 						if (moduleInfo->mHandle != nullptr)
 						{
-							void* initPtr = PlatformProcess::getDllExport(moduleInfo->mHandle, "initializeModule");
+							void* initPtr = PlatformProcess::getDllExport(moduleInfo->mHandle, TEXT("initializeModule"));
 							if (initPtr != nullptr)
 							{
 

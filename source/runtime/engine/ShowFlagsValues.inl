@@ -22,6 +22,12 @@ SHOWFLAG_ALWAYS_ACCESSIBLE(AmbientOcclusion, SFG_LightingComponents)
 
 SHOWFLAG_ALWAYS_ACCESSIBLE(DistanceFieldAO, SFG_LightingFeatures)
 
+SHOWFLAG_ALWAYS_ACCESSIBLE(Lighting, SFG_Hidden)
+
+SHOWFLAG_ALWAYS_ACCESSIBLE(DeferredLighting, SFG_Advanced)
+
+SHOWFLAG_ALWAYS_ACCESSIBLE(ScreenPercentage, SFG_Hidden)
+
 SHOWFLAG_FIXED_IN_SHIPPING(0, ReflectionOverride, SFG_Hidden)
 
 SHOWFLAG_FIXED_IN_SHIPPING(0, ShaderComplexity, SFG_Hidden)

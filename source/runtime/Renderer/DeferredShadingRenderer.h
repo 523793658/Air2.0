@@ -2,7 +2,8 @@
 #include "CoreMinimal.h"
 #include "sceneRendering.h"
 #include "DepthRendering.h"
-#include "DrawingPolicy.h"
+#include "DynamicBufferAllocator.h"
+#include "LightSceneInfo.h"
 namespace Air
 {
 	class HitProxyConsumer;
@@ -15,28 +16,25 @@ namespace Air
 		virtual void render(RHICommandListImmediate& RHICmdList) override;
 
 
-	public:
-
-		EDepthDrawingMode	mEarlyZPassMode;
-		bool bEarlyZPassMovable;
+	
 	private:
-		bool initViews(RHICommandListImmediate& RHICmdList, struct FILCUpdatePrimTaskData& ILCTaskData, GraphEventArray& sortEvents);
+		bool initViews(RHICommandListImmediate& RHICmdList, FExclusiveDepthStencil::Type basePassDepthStencilAccess, struct FILCUpdatePrimTaskData& ILCTaskData, GraphEventArray& sortEvents);
 
 		bool renderPrePass(RHICommandListImmediate& RHICmdList, std::function<void()> afterTaskAreStarted);
 
-		bool renderBasePass(RHICommandListImmediate& RHICmdList);
+		bool renderBasePass(RHICommandListImmediate& RHICmdList, FExclusiveDepthStencil::Type basePassDepthStencilAccess, IPooledRenderTarget* forwardScreenSpaceShadowMask, bool bParallelBasePass, bool bRenderLightmapDensity);
 
-		bool renderBasePassView(RHICommandListImmediate& RHICmdList, ViewInfo& view);
+		bool renderBasePassView(RHICommandListImmediate& RHICmdList, ViewInfo& view, FExclusiveDepthStencil::Type basePassDepthStencilAccess, const MeshPassProcessorRenderState& inDrawRenderState);
 
-		bool renderBasePassStaticData(RHICommandList& RHICmdList, ViewInfo& view, const DrawingPolicyRenderState& drawRenderState);
+	
 
-		void renderBasePassDynamicData(RHICommandList& RHICmdList, ViewInfo& view, const DrawingPolicyRenderState& drawRenderState, bool &isDrity);
+	
 
-		bool renderBasePassStaticDataType(RHICommandList& RHICmdList, ViewInfo& view, const DrawingPolicyRenderState& drawRenderState, const EBasePassDrawListType drawType);
+		void renderLights(RHICommandListImmediate& RHICmdList, SortedLightSetSceneInfo &sortedLightSet);
 
-		void renderLights(RHICommandListImmediate& RHICmdList);
+		bool shouldRenderVolumetricFog() const;
 
-		void renderDynamicSkyLighting(RHICommandListImmediate& RHICmdList, const TRefCountPtr<IPooledRenderTarget>& velocityTexture, TRefCountPtr<IPooledRenderTarget>& dynamicBentNormalAO);
+		bool shouldUseClusteredDeferredShading() const;
 
 		bool shouldRenderDistanceFieldAO() const;
 
@@ -57,12 +55,45 @@ namespace Air
 
 		void renderSky(RHICommandList& RHICmdList);
 
-		void renderLight(RHICommandList& RHICmdList, const LightSceneInfo* lightSceneInfo, bool bRenderOverlap, bool bIssueDrawEvent);
+		void renderLight(RHICommandList& RHICmdList, const LightSceneInfo* lightSceneInfo, IPooledRenderTarget* screenShadowMaskTexture, bool bRenderOverlap, bool bIssueDrawEvent);
 
 		bool renderLightFunction(RHICommandListImmediate& RHICmdList, const LightSceneInfo* lightSceneInfo, bool bLightAttenuationCleared, bool bProjectingForForwardShading);
 		
 		void copySceneCaptureComponentToTarget(RHICommandListImmediate& RHICmdList);
 
-		
+		void gatherAndSortLights(SortedLightSetSceneInfo& outSortedLights);
+
+		void computeLightGrid(RHICommandListImmediate& RHICmdList, bool bNeedLightGrid, SortedLightSetSceneInfo& sortedLightSet);
+
+
+		void clearTranslucentVolumeLightingAsyncCompute(RHICommandListImmediate& RHICmdList);
+		void clearTranslucentVolumeLighting(RHICommandListImmediate& RHICmdList, int32 viewIndex);
+
+		void renderDiffuseIndirectAndAmbientOcclusion(RHICommandListImmediate& RHICmdList);
+
+		void renderIndirectCapsuleShadows(RHICommandListImmediate& RHICmdList, RHITexture* indirectLightingTexture, RHITexture* existingIndirectOcclusionTexture) const;
+
+		void injectAmbientCubemapTranslucentVolumeLighting(RHICommandList& RHICmdList, const ViewInfo& view, int32 viewIndex);
+
+		void filterTranslucentVolumeLighting(RHICommandListImmediate& RHICmdList, const ViewInfo& view, const int32 viewIndex);
+
+		virtual void renderFinish(RHICommandListImmediate& RHICmdList) override;
+	public:
+
+		EDepthDrawingMode	mEarlyZPassMode;
+		bool bEarlyZPassMovable;
+
+	private:
+		static GlobalDynamicIndexBuffer mDynamicIndexBufferForInitViews;
+		static GlobalDynamicIndexBuffer mDynamicIndexBufferForInitShadows;
+		static GlobalDynamicVertexBuffer mDynamicVertexBufferForInitViews;
+		static GlobalDynamicVertexBuffer mDynamicVertexBufferForInitShadows;
+
+		static TGlobalResource<GlobalDynamicReadBuffer> mDynamicReadBufferForInitViews;
+		static TGlobalResource<GlobalDynamicReadBuffer> mDynamicReadBufferForInitShadows;
+
+		bool bClusteredShadingLightsInLightGrid;
+
+		ComputeFenceRHIRef mTranslucencyLightingVolumeClearEndFence;
 	};
 }

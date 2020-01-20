@@ -2,6 +2,23 @@
 #include "MaterialShaderType.h"
 namespace Air
 {
+	struct MeshMaterialShaderPermutationParameters
+	{
+		const EShaderPlatform mPlatform;
+		const FMaterial* mMaterial;
+		const VertexFactoryType* mVertexFactoryType;
+
+		const int32 mPermutationId;
+
+		MeshMaterialShaderPermutationParameters(EShaderPlatform inPlatform, const FMaterial* inMaterial, const VertexFactoryType* inVertexFactoryType, const int32 inPermutationId)
+			:mPlatform(inPlatform)
+			, mMaterial(inMaterial)
+			, mVertexFactoryType(inVertexFactoryType)
+			, mPermutationId(inPermutationId)
+		{}
+	};
+
+	
 	class MeshMaterialShaderType : public ShaderType
 	{
 	public:
@@ -9,6 +26,7 @@ namespace Air
 		{
 			VertexFactoryType* mVertexFactoryType;
 			CompiledShaderInitializerType(ShaderType* inType,
+				int32 inPermutationId,
 				const ShaderCompilerOutput& compilerOutput,
 				ShaderResource* inResource,
 				const ConstantExpressionSet& inConstantExpressionSet,
@@ -16,41 +34,46 @@ namespace Air
 				const wstring& inDebugDescription,
 				const ShaderPipelineType* inShaderPipeline,
 				VertexFactoryType* inVertexFactoryType)
-				:MaterialShaderType::CompiledShaderInitializerType(inType, compilerOutput, inResource, inConstantExpressionSet, inMaterialShaderMapHash, inShaderPipeline, inVertexFactoryType, inDebugDescription),
+				:MaterialShaderType::CompiledShaderInitializerType(inType, inPermutationId, compilerOutput, inResource, inConstantExpressionSet, inMaterialShaderMapHash, inShaderPipeline, inVertexFactoryType, inDebugDescription),
 				mVertexFactoryType(inVertexFactoryType)
 			{}
 		};
 
 		typedef Shader* (*ConstructCompiledType)(const CompiledShaderInitializerType&);
-		typedef bool(*ShouldCacheType)(EShaderPlatform, const FMaterial*, const VertexFactoryType* vertexFactoryType);
+		typedef bool(*ShouldCompilePermutationType)(const MeshMaterialShaderPermutationParameters&);
 
-		typedef void(*ModifyCompilationEnvironmentType)(EShaderPlatform, const FMaterial*, ShaderCompilerEnvironment&);
+		typedef bool(*ValidateCompiledResultType)(EShaderPlatform, const TArray<FMaterial*>&, const VertexFactoryType*, const ShaderParameterMap&, TArray<wstring>&);
+
+		typedef void(*ModifyCompilationEnvironmentType)(const MaterialShaderPermutationParameters&, ShaderCompilerEnvironment&);
 
 		MeshMaterialShaderType(
 			const TCHAR* inName,
 			const TCHAR* InSourceFilename,
 			const TCHAR* inFunctionName,
 			uint32 inFrequency,
+			int32 inTotalPermutationCount,
 			ConstructSerializedType inConstructSerializedRef,
 			ConstructCompiledType inConstructCompiledRef,
 			ModifyCompilationEnvironmentType inModifyCompilationEnvironmentRef,
-			ShouldCacheType inShouldCacheRef,
+			ShouldCompilePermutationType inShouldCacheRef,
+			ValidateCompiledResultType inValidateCompiledResultRef,
 			GetStreamOutElementsType inGetStreamOutElementRef
 		)
-			: ShaderType(EShaderTypeForDynamicCast::MeshMaterial, inName, InSourceFilename, inFunctionName, inFrequency, inConstructSerializedRef, inGetStreamOutElementRef),
+			: ShaderType(EShaderTypeForDynamicCast::MeshMaterial, inName, InSourceFilename, inFunctionName, inFrequency, inTotalPermutationCount, inConstructSerializedRef, inGetStreamOutElementRef),
 			mConstructCompiledRef(inConstructCompiledRef), 
 			mShouldCacheRef(inShouldCacheRef),
-			mModifyCompilationEnvironmentRef(inModifyCompilationEnvironmentRef)
+			mModifyCompilationEnvironmentRef(inModifyCompilationEnvironmentRef),
+			mValidateCompiledResultRef(inValidateCompiledResultRef)
 			{}
 		
-		bool shouldCache(EShaderPlatform platform, const FMaterial* material, const VertexFactoryType* vertexFactoryType) const
+		bool shouldCompilePermutation(EShaderPlatform platform, const FMaterial* material, VertexFactoryType* vertexFactoryType, int32 permutationId) const
 		{
-			return (*mShouldCacheRef)(platform, material, vertexFactoryType);
+			return (*mShouldCacheRef)(MeshMaterialShaderPermutationParameters(platform, material, vertexFactoryType, permutationId));
 		}
 
-		void setupCompileEnvironment(EShaderPlatform platform, const FMaterial* material, ShaderCompilerEnvironment& environment)
+		void setupCompileEnvironment(EShaderPlatform platform, const FMaterial* material, int32 permutationId, ShaderCompilerEnvironment& environment)
 		{
-			(*mModifyCompilationEnvironmentRef)(platform, material, environment);
+			(*mModifyCompilationEnvironmentRef)(MaterialShaderPermutationParameters(platform, material, permutationId), environment);
 		}
 
 		Shader* finishCompileShader(const ConstantExpressionSet& constantExpressionSet,
@@ -60,6 +83,7 @@ namespace Air
 			const wstring& inDebugDescription);
 
 		class ShaderCompileJob* beginCompileShader(uint32 shaderMapId,
+			uint32 permutationId,
 			EShaderPlatform platform,
 			const FMaterial* material,
 			ShaderCompilerEnvironment* materialEnvironment,
@@ -69,9 +93,9 @@ namespace Air
 
 	private:
 		ConstructCompiledType mConstructCompiledRef;
-		ShouldCacheType mShouldCacheRef;
+		ShouldCompilePermutationType mShouldCacheRef;
 		ModifyCompilationEnvironmentType mModifyCompilationEnvironmentRef;
-
+		ValidateCompiledResultType mValidateCompiledResultRef;
 
 	};
 }

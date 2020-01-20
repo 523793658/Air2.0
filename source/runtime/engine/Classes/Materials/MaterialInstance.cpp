@@ -17,34 +17,15 @@ namespace Air
 		bHasStaticPermutationResource = false;
 	}
 
-	ENQUEUE_UNIQUE_RENDER_COMMAND_FIVEPARAMETER_DECLARE_TEMPLATE(
-		SetMIParameterValue, ParameterType,
-		MaterialInstanceResource*, Resource0, Resource0,
-		MaterialInstanceResource*, Resource1, Resource1,
-		MaterialInstanceResource*, Resource2, Resource2,
-		wstring, ParameterName, Parameter.mParameterName,
-		typename ParameterType::ValueType, Value, ParameterType::getValue(Parameter),
-		{
-			Resource0->RenderThread_UpdateParameter(ParameterName, Value);
-			if (Resource1)
-			{
-				Resource1->RenderThread_UpdateParameter(ParameterName, Value);
-			}
-			if (Resource2)
-			{
-				Resource2->RenderThread_UpdateParameter(ParameterName, Value);
-			}
-		});
-
 	template<typename ParameterType>
 	void GameThread_UpdateMIParameter(const MaterialInstance* instance, const ParameterType& parameter)
 	{
-		ENQUEUE_UNIQUE_RENDER_COMMAND_FIVEPARAMETER_CREATE_TEMPLATE(SetMIParameterValue, ParameterType,
-			MaterialInstanceResource*, instance->mResources[0],
-			MaterialInstanceResource*, instance->mResources[1],
-			MaterialInstanceResource*, instance->mResources[2],
-			wstring, parameter.mParameterName,
-			typename ParameterType::ValueType, ParameterType::getValue(parameter));
+		MaterialInstanceResource* resource = instance->mResources[0];
+		const wstring parameterName = parameter.mParameterName;
+		typename ParameterType::ValueType value = ParameterType::getValue(parameter);
+		ENQUEUE_RENDER_COMMAND(SetMIParameterValue)([resource, parameterName, value](RHICommandListImmediate& RHICmdList) {
+			resource->RenderThread_UpdateParameter(parameterName, value);
+			});
 	}
 
 	template<typename ParameterType>

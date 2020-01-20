@@ -6,10 +6,11 @@
 #include "HAL/Event.h"
 #include "Template/TypeCompatibleBytes.h"
 #include "Template/RefCounting.h"
+#include "HAL/IConsoleManager.h"
 #include <functional>
 #include <utility>
 #include <mutex>
-
+#include <atomic>
 
 #include <iostream>
 namespace Air
@@ -68,14 +69,8 @@ namespace Air
 
 		};
 
-		extern CORE_API Type RenderThread; // this is not an enum, because if there is no render thread, this is just the game thread.
-		extern CORE_API Type RenderThread_Local; // this is not an enum, because if there is no render thread, this is just the game thread.
-
-												 // these allow external things to make custom decisions based on what sorts of task threads we are running now.
-												 // this are bools to allow runtime tuning.
+		
 		extern CORE_API int32 bHasBackgroundThreads;
-		extern CORE_API int32 bHasHighPriorityThreads;
-
 
 		FORCEINLINE Type getThreadIndex(Type ThreadAndINdex)
 		{
@@ -92,6 +87,13 @@ namespace Air
 			return Type(ThreadAndIndex | (priorityIndex << ThreadPriorityShift) | (bHiPri ? HighTaskPriority : NormalTaskPriority));
 		}
 
+		FORCEINLINE Type setTaskPriority(Type threadAndIndex, Type taskPriority)
+		{
+			BOOST_ASSERT(!(threadAndIndex & ~ThreadIndexMask) &&
+				!(taskPriority & ~TaskPriorityMask));
+			return Type(threadAndIndex | taskPriority);
+		}
+
 		FORCEINLINE int32 getTaskPriority(Type treadAndIndex)
 		{
 			return (treadAndIndex & TaskPriorityMask) >> TaskPriorityShift;
@@ -104,6 +106,38 @@ namespace Air
 			return result;
 		}
 
+		struct RenderThreadStatics
+		{
+		private:
+			static CORE_API std::atomic_int32_t mRenderThread;
+			static CORE_API std::atomic_int32_t mRenderThread_Local;
+
+			friend Type getRenderThread();
+			friend Type getRenderThread_Local();
+
+			friend void setRenderThread(Type thread);
+			friend void setRenderThread_Local(Type thread);
+		};
+		
+		FORCEINLINE Type getRenderThread()
+		{
+			return (Type)RenderThreadStatics::mRenderThread.load(std::memory_order_relaxed);
+		}
+
+		FORCEINLINE Type getRenderThread_Local()
+		{
+			return (Type)(RenderThreadStatics::mRenderThread_Local.load(std::memory_order_relaxed));
+		}
+
+		FORCEINLINE void setRenderThread(Type thread)
+		{
+			RenderThreadStatics::mRenderThread.store((int32)thread, std::memory_order_relaxed);
+		}
+
+		FORCEINLINE void setRenderThread_Local(Type thread)
+		{
+			RenderThreadStatics::mRenderThread_Local.store((int32)thread, std::memory_order_relaxed);
+		}
 	}
 
 	namespace ESubsequentsMode
@@ -231,6 +265,44 @@ namespace Air
 		}
 	};
 
+	enum class EPowerSavingEligibility
+	{
+		Unknown,
+		Eligible,
+		NotEligible
+	};
+
+	class CORE_API AutoConsoleTaskPriority
+	{
+		AutoConsoleCommand mCommand;
+		wstring mCommandName;
+		ENamedThreads::Type mThreadPriority;
+		ENamedThreads::Type mTaskPriority;
+		ENamedThreads::Type mTaskPriorityIfForcedToNormalThreadPriority;
+		EPowerSavingEligibility mPowerSavingEligibility;
+		void commandExecute(const TArray<wstring>& args);
+	public:
+		AutoConsoleTaskPriority(const TCHAR* name, const TCHAR* help, ENamedThreads::Type defaultThreadPriority, ENamedThreads::Type defaultTaskPriority, ENamedThreads::Type defaultTaskPriorityIfForceToNormalThreadPriority = ENamedThreads::UnusedAnchor, EPowerSavingEligibility defaultPowerSavingEligibility = EPowerSavingEligibility::Eligible)
+			:mCommand(name, help, std::function<void(const TArray<wstring>&)>(std::bind(&AutoConsoleTaskPriority::commandExecute, this, std::placeholders::_1)))
+			,mCommandName(name)
+			,mThreadPriority(defaultThreadPriority)
+			,mTaskPriority(defaultTaskPriority)
+			,mTaskPriorityIfForcedToNormalThreadPriority(defaultTaskPriorityIfForceToNormalThreadPriority)
+			,mPowerSavingEligibility(defaultPowerSavingEligibility)
+		{
+			BOOST_ASSERT(mTaskPriorityIfForcedToNormalThreadPriority != ENamedThreads::UnusedAnchor || mThreadPriority == ENamedThreads::NormalThreadPriority);
+		}
+
+		FORCEINLINE ENamedThreads::Type get(ENamedThreads::Type thread = ENamedThreads::AnyThread)
+		{
+			if (mThreadPriority == ENamedThreads::BackgroundThreadPriority && !ENamedThreads::bHasBackgroundThreads)
+			{
+				return ENamedThreads::setTaskPriority(thread, mTaskPriorityIfForcedToNormalThreadPriority);
+			}
+			return ENamedThreads::setPriorities(thread, mThreadPriority, mTaskPriority);
+		}
+	};
+
 
 	class BaseGraphTask
 	{
@@ -315,7 +387,7 @@ namespace Air
 	};
 
 	template<typename TTask>
-	class GraphTask : public BaseGraphTask
+	class TGraphTask : public BaseGraphTask
 	{
 	public:
 
@@ -330,20 +402,20 @@ namespace Air
 			}
 			
 			template<typename... T>
-			GraphTask* constructAndHold(T&&... args)
+			TGraphTask* constructAndHold(T&&... args)
 			{
 				new ((void*)&mOwner->mTaskStorage) TTask(std::forward<T>(args)...);
 				return mOwner->hold(mPrerequisites, mCurrentThreadIfKnown);
 			}
 		private:
-			friend class GraphTask;
-			GraphTask*		mOwner;
+			friend class TGraphTask;
+			TGraphTask*		mOwner;
 			const GraphEventArray* mPrerequisites;
 
 			ENamedThreads::Type mCurrentThreadIfKnown;
 
 		private:
-			Constructor(GraphTask* inOwner, const GraphEventArray* inPrerequisites, ENamedThreads::Type inCurrentThreadIfKnown)
+			Constructor(TGraphTask* inOwner, const GraphEventArray* inPrerequisites, ENamedThreads::Type inCurrentThreadIfKnown)
 				: mOwner(inOwner)
 				, mPrerequisites(inPrerequisites)
 				, mCurrentThreadIfKnown(inCurrentThreadIfKnown)
@@ -354,22 +426,22 @@ namespace Air
 		static Constructor createTask(const GraphEventArray* prerequisites = nullptr, ENamedThreads::Type currentThreadIfKnown = ENamedThreads::AnyThread)
 		{
 			int32 numPrereq = prerequisites ? prerequisites->size() : 0;
-			if (sizeof(GraphTask) <= BaseGraphTask::SMALL_TASK_SIZE)
+			if (sizeof(TGraphTask) <= BaseGraphTask::SMALL_TASK_SIZE)
 			{
 				void *mem = BaseGraphTask::getSmallTaskAllocator().allocate();
-				return Constructor(new(mem) GraphTask(TTask::getSubsequentsMode() == ESubsequentsMode::FireAndForget ? GraphEventRef() : GraphEvent::createGraphEvent(), numPrereq), prerequisites, currentThreadIfKnown);
+				return Constructor(new(mem) TGraphTask(TTask::getSubsequentsMode() == ESubsequentsMode::FireAndForget ? GraphEventRef() : GraphEvent::createGraphEvent(), numPrereq), prerequisites, currentThreadIfKnown);
 			}
-			return Constructor(new GraphTask(TTask::getSubsequentsMode() == ESubsequentsMode::FireAndForget ? nullptr : GraphEvent::createGraphEvent(), numPrereq), prerequisites, currentThreadIfKnown);
+			return Constructor(new TGraphTask(TTask::getSubsequentsMode() == ESubsequentsMode::FireAndForget ? nullptr : GraphEvent::createGraphEvent(), numPrereq), prerequisites, currentThreadIfKnown);
 		}
 
 		static Constructor createTask(GraphEventRef subsequentsToAssume, const GraphEventArray* prerequeistes = nullptr, ENamedThreads::Type currentThreadIfknown = ENamedThreads::AnyThread)
 		{
-			if (sizeof(GraphTask) <= BaseGraphTask::SMALL_TASK_SIZE)
+			if (sizeof(TGraphTask) <= BaseGraphTask::SMALL_TASK_SIZE)
 			{
 				void *mem = BaseGraphTask::getSmallTaskAllocator().allocate();
-				return Constructor(new (mem) GraphTask(subsequentsToAssume, prerequeistes ? prerequeistes->size() : 0), prerequeistes, currentThreadIfknown);
+				return Constructor(new (mem) TGraphTask(subsequentsToAssume, prerequeistes ? prerequeistes->size() : 0), prerequeistes, currentThreadIfknown);
 			}
-			return Constructor(new GraphTask(subsequentsToAssume, prerequeistes ? prerequeistes->size() : 0), prerequeistes, currentThreadIfknown);
+			return Constructor(new TGraphTask(subsequentsToAssume, prerequeistes ? prerequeistes->size() : 0), prerequeistes, currentThreadIfknown);
 		}
 
 		virtual void executeTask(TArray<BaseGraphTask *>& newTasks, ENamedThreads::Type currentThread) final override
@@ -387,9 +459,9 @@ namespace Air
 				mSubSequents->dispatchSubsequents(newTasks, currentThread);
 			}
 
-			if (sizeof(GraphTask) <= BaseGraphTask::SMALL_TASK_SIZE)
+			if (sizeof(TGraphTask) <= BaseGraphTask::SMALL_TASK_SIZE)
 			{
-				this->GraphTask::~GraphTask();
+				this->TGraphTask::~TGraphTask();
 				BaseGraphTask::getSmallTaskAllocator().free(this);
 			}
 			else
@@ -405,7 +477,7 @@ namespace Air
 			return returnedEvent;
 		}
 
-		GraphTask* hold(const GraphEventArray* prerequisites = nullptr, ENamedThreads::Type currentthreadIfKnown = ENamedThreads::AnyThread)
+		TGraphTask* hold(const GraphEventArray* prerequisites = nullptr, ENamedThreads::Type currentthreadIfKnown = ENamedThreads::AnyThread)
 		{
 			setupPrereqs(prerequisites, currentthreadIfKnown, false);
 			return this;
@@ -440,13 +512,13 @@ namespace Air
 			return mSubSequents;
 		}
 	private:
-		GraphTask(GraphEventRef inSubsequents, int32 numberOfPrerequistiesOutstanding) : BaseGraphTask(numberOfPrerequistiesOutstanding),
+		TGraphTask(GraphEventRef inSubsequents, int32 numberOfPrerequistiesOutstanding) : BaseGraphTask(numberOfPrerequistiesOutstanding),
 			mTaskConstructed(false)
 		{
 			mSubSequents.swap(inSubsequents);
 		}
 
-		virtual ~GraphTask()
+		virtual ~TGraphTask()
 		{
 			
 		}
@@ -560,7 +632,7 @@ namespace Air
 
 		static GraphEventRef createAndDispatchWhenReady(const std::function<void()>& inTaskDeletegate, const GraphEventArray* inPrerequistes = nullptr, ENamedThreads::Type inDesiredThread = ENamedThreads::AnyThread)
 		{
-			return GraphTask<SimpleDelegateGraphTask>::createTask(inPrerequistes).constructAndDispatchWhenReady < const std::function<void()> &>(inTaskDeletegate, inDesiredThread);
+			return TGraphTask<SimpleDelegateGraphTask>::createTask(inPrerequistes).constructAndDispatchWhenReady < const std::function<void()> &>(inTaskDeletegate, inDesiredThread);
 		}
 
 		static GraphEventRef createAndDispatchWhenReady(const std::function<void()>& inTaskDelegete, const GraphEventRef& inPrerequisite, ENamedThreads::Type inDesiredThread = ENamedThreads::AnyThread)
@@ -603,7 +675,7 @@ namespace Air
 
 		static GraphEventRef createAndDispatchWhenReady(const DelegateType& InTaskDeletegate, const GraphEventArray* InPrerequisites = NULL, ENamedThreads::Type InCurrentThreadIfKnown = ENamedThreads::AnyThread, ENamedThreads::Type InDesiredThread = ENamedThreads::AnyThread)
 		{
-			return GraphTask<DelegateGraphTask>::createTask(InPrerequisites, InCurrentThreadIfKnown).constructAndDispatchWhenReady(InTaskDeletegate, InDesiredThread);
+			return TGraphTask<DelegateGraphTask>::createTask(InPrerequisites, InCurrentThreadIfKnown).constructAndDispatchWhenReady(InTaskDeletegate, InDesiredThread);
 		}
 
 		static GraphEventRef createAndDispatchWhenReady(const DelegateType& InTaskDeletegate, const GraphEventRef& InPrerequisite, ENamedThreads::Type InCurrentThreadIfKnown = ENamedThreads::AnyThread, ENamedThreads::Type InDesiredThread = ENamedThreads::AnyThread)

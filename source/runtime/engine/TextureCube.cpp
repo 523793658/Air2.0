@@ -53,7 +53,7 @@ namespace Air
 
 		virtual void releaseRHI() override
 		{
-			RHIUpdateTextureReference(mOwner->mTextureReference.mTextureReferenceRHI, TextureCubeRHIParamRef());
+			RHIUpdateTextureReference(mOwner->mTextureReference.mTextureReferenceRHI, nullptr);
 			mTextureCubeRHI.safeRelease();
 			TextureResource::releaseRHI();
 		}

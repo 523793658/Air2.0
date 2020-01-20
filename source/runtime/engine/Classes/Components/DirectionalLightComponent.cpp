@@ -1,5 +1,6 @@
 #include "Classes/Components/DirectionalLightComponent.h"
 #include "SceneManagement.h"
+#include "RenderUtils.h"
 #include "SimpleReflection.h"
 namespace Air
 {
@@ -8,22 +9,33 @@ namespace Air
 	public:
 		DirectionalLightSceneProxy(const DirectionalLightComponent* component)
 			:LightSceneProxy(component)
+			,mAtmosphereTransmittanceFactor(LinearColor::White)
 		{
 
 		}
 
-		virtual void getParameters(float4& lightPositionAndInvRadius, float4& lightColorAndFalloffExponent, float3& normalizedLightDirection, float2& spotAngles, float& lightSourceRadius, float& lightSourceLength, float& lightMinRoughness) const override
+		virtual void getLightShaderParameters(LightShaderParameters& lightParameters) const override
 		{
-			lightPositionAndInvRadius = float4(0, 0, 0, 0);
-			lightColorAndFalloffExponent = float4(getColor().R, getColor().G, getColor().B, 0);
-			normalizedLightDirection = -getDirection();
-
-			spotAngles = float2(0, 0);
-			lightSourceRadius = 0.0f;
-			lightSourceLength = 0.0f;
-			lightMinRoughness = Math::max(mMinRoughness, .04f);
+			lightParameters.Position = float3::Zero;
+			lightParameters.InvRadius = 0.0f;
+			lightParameters.Color = float3(getColor() * mAtmosphereTransmittanceFactor);
+			lightParameters.FallofExponent = 0.0f;
+			lightParameters.Direction = -getDirection();
+			lightParameters.Tangent = -getDirection();
+			lightParameters.SpotAngles = float2::Zero;
+			lightParameters.SpecularScale = mSpecularScale;
+			lightParameters.SourceRadius = Math::sin(0.5f * Math::degreesToRadians(mLightSourceAngle));
+			lightParameters.SoftSourceRadius = Math::sin(0.5f * Math::degreesToRadians(mLightSourceSoftAngle));
+			lightParameters.SourceLength = 0.0f;
+			lightParameters.SourceTexture = GWhiteTexture->mTextureRHI;
 		}
 
+
+		LinearColor mAtmosphereTransmittanceFactor;
+
+		float mLightSourceAngle;
+
+		float mLightSourceSoftAngle;
 	};
 
 	DirectionalLightComponent::DirectionalLightComponent(const ObjectInitializer& objectInitializer/* = ObjectInitializer::get() */)

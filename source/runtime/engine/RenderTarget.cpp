@@ -7,6 +7,11 @@ namespace Air
 		return mRenderTargetTextureRHI;
 	}
 
+	RenderTarget::~RenderTarget()
+	{
+
+	}
+
 	float RenderTarget::getDisplayGamma() const
 	{
 		if (GEngine == nullptr)

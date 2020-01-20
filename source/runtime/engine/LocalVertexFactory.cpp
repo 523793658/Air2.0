@@ -2,9 +2,10 @@
 #include "MeshBatch.h"
 #include "Rendering/ColorVertexBuffer.h"
 #include "Classes/GameFramework/Actor.h"
+#include "RenderUtils.h"
 namespace Air
 {
-	IMPLEMENT_VERTEX_FACTORY_TYPE(LocalVertexFactory, "LocalVertexFactory", true, true, true, true, true);
+	IMPLEMENT_VERTEX_FACTORY_TYPE_EX(LocalVertexFactory, "LocalVertexFactory", true, true, true, true, true, true, true);
 
 	void LocalVertexFactory::initRHI()
 	{
@@ -66,7 +67,7 @@ namespace Air
 		BOOST_ASSERT(isValidRef(getDeclaration()));
 	}
 
-	bool LocalVertexFactory::shouldCache(EShaderPlatform platform, const class FMaterial* material, const class ShaderType* shaderType)
+	bool LocalVertexFactory::shouldCompilePermutation(EShaderPlatform platform, const class FMaterial* material, const class ShaderType* shaderType)
 	{
 		return true;
 	}
@@ -109,5 +110,13 @@ namespace Air
 		}
 
 
+	}
+
+	void LocalVertexFactory::validateCompiledResult(const VertexFactoryType* type, EShaderPlatform platform, const ShaderParameterMap& parameterMap, TArray<wstring>& outErrors)
+	{
+		if (type->supportsPrimitiveIdStream() && useGPUScene(platform, getMaxSupportedFeatureLevel(platform)) && parameterMap.containsParameterAllocation(PrimitiveConstantShaderParameters::StaticStructMetadata.getShaderVariableName()))
+		{
+			outErrors.addUnique(String::printf(TEXT("Shader attempted to bind the primitive constant buffer event though vertex factory %s computes a primitiveId per-instance. This will break auto-instancing. Shaders should use GetPrimtiveData(Parameters.PrimitiveId).Member instead of Primitive.Member."), type->getName()));
+		}
 	}
 }

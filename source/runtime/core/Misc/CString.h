@@ -82,6 +82,8 @@ namespace Air
 		}
 
 		static FORCEINLINE int vsprintf(CharType* const _Buffer, CharType const* const _Format, va_list argPtr);
+
+		static const CharType* strifind(const CharType* str, const CharType* find, bool bSkipQuotedChars = false);
 	};
 
 
@@ -119,6 +121,14 @@ namespace Air
 		typename TCString<T>::CharType* TCString<T>::strcpy(CharType* dest, SIZE_T destCount, const CharType* src)
 	{
 		return PlatformString::strcpy(dest, destCount, src);
+	}
+
+	template<typename T> FORCEINLINE
+		typename TCString<T>::CharType* TCString<T>::strncpy(CharType* dest, const CharType* src, int32 maxLen)
+	{
+		BOOST_ASSERT(maxLen > 0);
+		PlatformString::strncpy(dest, src, maxLen);
+		return dest;
 	}
 
 	template<typename T> FORCEINLINE
@@ -208,5 +218,58 @@ namespace Air
 		int TCString<T>::vsprintf(T* const _Buffer, T const* const _Format, va_list argPtr)
 	{
 		return PlatformString::vsprintf(_Buffer, _Format, argPtr);
+	}
+
+	template<typename T>
+	const typename TCString<T>::CharType* TCString<T>::strifind(const CharType* str, const CharType* find, bool bSkipQuotedChars /* = false */)
+	{
+		if (find == nullptr || str == nullptr)
+		{
+			return nullptr;
+		}
+
+		bool alnum = 0;
+		CharType f = (*find < LITERAL(CharType, 'a') || *find > LITERAL(CharType, 'z')) ? (*find) : (*find + LITERAL(CharType, 'A') - LITERAL(CharType, 'a'));
+		int32 length = strlen(find++) - 1;
+		CharType c = *str++;
+
+		if (bSkipQuotedChars)
+		{
+			bool bInQuotedStr = false;
+			while (c)
+			{
+				if (c >= LITERAL(CharType, 'a') && c <= LITERAL(CharType, 'z'))
+				{
+					c += LITERAL(CharType, 'A') - LITERAL(CharType, 'a');
+				}
+				if (!bInQuotedStr && !alnum && c == f && !strnicmp(str, find, length))
+				{
+					return str - 1;
+				}
+				alnum = (c >= LITERAL(CharType, 'A') && c <= LITERAL(CharType, 'Z')) || (c >= LITERAL(CharType, '0') && c <= LITERAL(CharType, '9'));
+				if (c == LITERAL(CharType, '"'))
+				{
+					bInQuotedStr = !bInQuotedStr;
+				}
+				c = *str++;
+			}
+		}
+		else
+		{
+			while (c)
+			{
+				if (c >= LITERAL(CharType, 'a') && c <= LITERAL(CharType, 'z'))
+				{
+					c += LITERAL(CharType, 'A') - LITERAL(CharType, 'a');
+				}
+				if (!alnum && c == f && !strnicmp(str, find, length))
+				{
+					return str - 1;
+				}
+				alnum = (c >= LITERAL(CharType, 'A') && c <= LITERAL(CharType, 'Z')) || (c >= LITERAL(CharType, '0') && c <= LITERAL(CharType, '9'));
+				c = *str++;
+			}
+		}
+		return nullptr;
 	}
 }

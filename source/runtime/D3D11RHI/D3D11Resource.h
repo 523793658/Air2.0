@@ -145,11 +145,45 @@ namespace Air
 		}
 	};
 
+	class D3D11StructuredBuffer : public RHIStructuredBuffer, public D3D11BaseShaderResource
+	{
+	public:
+		TRefCountPtr<ID3D11Buffer> mResource;
+		D3D11StructuredBuffer(ID3D11Buffer* inResource, uint32 inStride, uint32 inSize, uint32 inUsage)
+			:RHIStructuredBuffer(inStride, inSize, inUsage)
+			, mResource(inResource)
+		{
+			setCurrentGPUAccess(EResourceTransitionAccess::ERWBarrier);
+		}
+
+		virtual ~D3D11StructuredBuffer()
+		{
+			updateBufferStats(mResource, false);
+		}
+
+		virtual uint32 AddRef() const
+		{
+			return RHIResource::AddRef();
+		}
+
+		virtual uint32 Release() const
+		{
+			return RHIResource::Release();
+		}
+
+		virtual uint32 GetRefCount() const
+		{
+			return RHIResource::GetRefCount();
+		}
+	};
+
 	DECL_D3D11_RESOURCE_TRAITS(D3D11VertexDeclaration, RHIVertexDeclaration);
 
 	DECL_D3D11_RESOURCE_TRAITS(D3D11VertexBuffer, RHIVertexBuffer);
 
 	DECL_D3D11_RESOURCE_TRAITS(D3D11IndexBuffer, RHIIndexBuffer);
+
+	DECL_D3D11_RESOURCE_TRAITS(D3D11StructuredBuffer, RHIStructuredBuffer);
 
 }
 
@@ -160,4 +194,6 @@ namespace std
 	{
 		enum { value = true };
 	};
+
+	
 }

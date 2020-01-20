@@ -50,5 +50,15 @@ namespace Air
 
 	};
 
+	class IDelegateInstance
+	{
+	public:
+		virtual bool isSafeToExecute() const = 0;
 
+		virtual DelegateHandle getHandle() const = 0;
+
+		virtual uint64 getBoundProgramCounterForTimerManager() const = 0;
+	public:
+		virtual ~IDelegateInstance() {}
+	};
 }

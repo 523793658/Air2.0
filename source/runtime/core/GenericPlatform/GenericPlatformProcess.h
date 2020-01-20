@@ -42,7 +42,7 @@ namespace Air
 
 		static void freeDllHandle(void*);
 
-		static void* getDllExport(void* dllHandle, const char* ProcName) { return nullptr; }
+		static void* getDllExport(void* dllHandle, const TCHAR* ProcName) { return nullptr; }
 
 		static const TCHAR* getBinariesSubDirectory() { return nullptr; };
 		static const TCHAR* getModuleExtension() { return nullptr; }

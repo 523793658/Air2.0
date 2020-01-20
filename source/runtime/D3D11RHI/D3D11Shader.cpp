@@ -121,7 +121,7 @@ namespace Air
 		return shader;
 	}
 
-	void D3D11DynamicRHI::RHISetShaderConstantBuffer(VertexShaderRHIParamRef vertexShader, uint32 bufferIndex, ConstantBufferRHIParamRef bufferRHI)
+	void D3D11DynamicRHI::RHISetShaderConstantBuffer(RHIVertexShader* vertexShader, uint32 bufferIndex, RHIConstantBuffer* bufferRHI)
 	{
 		D3D11ConstantBuffer* buffer = ResourceCast(bufferRHI);
 		{
@@ -132,7 +132,7 @@ namespace Air
 		mDirtyConstantBuffers[SF_Vertex] |= (1 << bufferIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderConstantBuffer(PixelShaderRHIParamRef pixelShader, uint32 bufferIndex, ConstantBufferRHIParamRef bufferRHI)
+	void D3D11DynamicRHI::RHISetShaderConstantBuffer(RHIPixelShader* pixelShader, uint32 bufferIndex, RHIConstantBuffer* bufferRHI)
 	{
 		D3D11ConstantBuffer* buffer = ResourceCast(bufferRHI);
 		{
@@ -143,7 +143,7 @@ namespace Air
 		mDirtyConstantBuffers[SF_Pixel] |= (1 << bufferIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderConstantBuffer(HullShaderRHIParamRef pixelShader, uint32 bufferIndex, ConstantBufferRHIParamRef bufferRHI)
+	void D3D11DynamicRHI::RHISetShaderConstantBuffer(RHIHullShader* pixelShader, uint32 bufferIndex, RHIConstantBuffer* bufferRHI)
 	{
 		D3D11ConstantBuffer* buffer = ResourceCast(bufferRHI);
 		{
@@ -154,7 +154,7 @@ namespace Air
 		mDirtyConstantBuffers[SF_Hull] |= (1 << bufferIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderConstantBuffer(DomainShaderRHIParamRef domainShader, uint32 bufferIndex, ConstantBufferRHIParamRef bufferRHI)
+	void D3D11DynamicRHI::RHISetShaderConstantBuffer(RHIDomainShader* domainShader, uint32 bufferIndex, RHIConstantBuffer* bufferRHI)
 	{
 		D3D11ConstantBuffer* buffer = ResourceCast(bufferRHI);
 		{
@@ -165,7 +165,7 @@ namespace Air
 		mDirtyConstantBuffers[SF_Domain] |= (1 << bufferIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderConstantBuffer(GeometryShaderRHIParamRef pixelShader, uint32 bufferIndex, ConstantBufferRHIParamRef bufferRHI)
+	void D3D11DynamicRHI::RHISetShaderConstantBuffer(RHIGeometryShader* pixelShader, uint32 bufferIndex, RHIConstantBuffer* bufferRHI)
 	{
 		D3D11ConstantBuffer* buffer = ResourceCast(bufferRHI);
 		{
@@ -176,7 +176,7 @@ namespace Air
 		mDirtyConstantBuffers[SF_Geometry] |= (1 << bufferIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderConstantBuffer(ComputeShaderRHIParamRef computeShader, uint32 bufferIndex, ConstantBufferRHIParamRef bufferRHI)
+	void D3D11DynamicRHI::RHISetShaderConstantBuffer(RHIComputeShader* computeShader, uint32 bufferIndex, RHIConstantBuffer* bufferRHI)
 	{
 		D3D11ConstantBuffer* buffer = ResourceCast(bufferRHI);
 		{
@@ -187,34 +187,34 @@ namespace Air
 		mDirtyConstantBuffers[SF_Compute] |= (1 << bufferIndex);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderParameter(VertexShaderRHIParamRef vertexShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+	void D3D11DynamicRHI::RHISetShaderParameter(RHIVertexShader* vertexShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
 	{
 		mVSUnifomBuffers[bufferIndex]->updateUniform((const uint8*)newValue, baseIndex, numBytes);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderParameter(HullShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+	void D3D11DynamicRHI::RHISetShaderParameter(RHIHullShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
 	{
 		mHSUnifomBuffers[bufferIndex]->updateUniform((const uint8*)newValue, baseIndex, numBytes);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderParameter(DomainShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+	void D3D11DynamicRHI::RHISetShaderParameter(RHIDomainShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
 	{
 		mDSUnifomBuffers[bufferIndex]->updateUniform((const uint8*)newValue, baseIndex, numBytes);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderParameter(GeometryShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+	void D3D11DynamicRHI::RHISetShaderParameter(RHIGeometryShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
 	{
 		mGSUnifomBuffers[bufferIndex]->updateUniform((const uint8*)newValue, baseIndex, numBytes);
 	}
 
-	void D3D11DynamicRHI::RHISetShaderParameter(PixelShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+	void D3D11DynamicRHI::RHISetShaderParameter(RHIPixelShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
 	{
 		mPSUnifomBuffers[bufferIndex]->updateUniform((const uint8*)newValue, baseIndex, numBytes);
 	}
 
 	static DXGI_FORMAT getPlatformTextureResourceFormat(DXGI_FORMAT inFormat, uint32 inFlags);
 
-	void D3D11DynamicRHI::RHISetShaderParameter(ComputeShaderRHIParamRef hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
+	void D3D11DynamicRHI::RHISetShaderParameter(RHIComputeShader* hullShader, uint32 bufferIndex, uint32 baseIndex, uint32 numBytes, const void* newValue)
 	{
 		mCSUnifomBuffers[bufferIndex]->updateUniform((const uint8*)newValue, baseIndex, numBytes);
 	}
@@ -253,7 +253,7 @@ namespace Air
 	}
 
 
-	BoundShaderStateRHIRef D3D11DynamicRHI::RHICreateBoundShaderState(VertexDeclarationRHIParamRef vertexDeclaration, VertexShaderRHIParamRef vertexShaderRHI, HullShaderRHIParamRef hullShaderRHI, DomainShaderRHIParamRef domainShaderRHI, GeometryShaderRHIParamRef geometryShaderRHI, PixelShaderRHIParamRef pixelShaderRHI)
+	BoundShaderStateRHIRef D3D11DynamicRHI::RHICreateBoundShaderState(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShaderRHI, RHIHullShader* hullShaderRHI, RHIDomainShader* domainShaderRHI, RHIGeometryShader* geometryShaderRHI, RHIPixelShader* pixelShaderRHI)
 	{
 		BOOST_ASSERT(isInRenderingThread());
 		BOOST_ASSERT(GIsRHIInitialized && mD3D11Context);
@@ -270,7 +270,7 @@ namespace Air
 
 #define TEST_HR(t) {hr = t;}
 
-	D3D11BoundShaderState::D3D11BoundShaderState(VertexDeclarationRHIParamRef inVertexDeclarationRHI, VertexShaderRHIParamRef inVertexShaderRHI, PixelShaderRHIParamRef inPixelShaderRHI, HullShaderRHIParamRef inHullShaderRHI, DomainShaderRHIParamRef inDomainShaderRHI, GeometryShaderRHIParamRef inGeometryShaderRHI, ID3D11Device* direct3DDevice)
+	D3D11BoundShaderState::D3D11BoundShaderState(RHIVertexDeclaration* inVertexDeclarationRHI, RHIVertexShader* inVertexShaderRHI, RHIPixelShader* inPixelShaderRHI, RHIHullShader* inHullShaderRHI, RHIDomainShader* inDomainShaderRHI, RHIGeometryShader* inGeometryShaderRHI, ID3D11Device* direct3DDevice)
 		:mCachedLink(inVertexDeclarationRHI, inVertexShaderRHI, inPixelShaderRHI,inHullShaderRHI, inDomainShaderRHI, inGeometryShaderRHI, this)
 	{
 		D3D11VertexDeclaration* inVertexDeclaration = D3D11DynamicRHI::ResourceCast(inVertexDeclarationRHI);
