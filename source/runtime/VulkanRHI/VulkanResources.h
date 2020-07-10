@@ -4,8 +4,8 @@
 #include "VulkanState.h"
 #include "VulkanUtil.h"
 #include "BoundShaderStateCache.h"
-#include "VulkanContext.h"
 #include "VulkanMemory.h"
+#include "VulkanRHIPrivate.h"
 namespace Air
 {
 	struct SamplerYcbcrConversionInitializer
@@ -230,6 +230,315 @@ namespace Air
 		StagingBuffer* mResultsBuffer = nullptr;
 	};
 
+	class VulkanResourceMultiBuffer : public DeviceChild
+	{
+	public:	 
+		VulkanResourceMultiBuffer(VulkanDevice* inDevice, VkBufferUsageFlags inBufferUsageFlags, uint32 inSize, uint32 inUsage, RHIResourceCreateInfo& createInfo, class RHICommandListImmediate* inRHICmdList = nullptr);
+
+		void* lock(bool bFromRenderingThread, EResourceLockMode lockMode, uint32 size, uint32 offset);
+
+		void unlock(bool bFromRenderingThread);
+	protected:
+		uint32 mUsage;
+		VkBufferUsageFlags mBufferUsageFlags;
+		uint32 mNumBuffers;
+		uint32 mDynamicBufferIndex;
+		enum
+		{
+			NUM_BUFFERS = 3,
+		};
+
+		TRefCountPtr<BufferSuballocation> mBuffers[NUM_BUFFERS];
+		struct  
+		{
+			BufferSuballocation* mSubAlloc = nullptr;
+			BufferAllocation* mBufferAllocation = nullptr;
+			VkBuffer mHandle = VK_NULL_HANDLE;
+			uint64 mOffset = 0;
+		}mCurrent;
+		TempFrameAllocationBuffer::TempAllocInfo mVolatileLockInfo;
+
+		static void internalUnlock(VulkanCommandListContext& context, PendingBufferLock& pendingLock, VulkanResourceMultiBuffer* multiBuffer, int32 inDynamicBufferIndex);
+
+		friend class VulkanCommandListContext;
+		friend struct RHICommandMultiBufferUnlock;
+	};
+
+	class VulkanBuffer : RHIResource
+	{
+		VulkanBuffer(VulkanDevice& device, uint32 inSize, VkFlags usage, VkMemoryPropertyFlags inMemPropertyFlags, bool bAllowMultiLock, const char* file, int32 line);
+
+		virtual ~VulkanBuffer();
+
+		inline VkBuffer getBufferHandle() const { return mBuffer; }
+
+		inline uint32 getSize() const { return mSize; }
+
+		void* lock(uint32 inSize, uint32 inOffset = 0);
+
+		void unlock();
+
+		inline VkFlags getFlags() const { return mUsage; }
+	private:  
+		VulkanDevice& mDevice;
+		VkBuffer mBuffer;
+		DeviceMemoryAllocation* mAllocation;
+		uint32 mSize;
+		VkFlags mUsage;
+
+		void* mBufferPtr;
+		VkMappedMemoryRange mMappedRange;
+
+		bool bAllowMultiLock;
+
+		int32 mLockStack;
+	};
+
+	class VulkanStructuredBuffer : public RHIStructuredBuffer, public VulkanResourceMultiBuffer
+	{
+	public:
+		VulkanStructuredBuffer(VulkanDevice* inDevice, uint32 stride, uint32 size, RHIResourceCreateInfo& createInfo, uint32 inUsage);
+		~VulkanStructuredBuffer();
+	};
+
+	class VulkanVertexBuffer : public RHIVertexBuffer, public VulkanResourceMultiBuffer
+	{
+	public:
+		VulkanVertexBuffer(VulkanDevice* inDevice, uint32 inSize, uint32 inUsage, RHIResourceCreateInfo& createInfo, class RHICommandListImmediate* inRHICmdList);
+
+		void swap(VulkanVertexBuffer& other);
+	};
+
+	class VulkanIndexBuffer : public RHIIndexBuffer, public VulkanResourceMultiBuffer
+	{
+	public:
+		VulkanIndexBuffer(VulkanDevice* inDevice, uint32 inStride, uint32 inSize, uint32 inUsage, RHIResourceCreateInfo& createInfo, class RHICommandListImmediate* inRHICommandList);
+
+		inline VkIndexType getIndexType()const
+		{
+			return mIndexType;
+		}
+
+		void swap(VulkanIndexBuffer& other);
+
+	private:
+		VkIndexType mIndexType;
+	};
+
+	class VulkanConstantBuffer : public RHIConstantBuffer 
+	{
+	public:
+		VulkanConstantBuffer(const RHIConstantBufferLayout& inLayout, const void* contents, EConstantBufferUsage inUsage, EConstantBufferValidation validation);
+
+		const TArray<TRefCountPtr<RHIResource>>& getResourceTable() const { return mResourceTable; }
+
+		void updateResourceTable(const RHIConstantBufferLayout& inLayout, const void* contents, int32 resourceNum);
+
+		void updateResourceTable(RHIResource** resources, int32 resourceNum);
+	protected:
+		TArray<TRefCountPtr<RHIResource>> mResourceTable;
+	};
+
+	class VulkanRealConstantBuffer : public VulkanConstantBuffer {
+
+	public:
+		VulkanRealConstantBuffer(VulkanDevice& device, const RHIConstantBufferLayout& inLayout, const void* contents, EConstantBufferUsage inUsage, EConstantBufferValidation validation);
+
+		virtual ~VulkanRealConstantBuffer();
+
+		BufferAllocation* getBufferAllocation() const
+		{
+			BOOST_ASSERT(mCBAllocation);
+			return mCBAllocation->getBufferAllocation();
+		}
+
+		inline uint32 getOffset() const
+		{
+			return mCBAllocation->getOffset();
+		}
+
+		inline BufferSuballocation* updateCBAllocation(BufferSuballocation* newAlloc)
+		{
+			BOOST_ASSERT(mCBAllocation);
+			BufferSuballocation* prevBufferSuballoc = mCBAllocation;
+			mCBAllocation = newAlloc;
+			return prevBufferSuballoc;
+		}
+
+
+		VulkanDevice* mDevice;
+		BufferSuballocation* mCBAllocation = nullptr;
+	};
+
+	class VulkanEmulatedConstantBuffer : public VulkanConstantBuffer
+	{
+	public:
+		VulkanEmulatedConstantBuffer(const RHIConstantBufferLayout& inLayout, const void* contents, EConstantBufferUsage inUsage, EConstantBufferValidation validation);
+
+		void udpateConstantData(const void* contents, int32 contentsSize);
+
+		TArray<uint8> mConstantData;
+
+
+	};
+
+	struct VulkanBufferView : public RHIResource, public DeviceChild
+	{
+		VulkanBufferView(VulkanDevice* inDevice)
+			:DeviceChild(inDevice)
+			,mView(VK_NULL_HANDLE)
+			,mViewId(0)
+			,mFlags(0)
+			,mOffset(0)
+			,mSize(0)
+		{
+			
+		}
+
+		~VulkanBufferView()
+		{
+			destroy();
+		}
+
+		void create(VulkanBuffer& buffer, EPixelFormat format, uint32 inOffset, uint32 inSize);
+
+		void create(VulkanResourceMultiBuffer* buffer, EPixelFormat format, uint32 inOffset, uint32 inSize);
+
+		void create(VkFormat format, VulkanResourceMultiBuffer* buffer, uint32 inOffset, uint32 inSize);
+
+		void destroy();
+
+		VkBufferView mView;
+		uint32 mViewId;
+		VkFlags mFlags;
+		uint32 mOffset;
+		uint32 mSize;
+	};
+
+
+	class VulkanShaderResourceView : public RHIShaderResourceView, public DeviceChild
+	{
+	public:
+		VulkanShaderResourceView(VulkanDevice* device, RHIResource* inRHIBuffer, VulkanResourceMultiBuffer* inSourceBuffer, uint32 inSize, EPixelFormat inFormat);
+
+		VulkanShaderResourceView(VulkanDevice* device, RHITexture* inSourceTexture, const RHITextureSRVCreateInfo& inCreateInfo)
+			:DeviceChild(device)
+			,mBufferViewFormat((EPixelFormat)inCreateInfo.mFormat)
+			,mSRGBOverride(inCreateInfo.mSRGBOverride)
+			,mSourceTexture(inSourceTexture)
+			, mSourceStructuredBuffer(nullptr)
+			, mMipLevel(inCreateInfo.mMipLevel)
+			,mNumMips(inCreateInfo.mNumMipLevels)
+			,mFirstArraySlice(inCreateInfo.mFirstArraySize)
+			,mNumArraySlices(inCreateInfo.mNumArraySlices)
+			,mSize(0)
+			,mSourceBuffer(nullptr)
+		{
+
+		}
+
+		VulkanShaderResourceView(VulkanDevice* device, VulkanStructuredBuffer* inStructuredBuffer)
+			:DeviceChild(device)
+			,mBufferViewFormat(PF_Unknown)
+			,mSourceTexture(nullptr)
+			,mSourceStructuredBuffer(inStructuredBuffer)
+			,mNumMips(0)
+			,mSize(inStructuredBuffer->getSize())
+			,mSourceBuffer(nullptr)
+		{
+
+		}
+
+
+		EPixelFormat mBufferViewFormat;
+		ERHITextureSRVOverrideSRGBType mSRGBOverride = SRGBO_Default;
+
+		TRefCountPtr<RHITexture> mSourceTexture;
+		VulkanTextureView mTextureView;
+		VulkanStructuredBuffer* mSourceStructuredBuffer;
+		uint32 mMipLevel = 0;
+		uint32 mNumMips = std::numeric_limits<uint32>::max();
+		uint32 mFirstArraySlice = 0;
+		uint32 mNumArraySlices = 0;
+
+		~VulkanShaderResourceView();
+
+		TArray<TRefCountPtr<VulkanBufferView>> mBufferViews;
+
+		uint32 mBufferIndex = 0; 
+		uint32 mSize;
+
+		VulkanResourceMultiBuffer* mSourceBuffer;
+
+		TRefCountPtr<RHIResource> mSourceRHIBuffer;
+
+	protected:
+		VkBuffer mVolatileBufferHandle = VK_NULL_HANDLE;
+
+		uint32 mVolatileLockCounter = std::numeric_limits<uint32>::max();
+	};
+
+	class VulkanUnorderedAccessView : public RHIUnorderedAccessView, public DeviceChild
+	{
+	public:
+
+		VulkanUnorderedAccessView(VulkanDevice* device)
+			:DeviceChild(device)
+			,mMipLevel(0)
+			,mBufferViewFormat(PF_Unknown)
+			,mVolatileLockCounter(std::numeric_limits<uint32>::max())
+		{}
+		~VulkanUnorderedAccessView();
+
+		void updateView();
+
+		TRefCountPtr<VulkanStructuredBuffer> mSourceStructuredBuffer;
+
+		TRefCountPtr<RHITexture> mSourceTexture;
+
+		VulkanTextureView mTextureView;
+
+		uint32 mMipLevel;
+
+		TRefCountPtr<VulkanVertexBuffer> mSourceVertexBuffer;
+		TRefCountPtr<VulkanIndexBuffer> mSourceIndexBuffer;
+		TRefCountPtr<VulkanBufferView> mBufferView;
+
+		EPixelFormat mBufferViewFormat;
+
+	protected:
+
+		uint32 mVolatileLockCounter;
+	};
+
+	class VulkanShader : public IRefCountedObject
+	{
+	protected:
+#if VULKAN_ENABLE_SHADER_DEBUG_NAMES
+		wstring mDebugEntryPoint;
+#endif
+		uint64 mShaderKey;
+
+		VulkanShaderHeader	mCodeHeader;
+
+		TMap<uint32, VkShaderModule> mShaderModules;
+
+		const VkShaderStageFlagBits		mStageFlag;
+
+		EShaderFrequency				mFrequency;
+
+		TArray<uint32>					mSpirv;
+
+		VulkanDevice* mDevice;
+
+		VkShaderModule createHandle(const VulkanLayout)
+	};
+
+
+	template<typename BaseResourceType, EShaderFrequency ShaderType, VkShaderStageFlagBits StageFlagBits>
+	class TVulkanBaseShader : public BaseResourceType, public VulkanShader
+
+
 	template<typename TRHIType> 
 	static FORCEINLINE typename TVulkanResourceTraits<TRHIType>::TConcreteType* resourceCast(TRHIType* resource)
 	{
@@ -241,4 +550,34 @@ namespace Air
 	{
 		return static_cast<const typename TVulkanResourceTraits<TRHIType>::TConcreteType*>(resource);
 	}
+
+	template<>
+	struct TVulkanResourceTraits<RHIStructuredBuffer>
+	{
+		typedef VulkanStructuredBuffer TConcreteType;
+	};
+
+	template<>
+	struct TVulkanResourceTraits<RHIUnorderedAccessView>
+	{
+		typedef VulkanUnorderedAccessView TConcreteType;
+	};
+
+	template<>
+	struct TVulkanResourceTraits<RHIVertexBuffer>
+	{
+		typedef VulkanVertexBuffer TConcreteType;
+	};
+
+	template<>
+	struct TVulkanResourceTraits<RHIIndexBuffer>
+	{
+		typedef VulkanIndexBuffer TConcreteType;
+	};
+
+	template<>
+	struct TVulkanResourceTraits<RHIConstantBuffer>
+	{
+		typedef VulkanConstantBuffer TConcreteType;
+	};
 }

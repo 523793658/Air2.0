@@ -7,9 +7,9 @@ namespace Air
 {
 	void cacheMaterialInstanceConstantExpressions(const MaterialInstance* materialInstance)
 	{
-		if (materialInstance->mResources[0])
+		if (materialInstance->mResource)
 		{
-			materialInstance->mResources[0]->cacheConstantExpressions_GameThread();
+			materialInstance->mResource->cacheConstantExpressions_GameThread();
 		}
 	}
 
@@ -33,7 +33,7 @@ namespace Air
 			}
 			else
 			{
-				MaterialRenderProxy* parentProxy = mParent->getRenderProxy(isSelected(), isHovered());
+				MaterialRenderProxy* parentProxy = mParent->getRenderProxy();
 				if (parentProxy)
 				{
 					return parentProxy->getMaterialNoFallback(inFeatureLevel);
@@ -82,7 +82,7 @@ namespace Air
 
 		else if (mParent)
 		{
-			return mParent->getRenderProxy(isSelected(), isHovered())->getScalarValue(parameterName, outValue, context);
+			return mParent->getRenderProxy()->getScalarValue(parameterName, outValue, context);
 		}
 		else
 		{
@@ -101,7 +101,7 @@ namespace Air
 		}
 		else if (mParent)
 		{
-			return mParent->getRenderProxy(isSelected(), isHovered())->getVectorValue(parameterName, outValue, context);
+			return mParent->getRenderProxy()->getVectorValue(parameterName, outValue, context);
 		}
 		else
 		{
@@ -120,7 +120,7 @@ namespace Air
 		}
 		else if (mParent)
 		{
-			return mParent->getRenderProxy(isSelected(), isHovered())->getTextureValue(parameterName, outValue, context);
+			return mParent->getRenderProxy()->getTextureValue(parameterName, outValue, context);
 		}
 		else
 		{
@@ -147,19 +147,19 @@ namespace Air
 				{
 					EMaterialDomain domain = (EMaterialDomain)staticPermutationResource->getMaterialDomain();
 					std::shared_ptr<RMaterial>& fallbackMaterial = RMaterial::getDefaultMaterial(domain);
-					return fallbackMaterial->getRenderProxy(isSelected(), isHovered())->getMaterial(inFeatureLevel);
+					return fallbackMaterial->getRenderProxy()->getMaterial(inFeatureLevel);
 				}
 
 			}
 			else
 			{
-				return mParent->getRenderProxy(isSelected(), isHovered())->getMaterial(inFeatureLevel);
+				return mParent->getRenderProxy()->getMaterial(inFeatureLevel);
 			}
 		}
 		else
 		{
 			std::shared_ptr<RMaterial>& fallbackMaterial = RMaterial::getDefaultMaterial(MD_Surface);
-			return fallbackMaterial->getRenderProxy(isSelected(), isHovered())->getMaterial(inFeatureLevel);
+			return fallbackMaterial->getRenderProxy()->getMaterial(inFeatureLevel);
 		}
 	}
 }

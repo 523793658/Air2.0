@@ -104,6 +104,8 @@ namespace Air
 
 	uint32 RHIResource::mCurrentFrame = 0;
 
+	VertexElementTypeSupportInfo GVertexElementTypeSupport;
+
 
 	RHI_API EShaderPlatform GShaderPlatformForFeatureLevel[ERHIFeatureLevel::Num] = { SP_NumPlatforms, SP_NumPlatforms , SP_NumPlatforms , SP_NumPlatforms };
 

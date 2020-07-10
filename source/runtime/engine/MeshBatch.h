@@ -14,7 +14,11 @@ namespace Air
 	struct MeshBatchElement
 	{
 		const TConstantBuffer<PrimitiveConstantShaderParameters>* mPrimitiveConstantBufferResource;
-		TConstantBufferRef<PrimitiveConstantShaderParameters> mPrimitiveConstantBuffer;
+		RHIConstantBuffer* mPrimitiveConstantBuffer;
+
+
+		void* mVertexFactoryUserData;
+
 		const IndexBuffer* mIndexBuffer;
 
 		union
@@ -73,11 +77,17 @@ namespace Air
 		uint16 mDynamicVertexStride{ 0 };
 		int8 mLODIndex{ INDEX_NONE };
 		int8 mVisualizeLODIndex{ INDEX_NONE };
+		uint8 mSegmentIndex;
+		uint32 mMinVertexIndex;
+		uint32 mMaxVertexIndex;
 
 		uint32 bUseDynamicData : 1;
 		uint32 bReverseCulling : 1;
 		uint32 bDisableBackfaceCulling : 1;
 		uint32 bCastShadow : 1;
+#if RHI_RAYTRACING
+		uint32 bCastRayTracedShadow : 1;
+#endif
 		uint32 bUseForMaterial : 1;
 		uint32 bUseAsOccluder : 1;
 		uint32 bWireframe : 1;

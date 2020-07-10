@@ -9,11 +9,25 @@ namespace Air
 
 	void LocalVertexFactory::initRHI()
 	{
+		BOOST_ASSERT(hasValidFeatureLevel());
+		const bool bCanUseGPUScene = useGPUScene(GMaxRHIShaderPlatform, GMaxRHIFeatureLevel);
+
 		if (mData.mPositionComponents.mVertexBuffer != mData.mTangentBasisComponents[0].mVertexBuffer)
 		{
-			VertexDeclarationElementList positionOnlyStreamElements;
-			positionOnlyStreamElements.add(accessPositionStreamComponent(mData.mPositionComponents, 0));
-			initPositionDeclaration(positionOnlyStreamElements);
+			auto addDeclaration = [this, bCanUseGPUScene](EVertexInputStreamType inputStreamType, bool bAddNormal)
+			{
+				VertexDeclarationElementList streamElements;
+				streamElements.add(accessStreamComponent(mData.mPositionComponent, 0, inputStreamType));
+
+				bAddNormal = bAddNormal && mData.mTangentBasisComponents[1].mVertexBuffer != nullptr;
+				if (bAddNormal)
+				{
+					streamElements.add(accessStreamComponent(mData.mTangentBasisComponents[1], 2, inputStreamType));
+				}
+
+				const uint8 typeIndex = static_cast<uint8>(inputStreamType);
+				mPrimitiveIdStreamIndex[typeIndex] = -1;
+			};
 		}
 		VertexDeclarationElementList elements;
 		if (mData.mPositionComponents.mVertexBuffer != nullptr)

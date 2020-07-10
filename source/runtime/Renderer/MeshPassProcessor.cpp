@@ -1,5 +1,6 @@
 #include "MeshPassProcessor.h"
 #include "MeshDrawShaderBindings.h"
+#include "RenderUtils.h"
 namespace Air
 {
 	class ReadOnlyMeshDrawSingleShaderBindings : public MeshDrawShaderBindingsLayout
@@ -123,5 +124,13 @@ namespace Air
 			}
 
 		}
+	}
+
+	CachedPassMeshDrawListContext::CachedPassMeshDrawListContext(CachedMeshDrawCommandInfo& inCommandInfo, CachedPassMeshDrawList& inDrawList, Scene& inScene)
+		:mCommandInfo(inCommandInfo)
+		,mDrawList(inDrawList)
+		,mScene(inScene)
+	{
+		bUseStateBuckets = useGPUScene(GMaxRHIShaderPlatform, GMaxRHIFeatureLevel);
 	}
 }

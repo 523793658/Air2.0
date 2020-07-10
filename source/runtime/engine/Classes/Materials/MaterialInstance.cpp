@@ -20,7 +20,7 @@ namespace Air
 	template<typename ParameterType>
 	void GameThread_UpdateMIParameter(const MaterialInstance* instance, const ParameterType& parameter)
 	{
-		MaterialInstanceResource* resource = instance->mResources[0];
+		MaterialInstanceResource* resource = instance->mResource;
 		const wstring parameterName = parameter.mParameterName;
 		typename ParameterType::ValueType value = ParameterType::getValue(parameter);
 		ENQUEUE_RENDER_COMMAND(SetMIParameterValue)([resource, parameterName, value](RHICommandListImmediate& RHICmdList) {
@@ -37,6 +37,14 @@ namespace Air
 			{
 				GameThread_UpdateMIParameter(instance, parameters[parameterIndex]);
 			}
+		}
+	}
+
+	std::shared_ptr<const RMaterial> MaterialInstance::getMaterial_Concurrent(TMicRecursionGuard& recursionGurad) const
+	{
+		if (mParent || recursionGurad.contains(this))
+		{
+			return RMaterial::getDefaultMaterial(MD_Surface);
 		}
 	}
 
@@ -206,13 +214,9 @@ namespace Air
 		}
 
 		BOOST_ASSERT(safeParent);
-		for (int32 curResourceIndex = 0; curResourceIndex < ARRAY_COUNT(mResources); ++curResourceIndex)
-		{
-			if (mResources[curResourceIndex] != nullptr)
-			{
-				mResources[curResourceIndex]->GameThread_setParent(safeParent);
-			}
-		}
+		
+		mResource->GameThread_setParent(safeParent);
+	
 
 		GameThread_InitMIParameters(this, mScalarParameterValues);
 		GameThread_InitMIParameters(this, mVectorParameterValues);
@@ -283,13 +287,8 @@ namespace Air
 	}
 	void MaterialInstance::propagateDataToMaterialProxy()
 	{
-		for (int32 i = 0; i < ARRAY_COUNT(mResources); i++)
-		{
-			if (mResources[i])
-			{
-				updateMaterialRenderProxy(*mResources[i]);
-			}
-		}
+
+		updateMaterialRenderProxy(*mResource);
 	}
 
 	bool MaterialInstance::isDependent(MaterialInterface* testDependency)
@@ -472,12 +471,7 @@ namespace Air
 		ParentType::postInitProperties();
 		if (!hasAnyFlags(RF_ClassDefaultObject))
 		{
-			mResources[0] = new MaterialInstanceResource(this, false, false);
-			if (GIsEditor)
-			{
-				mResources[1] = new MaterialInstanceResource(this, true, false);
-				mResources[2] = new MaterialInstanceResource(this, false, true);
-			}
+			mResource = new MaterialInstanceResource(this, false, false);
 		}
 	}
 
@@ -501,10 +495,9 @@ namespace Air
 		
 	}
 
-	MaterialRenderProxy* MaterialInstance::getRenderProxy(bool selected, bool bHovered /* = false */) const
+	MaterialRenderProxy* MaterialInstance::getRenderProxy() const
 	{
-		BOOST_ASSERT(!(selected || bHovered) || GIsEditor);
-		return mResources[selected ? 1 : (bHovered ? 2 : 0)];
+		return mResource;
 	}
 
 

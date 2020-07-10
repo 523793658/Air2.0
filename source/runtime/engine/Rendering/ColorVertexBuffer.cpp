@@ -9,11 +9,7 @@ namespace Air
 			:TStaticMeshVertexData<Color>(inNeedsCPUAccess)
 		{}
 
-		TStaticMeshVertexData<Color>& operator = (const TArray<Color>& other)
-		{
-			TStaticMeshVertexData<Color>::operator=(other);
-			return *this;
-		}
+		
 	};
 
 	ColorVertexBuffer::ColorVertexBuffer()
@@ -130,6 +126,42 @@ namespace Air
 				RHIResourceCreateInfo info(resourceArray);
 				mVertexBufferRHI = RHICreateVertexBuffer(resourceArray->getResourceDataSize(), BUF_Static, info);
 			}
+		}
+	}
+
+	void ColorVertexBuffer::bindColorVertexBuffer(const class VertexFactory* vertexFactory, struct StaticMeshDataType& staticMeshData) const
+	{
+		if (getNumVertices() == 0)
+		{
+			bindDefaultColorVertexBuffer(vertexFactory, staticMeshData, NullBindStride::ZeroForDefaultBufferBind);
+			return;
+		}
+		staticMeshData.mColorComponentsSRV = mColorComponentsSRV;
+		staticMeshData.mColorIndexMask = ~0u;
+		{
+			staticMeshData.mColorComponent = VertexStreamComponent(
+				this,
+				0,
+				getStride(),
+				VET_Color,
+				EVertexStreamUsage::ManualFetch
+			);
+		}
+	}
+
+	void ColorVertexBuffer::bindDefaultColorVertexBuffer(const class VertexFactory* vertexFactory, struct StaticMeshDataType& staticMeshData, NullBindStride bindStride)
+	{
+		staticMeshData.mColorComponentsSRV = GNullColorVertexBuffer.mVertexBufferSRV;
+		staticMeshData.mColorIndexMask = 0;
+
+		{
+			const bool bBindForDrawOverride = bindStride == NullBindStride::ColorSizeForComponentOverride;
+			staticMeshData.mColorComponent = VertexStreamComponent(
+				&GNullColorVertexBuffer,
+				0,
+				bBindForDrawOverride ? sizeof(Color) : 0,
+				VET_Color,
+				bBindForDrawOverride ? (EVertexStreamUsage::ManualFetch | EVertexStreamUsage::Overridden) : EVertexStreamUsage::ManualFetch);
 		}
 	}
 }

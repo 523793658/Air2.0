@@ -26,7 +26,7 @@ namespace Air
 	public:
 		
 
-		ENGINE_API virtual class MaterialRenderProxy* getRenderProxy(bool selected, bool bHovered = false) const override;
+		ENGINE_API virtual class MaterialRenderProxy* getRenderProxy() const override;
 
 		virtual void postInitProperties() override;
 
@@ -37,6 +37,9 @@ namespace Air
 		ENGINE_API virtual std::shared_ptr<RMaterial> getMaterial() override;
 
 		ENGINE_API virtual std::shared_ptr<const RMaterial> getMaterial() const override;
+
+		ENGINE_API virtual std::shared_ptr<const RMaterial> getMaterial_Concurrent(TMicRecursionGuard& recursionGurad) const override;
+
 
 		ENGINE_API void postLoad() override;
 
@@ -57,6 +60,8 @@ namespace Air
 		ENGINE_API virtual void recacheConstantExpressions() const override;
 
 		ENGINE_API virtual bool isTwoSided() const override;
+
+		
 
 		ENGINE_API virtual bool isMasked() const override;
 
@@ -114,7 +119,7 @@ namespace Air
 
 		std::shared_ptr<void> mLocalData;
 	public:
-		class DefaultMaterialInstance* mDefaultMaterialInstances[3];
+		class DefaultMaterialInstance* mDefaultMaterialInstances;
 
 		friend class DefaultMaterialInstance;
 
@@ -129,6 +134,8 @@ namespace Air
 		uint32 bUsedAsSpecialEngineMaterial : 1;
 
 		uint32 mDitheredLODTransition : 1;
+
+		uint32 bEnableCrackFreeDisplacemenet : 1;
 
 		TEnumAsByte<enum EMaterialDomain> mMaterialDomain;
 
@@ -152,6 +159,9 @@ namespace Air
 		ScalarMaterialInput mAmbientOcclusion;
 
 		ExpressionInput* mMaterialPropertyTable[MP_Max];
+
+		TEnumAsByte<enum EMaterialTessellationMode> mD3D11TessellationMode;
+
 	private:
 		friend class MaterialResource;
 		friend class MaterialLoadingDesc;

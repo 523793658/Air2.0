@@ -190,7 +190,7 @@ namespace Air
 		}
 	}
 
-	VertexElement VertexFactory::accessPositionStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex)
+	/*VertexElement VertexFactory::accessPositionStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex)
 	{
 		VertexStream vertexStream;
 		vertexStream.mVertexBuffer = component.mVertexBuffer;
@@ -199,7 +199,7 @@ namespace Air
 		vertexStream.bUseInstanceIndex = component.bUseInstanceIndex;
 		vertexStream.bSetByVertexFactoryInSetMesh = component.bSetByVertexFactoryInSetMesh;
 		return VertexElement(mPositionStream.addUnique(vertexStream), component.mOffset, component.mType, attributeIndex, vertexStream.mStride, component.bUseInstanceIndex);
-	}
+	}*/
 
 	VertexElement VertexFactory::accessStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex)
 	{
@@ -207,10 +207,31 @@ namespace Air
 		vertexStream.mVertexBuffer = component.mVertexBuffer;
 		vertexStream.mStride = component.mStride;
 		vertexStream.mOffset = 0;
-		vertexStream.bUseInstanceIndex = component.bUseInstanceIndex;
-		vertexStream.bSetByVertexFactoryInSetMesh = component.bSetByVertexFactoryInSetMesh;
-		return VertexElement(mStreams.addUnique(vertexStream), component.mOffset, component.mType, attributeIndex, vertexStream.mStride, component.bUseInstanceIndex);
+		vertexStream.mVertexStreamUsage= component.mVertexStreamUsage;
+		return VertexElement(mStreams.addUnique(vertexStream), component.mOffset, component.mType, attributeIndex, vertexStream.mStride, enumHasAnyFlags(EVertexStreamUsage::Instancing, vertexStream.mVertexStreamUsage));
 	}
+
+	VertexElement VertexFactory::accessStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex, EVertexInputStreamType inputStreamType)
+	{
+		VertexStream vertexStream;
+		vertexStream.mVertexBuffer = component.mVertexBuffer;
+		vertexStream.mStride = component.mStride;
+		vertexStream.mOffset = component.mStreamOffset;
+		vertexStream.mVertexStreamUsage = component.mVertexStreamUsage;
+		if (inputStreamType == EVertexInputStreamType::PositionOnly)
+		{
+			return VertexElement(mPositionStream.addUnique(vertexStream), component.mOffset, component.mType, attributeIndex, vertexStream.mStride, enumHasAnyFlags(EVertexStreamUsage::Instancing, vertexStream.mVertexStreamUsage));
+		}
+		else if (inputStreamType == EVertexInputStreamType::PositionAndNormalOnly)
+		{
+			return VertexElement(mPositionNormalStream.addUnique(vertexStream), component.mOffset, component.mType, attributeIndex, vertexStream.mStride, enumHasAnyFlags(EVertexStreamUsage::Instancing, vertexStream.mVertexStreamUsage));
+		}
+		else
+		{
+			return VertexElement(mStreams.addUnique(vertexStream), component.mOffset, component.mType, attributeIndex, vertexStream.mStride, enumHasAnyFlags(EVertexStreamUsage::Instancing, vertexStream.mVertexStreamUsage));
+		}
+	}
+
 
 	void VertexFactory::initDeclaration(VertexDeclarationElementList& elements)
 	{

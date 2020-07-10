@@ -10,6 +10,11 @@
 #include "SystemTextures.h"
 namespace Air
 {
+
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(OpaqueBasePassConstantParameters, "OpaqueBasePass");
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(SharedBasePassConstantParameters, "BasePass");
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(TranslucentBasePassConstantParameters, "TranslucentBasePass");
+
 	static void setupBasePassView(RHICommandList& cmdList, const ViewInfo& view, const SceneRenderer* sceneRenderer, const bool bIsEditorPrimitivePass = false)
 	{
 		if (!view.isInstancedStereoPass() || bIsEditorPrimitivePass)

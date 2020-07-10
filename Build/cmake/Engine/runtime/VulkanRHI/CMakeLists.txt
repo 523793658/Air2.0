@@ -43,6 +43,11 @@ SET(SOURCE_FILE
     ${VulkanRHI_SOURCE_DIR}/VulkanTexture.h
     ${VulkanRHI_SOURCE_DIR}/VulkanTexture.cpp
     ${VulkanRHI_SOURCE_DIR}/VulkanUAV.cpp
+    ${VulkanRHI_SOURCE_DIR}/VulkanStructuredBuffer.cpp
+    ${VulkanRHI_SOURCE_DIR}/VulkanConstantBuffer.cpp
+    ${VulkanRHI_SOURCE_DIR}/VulkanShader.cpp
+    ${VulkanRHI_SOURCE_DIR}/VulkanShaderResource.h
+    ${VulkanRHI_SOURCE_DIR}/VulkanDescriptor.h
     
 )
 
@@ -59,7 +64,7 @@ SET_TARGET_PROPERTIES(${LIB_NAME} PROPERTIES FOLDER Engine/Runtime)
 
 target_include_directories(${LIB_NAME} PUBLIC ${AIR_EXTERNAL_SOURCE_DIR}/vulkan/Include)
 
-target_link_libraries(${LIB_NAME} LINK_PUBLIC core RHI engine RenderCore ShaderCore UtilityShader)
+target_link_libraries(${LIB_NAME} LINK_PUBLIC core RHI engine RenderCore UtilityShader)
 
 
 target_link_libraries(${LIB_NAME} LINK_PRIVATE

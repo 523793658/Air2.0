@@ -108,6 +108,10 @@ SET(SOURCE_FILE
     ${engine_SOURCE_DIR}/StaticMeshVertexData.h
     ${engine_SOURCE_DIR}/StaticMeshVertexData.cpp
     ${engine_SOURCE_DIR}/FinalPostProcessSettings.h
+    ${engine_SOURCE_DIR}/PerPlatformProperties.h
+    ${engine_SOURCE_DIR}/PerPlatformProperties.cpp
+    ${engine_SOURCE_DIR}/TessellationRendering.h
+    ${engine_SOURCE_DIR}/TessellationRendering.cpp
     )
 SET(Materials_Source
     ${engine_SOURCE_DIR}/Materials/MaterialInstanceSupport.h
@@ -120,6 +124,7 @@ SOURCE_GROUP(Materials FILES ${Materials_Source})
 SET(Rendering_Source
     ${engine_SOURCE_DIR}/Rendering/ColorVertexBuffer.h
     ${engine_SOURCE_DIR}/Rendering/ColorVertexBuffer.cpp
+    ${engine_SOURCE_DIR}/Rendering/PositionVertexBuffer.cpp
     ${engine_SOURCE_DIR}/Rendering/SceneRenderTargetParameters.h
     ${engine_SOURCE_DIR}/Rendering/SceneRenderTargetParameters.cpp
     )

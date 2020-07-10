@@ -47,5 +47,4 @@ target_link_libraries(${LIB_NAME}
     MovieSceneCapture
     RenderCore
     RHI
-    ShaderCore
     )

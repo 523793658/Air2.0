@@ -116,9 +116,8 @@ namespace Air
 		mMap.erase(key);
 	}
 
-	void StaticMeshLODResources::initResources(RStaticMesh* parent)
+	void StaticMeshLODResources::conditionalForce16BitIndexBuffer(EShaderPlatform maxShaderPlatform, RStaticMesh* parent)
 	{
-		const auto maxShaderPlatform = GShaderPlatformForFeatureLevel[GMaxRHIFeatureLevel];
 		if (isES2Platform(maxShaderPlatform) && !isMetalPlatform(maxShaderPlatform))
 		{
 			if (mIndexBuffer.is32Bit())
@@ -128,53 +127,23 @@ namespace Air
 				mIndexBuffer.setIndices(indices, EIndexBufferStride::Force16Bit);
 			}
 		}
-		beginInitResource(&mIndexBuffer);
-		if (mWireframeIndexBuffer.getNumIndices())
-		{
-			beginInitResource(&mWireframeIndexBuffer);
-		}
-		beginInitResource(&mVertexBuffer);
-		beginInitResource(&mPositionVertexBuffer);
-		if (mColorVertexBuffer.getNumVertices() > 0)
-		{
-			beginInitResource(&mColorVertexBuffer);
-		}
-		if (mReversedIndexBuffer.getNumIndices() > 0)
-		{
-			beginInitResource(&mReversedIndexBuffer);
-		}
-		if (mDepthOnlyIndexBuffer.getNumIndices() > 0)
-		{
-			beginInitResource(&mDepthOnlyIndexBuffer);
-		}
-		if (mReversedDepthOnlyIndexBuffer.getNumIndices() > 0)
-		{
-			beginInitResource(&mReversedDepthOnlyIndexBuffer);
-		}
-		if (RHISupportsTessellation(maxShaderPlatform))
-		{
-			beginInitResource(&mAdjacencyIndexBuffer);
-		}
+	}
 
-		initVertexFactory(mVertexFactory, parent, false);
-		beginInitResource(&mVertexFactory);
-		initVertexFactory(mVertexFactoryOverrideColorVertexBuffer, parent, true);
-		beginInitResource(&mVertexFactoryOverrideColorVertexBuffer);
+	void StaticMeshLODResources::initResources(RStaticMesh* parent)
+	{
+		conditionalForce16BitIndexBuffer(GMaxRHIShaderPlatform, parent);
+		beginInitResource(&mIndexBuffer);
+		beginInitResource(&mVertexBuffers.mStaticMeshVertexBuffer);
+		beginInitResource(&mVertexBuffers.mPositionVertexBuffer);
 	}
 
 	void StaticMeshLODResources::releaseResource()
 	{
-		beginReleaseResource(&mAdjacencyIndexBuffer);
 		beginReleaseResource(&mIndexBuffer);
-		beginReleaseResource(&mWireframeIndexBuffer);
-		beginReleaseResource(&mVertexBuffer);
-		beginReleaseResource(&mPositionVertexBuffer);
-		beginReleaseResource(&mColorVertexBuffer);
-		beginReleaseResource(&mReversedIndexBuffer);
+		beginReleaseResource(&mVertexBuffers.mStaticMeshVertexBuffer);
+		beginReleaseResource(&mVertexBuffers.mPositionVertexBuffer);
+		beginReleaseResource(&mVertexBuffers.mColorVertexBuffer);
 		beginReleaseResource(&mDepthOnlyIndexBuffer);
-		beginReleaseResource(&mReversedDepthOnlyIndexBuffer);
-		beginReleaseResource(&mVertexFactory);
-		beginReleaseResource(&mVertexFactoryOverrideColorVertexBuffer);
 	}
 
 	int32 StaticMeshLODResources::getNumTriangles() const
@@ -189,12 +158,12 @@ namespace Air
 
 	int32 StaticMeshLODResources::getNumVertices() const
 	{
-		return mVertexBuffer.getNumVertices();
+		return mVertexBuffers.mStaticMeshVertexBuffer.getNumVertices();
 	}
 
 	int32 StaticMeshLODResources::getNumTexCoords() const
 	{
-		return mVertexBuffer.getNumVertices();
+		return mVertexBuffers.mStaticMeshVertexBuffer.getNumTexCoords();
 	}
 
 	Archive& operator << (Archive& ar, MeshUVChannelInfo& channelInfo)
@@ -282,6 +251,46 @@ namespace Air
 				getPlatformStaticMeshRenderData(this, platform);
 			}
 		}
+	}
+
+	void StaticMeshVertexFactories::InitVertexFactory(const StaticMeshLODResources& lodResources, LocalVertexFactory& inOutVertexFactory, uint32 lodIndex, const RStaticMesh* inParentMesh, bool bInOverrideColorVertexBuffer)
+	{
+		BOOST_ASSERT(inParentMesh != nullptr);
+		struct InitStaticMeshVertexFactoryParams
+		{
+			LocalVertexFactory* mVertexFactory;
+			const StaticMeshLODResources* mLODResources;
+			bool bOverrideColorVertexBuffer;
+			uint32 mLightMapCoordinateIndex;
+			uint32 mLODIndex;
+		}mParams;
+		mParams.mVertexFactory = &inOutVertexFactory;
+		mParams.mLODResources = &lodResources;
+		mParams.bOverrideColorVertexBuffer = bInOverrideColorVertexBuffer;
+		mParams.mLightMapCoordinateIndex = 0;
+		mParams.mLODIndex = lodIndex;
+
+		ENQUEUE_RENDER_COMMAND(InitStaticMeshVertexFactory)(
+			[mParams](RHICommandListImmediate& rhiCmdList)
+			{
+				LocalVertexFactory::DataType data;
+				mParams.mLODResources->mVertexBuffers.mPositionVertexBuffer.bindPositionVertexBuffer(mParams.mVertexFactory, data);
+				mParams.mLODResources->mVertexBuffers.mStaticMeshVertexBuffer.bindTangentVertexBuffer(mParams.mVertexFactory, data);
+				mParams.mLODResources->mVertexBuffers.mStaticMeshVertexBuffer.bindPackedTexCoordVertexBuffer(mParams.mVertexFactory, data);
+				mParams.mLODResources->mVertexBuffers.mStaticMeshVertexBuffer.bindLightMapVertexBuffer(mParams.mVertexFactory, data, mParams.mLightMapCoordinateIndex);
+				if (mParams.bOverrideColorVertexBuffer)
+				{
+					ColorVertexBuffer::bindDefaultColorVertexBuffer(mParams.mVertexFactory, data, ColorVertexBuffer::NullBindStride::ColorSizeForComponentOverride);
+				}
+				else
+				{
+					mParams.mLODResources->mVertexBuffers.mColorVertexBuffer.bindColorVertexBuffer(mParams.mVertexFactory, data);
+				}
+
+				data.mLODLightmapDataIndex = mParams.mLODIndex;
+				mParams.mVertexFactory->setData(data);
+				mParams.mVertexFactory->initResource();
+			});
 	}
 
 	DECLARE_SIMPLER_REFLECTION(RStaticMesh);

@@ -52,6 +52,7 @@ namespace Air
 		uint32 bRenderInMainPass : 1;
 
 		uint32 bCastShadow : 1;
+		uint32 bReverseCulling : 1;
 
 		static ThreadSafeCounter NextComponentId;
 	};

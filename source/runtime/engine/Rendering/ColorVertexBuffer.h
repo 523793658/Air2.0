@@ -7,6 +7,13 @@ namespace Air
 	class ColorVertexBuffer : public VertexBuffer
 	{
 	public:
+		enum class NullBindStride
+		{
+			ColorSizeForComponentOverride,
+			ZeroForDefaultBufferBind
+		};
+
+
 		ENGINE_API ColorVertexBuffer();
 		ENGINE_API ~ColorVertexBuffer();
 		FORCEINLINE uint8 getStride() const
@@ -33,7 +40,14 @@ namespace Air
 
 		virtual void initRHI() override;
 
+		ENGINE_API static void bindDefaultColorVertexBuffer(const class VertexFactory* vertexFactory, struct StaticMeshDataType& staticMeshData, NullBindStride bindStride);
+
+		ENGINE_API void bindColorVertexBuffer(const class VertexFactory* vertexFactory, struct StaticMeshDataType& staticMeshData) const;
+
 	private:
+
+		ShaderResourceViewRHIRef mColorComponentsSRV;
+
 		class ColorVertexData*	mVertexData{ nullptr };
 		uint8* mData{ nullptr };
 

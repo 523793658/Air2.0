@@ -2169,6 +2169,11 @@ namespace Air
 		return RHICommandListExecutor::getImmediateCommandList().createVertexBuffer(size, inUsage, createInfo);
 	}
 
+	FORCEINLINE VertexBufferRHIRef RHIAsyncCreateVertexBuffer(uint32 sie, uint32 inUsage, RHIResourceCreateInfo& createInfo)
+	{
+		return GDynamicRHI->RHICreateVertexBuffer(inUsage, inUsage, createInfo);
+	}
+
 	FORCEINLINE IndexBufferRHIRef RHICreateIndexBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
 	{
 		return RHICommandListExecutor::getImmediateCommandList().createIndexBuffer(stride, size, inUsage, createInfo);

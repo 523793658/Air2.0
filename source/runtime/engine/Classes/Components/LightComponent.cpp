@@ -39,7 +39,7 @@ namespace Air
 		mColor = LinearColor(inLightComponent->mLightColor) * lightBrightness;
 		if (mLightComponent->mLightFunctionMaterial && mLightComponent->mLightFunctionMaterial->getMaterial()->mMaterialDomain == MD_LightFunction)
 		{
-			mLightFunctionMaterial = mLightComponent->mLightFunctionMaterial->getRenderProxy(false);
+			mLightFunctionMaterial = mLightComponent->mLightFunctionMaterial->getRenderProxy();
 		}
 		else
 		{

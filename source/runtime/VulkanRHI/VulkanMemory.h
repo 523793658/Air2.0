@@ -176,6 +176,12 @@ namespace Air
 			return mMemoryProperties;
 		}
 
+		inline bool hasUnifiedMemory()const
+		{
+			return bHasUnifiedMemory;
+		}
+		
+
 		inline VkResult getMemoryTypeFromProperties(uint32 typeBits, VkMemoryPropertyFlags properties, uint32* outTypeIndex)
 		{
 			for (uint32 i = 0; i < mMemoryProperties.memoryTypeCount && typeBits; i++)
@@ -351,6 +357,11 @@ namespace Air
 
 		virtual void destroy(VulkanDevice* device) override;
 
+		inline VkBuffer getHandle() const
+		{
+			return mBuffer;
+		}
+
 		void release(BufferSuballocation* suballocation);
 	protected:
 		VkBufferUsageFlags mBufferUsageFlags;
@@ -380,6 +391,12 @@ namespace Air
 		void processPendingUBFrees(bool bForce);
 
 		void destroyResourceAllocations();
+
+		BufferSuballocation* allocateBuffer(uint32 size, VkBufferUsageFlags bufferUsageFlags, VkMemoryPropertyFlags memoryPropertyFlags, const char* file, uint32 line);
+
+		BufferSuballocation* allocConstantBuffer(uint32 size, const void* contents);
+
+		void releaseConstantBuffer(BufferSuballocation* cbAlloc);
 
 		void releaseBuffer(BufferAllocation* bufferAllocation);
 
@@ -585,5 +602,164 @@ namespace Air
 	{
 	protected:
 		//TRefCountPtr<OldResource
+	};
+
+	class TempFrameAllocationBuffer : public DeviceChild
+	{
+		enum
+		{
+			ALLOCATION_SIZE = (4 * 1024 * 1024),
+		};
+
+	public:
+		TempFrameAllocationBuffer(VulkanDevice* inDevice);
+
+		virtual ~TempFrameAllocationBuffer();
+		void destroy();
+
+		struct TempAllocInfo
+		{
+			void* mData{ nullptr };
+
+			BufferSuballocation* mBufferSuballocation{ nullptr };
+
+			uint32 mCurrentOffset{ 0 };
+
+			uint32 mLockCounter{ 0 };
+
+			inline BufferAllocation* getBufferAllocation() const
+			{
+				return mBufferSuballocation->getBufferAllocation();
+			}
+
+			inline uint32 getBindOffset() const
+			{
+				return mBufferSuballocation->getOffset() + mCurrentOffset;
+			}
+
+			inline VkBuffer getHandle() const
+			{
+				return mBufferSuballocation->getHandle();
+			}
+		};
+
+		void alloc(uint32 inSize, uint32 inAligment, TempAllocInfo& outInfo);
+
+		void reset();
+
+	protected:
+		uint32 mBufferIndex;
+
+		enum
+		{
+			NUM_BUFFERS = 3,
+		};
+
+		struct FrameEntry
+		{
+			TRefCountPtr<BufferSuballocation> mBufferSuballocation;
+
+			TArray<TRefCountPtr<BufferSuballocation>> mPendingDeletionList;
+
+			uint8* mMappedData = nullptr;
+
+			uint8* mCurrentData = nullptr;
+
+			uint32 mSize = 0;
+
+			uint32 mPeakUsed = 0;
+
+			void initBuffer(VulkanDevice* inDevice, uint32 inSize);
+
+			void reset();
+
+			bool tryAlloc(uint32 inSize, uint32 inAligment, TempAllocInfo& outInfo);
+
+		};
+
+		FrameEntry mEntries[NUM_BUFFERS];
+
+		CriticalSection mCS;
+
+		friend class VulkanCommandListContext;
+	};
+
+	class FenceManager;
+	class Fence
+	{
+	public:
+		Fence(VulkanDevice* inDevice, FenceManager* inOwner, bool bCreateSignaled);
+
+		inline VkFence getHandle() const
+		{
+			return mHandle;
+		}
+
+		inline bool isSignaled() const
+		{
+			mState == EState::Signaled;
+		}
+
+		FenceManager* getOwner()
+		{
+			return mOwner;
+		}
+
+	protected:
+		VkFence mHandle;
+
+		enum class EState
+		{
+			NotReady,
+			Signaled,
+		};
+
+		EState mState;
+		class FenceManager* mOwner;
+		~Fence();
+
+		friend class FenceManager;
+	};
+
+	class FenceManager
+	{
+	public:
+		FenceManager()
+			:mDevice(nullptr)
+		{}
+
+		~FenceManager();
+
+		void init(VulkanDevice* inDevie);
+
+		void deinit();
+
+		Fence* allocateFence(bool bCreateSignaled = false);
+
+		inline bool isFenceSignaled(Fence* fence)
+		{
+			if (fence->isSignaled())
+			{
+				return true;
+			}
+			return checkFenceState(fence);
+		}
+
+		bool waitForFence(Fence* fence, uint64 timeInNanoseconds);
+
+		void resetFence(Fence* fence);
+
+		void releaseFence(Fence*& Fence);
+
+		void waitAndReleaseFence(Fence*& Fence, uint64 timeInNanoseconds);
+
+	protected:
+		VulkanDevice* mDevice;
+		TArray<Fence*> mFreeFences;
+		TArray<Fence*> mUsedFences;
+		bool checkFenceState(Fence* fence);
+
+		void destroyFence(Fence* fence);
+
 	};
 }

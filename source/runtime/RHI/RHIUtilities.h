@@ -285,6 +285,7 @@ namespace Air
 
 			createInfo.mDebugName = inDebugName;
 
+
 			mBuffer = RHICreateStructuredBuffer(bytesPerElement, mNumBytes, BUF_UnorderedAccess | BUF_ShaderResource | additionalUsage, createInfo);
 			mUAV = RHICreateUnorderedAccessView(mBuffer, bUseUavCounter, bAppendBuffer);
 			mSRV = RHICreateShaderResourceView(mBuffer);

@@ -198,7 +198,7 @@ namespace Air
 
 		MaterialRenderProxy & getFallbackRenderProxy() const
 		{
-			return *(RMaterial::getDefaultMaterial(mMaterial->mMaterialDomain)->getRenderProxy(isSelected(), isHovered()));
+			return *(RMaterial::getDefaultMaterial(mMaterial->mMaterialDomain)->getRenderProxy());
 		}
 
 		RMaterial* mMaterial;
@@ -344,10 +344,9 @@ namespace Air
 		mMaterialPropertyTable[MP_EmissiveColor] = &mEmissiveColor;
 	}
 
-	MaterialRenderProxy* RMaterial::getRenderProxy(bool selected, bool bHovered /* = false */) const
+	MaterialRenderProxy* RMaterial::getRenderProxy() const
 	{
-		BOOST_ASSERT(!(selected || bHovered) || GIsEditor);
-		return mDefaultMaterialInstances[selected ? 1 : (bHovered ? 2 : 0)];
+		return mDefaultMaterialInstances;
 	}
 
 	std::shared_ptr<RMaterial> RMaterial::getMaterial()
@@ -361,17 +360,14 @@ namespace Air
 	}
 
 
+
 	void RMaterial::postInitProperties()
 	{
 		ParentType::postInitProperties();
 		if (!hasAnyFlags(RF_ClassDefaultObject))
 		{
-			mDefaultMaterialInstances[0] = new DefaultMaterialInstance(this, false, false);
-			if (GIsEditor)
-			{
-				mDefaultMaterialInstances[1] = new DefaultMaterialInstance(this, true, false);
-				mDefaultMaterialInstances[2] = new DefaultMaterialInstance(this, false, true);
-			}
+			mDefaultMaterialInstances = new DefaultMaterialInstance(this, false, false);
+			
 		}
 		PlatformMisc::createGuid(mStateId);
 		updateResourceAllocations();
@@ -697,13 +693,7 @@ namespace Air
 
 	void RMaterial::propagateDataToMaterialProxy()
 	{
-		for (int32 i = 0; i < ARRAY_COUNT(mDefaultMaterialInstances); i++)
-		{
-			if (mDefaultMaterialInstances[i])
-			{
-				updateMaterialRenderProxy(*mDefaultMaterialInstances[i]);
-			}
-		}
+		updateMaterialRenderProxy(*mDefaultMaterialInstances);
 	}
 
 	void RMaterial::rebuildExpressionTextureReferences()
@@ -716,6 +706,11 @@ namespace Air
 
 		mExpressionTextureReferences.empty();
 		appendReferencedTextures(mExpressionTextureReferences);
+	}
+
+	std::shared_ptr<const RMaterial> RMaterial::getMaterial_Concurrent(TMicRecursionGuard& recursionGurad) const
+	{
+		return std::dynamic_pointer_cast<const RMaterial>(this->shared_from_this());
 	}
 
 	void MaterialInterface::postLoadDefaultMaterials()

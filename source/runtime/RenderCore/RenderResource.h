@@ -11,6 +11,16 @@ namespace Air
 	class RENDER_CORE_API RenderResource
 	{
 	public:
+		RenderResource()
+			:mFeatureLevel(ERHIFeatureLevel::Num)
+			, bInitialized(false)
+		{}
+
+		RenderResource(ERHIFeatureLevel::Type inFeatureLevel)
+			:mFeatureLevel(inFeatureLevel)
+			,bInitialized(false)
+		{}
+
 		static TLinkedList<RenderResource*>*& getResourceList();
 
 		virtual void initRHI() {}
@@ -29,21 +39,23 @@ namespace Air
 
 		virtual wstring getFriendlyName()const { return TEXT(""); };
 
-		FORCEINLINE bool isInitialized() const { return mInitialized; }
+		FORCEINLINE bool isInitialized() const { return bInitialized; }
 
 		void initResourceFromPossiblyParallelRendering();
 
+		virtual ~RenderResource();
 	protected:
 		ERHIFeatureLevel::Type getFeatureLevel() const { return mFeatureLevel == ERHIFeatureLevel::Num ? GMaxRHIFeatureLevel : mFeatureLevel; }
 
 		FORCEINLINE bool hasValidFeatureLevel()const { return mFeatureLevel < ERHIFeatureLevel::Num; }
 
 	protected:
-		bool mInitialized{ false };
+		bool bInitialized{ false };
 
 		ERHIFeatureLevel::Type mFeatureLevel;
 
 		TLinkedList<RenderResource*> mResourceLink;
+
 
 	};
 

@@ -6,6 +6,13 @@ namespace Air
 {
 	class VulkanDynamicRHI;
 	class VulkanQueue;
+	class VulkanCommandBufferManager;
+	class TempFrameAllocationBuffer;
+
+
+
+
+
 	class VulkanCommandListContext : public IRHICommandContext
 	{
 	public:
@@ -14,8 +21,22 @@ namespace Air
 			return mGpuProfiler;
 		}
 
+		inline VulkanCommandBufferManager* getCommandBufferManager()
+		{
+			return mCommandBufferManager;
+		}
+
+		inline TempFrameAllocationBuffer& getTempFrameAllocationBuffer()
+		{
+			return mTempFrameAllocationBuffer;
+		}
+
 	private:
 		VulkanGPUProfiler mGpuProfiler;
+
+		VulkanCommandBufferManager* mCommandBufferManager;
+
+		TempFrameAllocationBuffer mTempFrameAllocationBuffer;
 	};
 
 	class VulkanCommandListContextImmediate : public VulkanCommandListContext

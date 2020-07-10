@@ -763,6 +763,24 @@ namespace Air
 		}
 	}
 
+	TSet<MaterialRenderProxy*> MaterialRenderProxy::mMaterialRenderProxyMap;
+	TSet<MaterialRenderProxy*> MaterialRenderProxy::mDeferredConstantExpressionCacheRequests;
+
+	void MaterialRenderProxy::updateDeferredCachedConstantExpressions()
+	{
+		BOOST_ASSERT(isInRenderingThread());
+		for (TSet<MaterialRenderProxy*>::TConstIterator it(mDeferredConstantExpressionCacheRequests); it; ++it)
+		{
+			MaterialRenderProxy* materialProxy = *it;
+			if (materialProxy->isDeleted())
+			{
+				AIR_LOG(logMaterial, Fatal, TEXT("MaterialRenderProxy deleted"));
+			}
+			//umaterial
+
+		}
+	}
+
 
 	void ConstantExpressionSet::serialize(Archive& ar)
 	{

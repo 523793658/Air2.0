@@ -25,7 +25,6 @@ target_link_libraries(${LIB_NAME}
     RenderCore
     RHI
     Renderer
-    ShaderCore
     Slate
     SlateRHIRenderer
     WindowsTargetPlatform

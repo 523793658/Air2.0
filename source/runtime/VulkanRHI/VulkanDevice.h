@@ -7,7 +7,8 @@ namespace Air
 {
 	class VulkanSamplerState;
 	class VulkanSurface;
-
+	class VulkanCommandListContextImmediate;
+	class VulkanCommandListContext;
 	struct OptionalVulkanDeviceExtensions
 	{
 		uint32 HasKHRMaintenance1 : 1;
@@ -84,6 +85,16 @@ namespace Air
 		inline VulkanQueue* getGraphicsQueue()
 		{
 			return mGfxQueue;
+		}
+
+		inline bool hasUnifiedMemory() const
+		{
+			return mMemoryManager.hasUnifiedMemory();
+		}
+
+		inline ResourceHeapManager& getResourceHeapManager()
+		{
+			return mResourceHeapManager;
 		}
 
 		void prepareForDestroy();

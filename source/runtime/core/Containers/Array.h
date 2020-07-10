@@ -1023,6 +1023,16 @@ namespace Air
 			return (ElementType*)mAllocatorInstance.getAllocation();
 		}
 
+		FORCEINLINE size_t getSlack() const
+		{
+			return mArrayMax - mArrayNum;
+		}
+
+		FORCEINLINE size_t max() const
+		{
+			return mArrayMax;
+		}
+
 		FORCEINLINE ElementType* data()
 		{
 			return (ElementType*)mAllocatorInstance.getAllocation();

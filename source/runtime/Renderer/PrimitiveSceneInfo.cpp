@@ -37,6 +37,18 @@ namespace Air
 				
 			}
 		}
+
+		virtual void reserveMemoryForMeshes(int32 meshNum)
+		{
+			if (mPrimitiveSceneInfo->mStaticMeshRelevances.getSlack() < meshNum)
+			{
+				mPrimitiveSceneInfo->mStaticMeshRelevances.reserve(mPrimitiveSceneInfo->mStaticMeshRelevances.max() + meshNum);
+			}
+			if (mPrimitiveSceneInfo->mStaticMeshes.getSlack() < meshNum)
+			{
+				mPrimitiveSceneInfo->mStaticMeshes.reserve(mPrimitiveSceneInfo->mStaticMeshes.max() + meshNum);
+			}
+		}
 	private:
 		PrimitiveSceneInfo* mPrimitiveSceneInfo;
 	};

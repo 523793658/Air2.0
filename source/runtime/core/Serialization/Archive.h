@@ -120,6 +120,11 @@ namespace Air
 			return ar;
 		}
 
+		FORCEINLINE bool isCountingMemory() const
+		{
+			return mArIsCountingMemory;
+		}
+
 
 		friend CORE_API Archive& operator << (Archive& ar, wstring& value);
 

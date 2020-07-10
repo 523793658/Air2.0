@@ -1,6 +1,6 @@
 #pragma once
 #include "EngineMininal.h"
-
+#include "VertexFactory.h"
 
 namespace Air
 {
@@ -31,5 +31,23 @@ namespace Air
 		float mLocalDensities[MAX_TEXCOORDS];
 
 		friend Archive & operator <<(Archive& ar, MeshUVChannelInfo& info);
+	};
+
+	struct StaticMeshDataType
+	{
+		VertexStreamComponent mPositionComponent;
+		VertexStreamComponent mTangentBasisComponents[2];
+		TArray<VertexStreamComponent, TFixedAllocator<MAX_STATIC_TEXCOORDS / 2> > mTextureCoordinates;
+		VertexStreamComponent mLightMapCoordinateComponent;
+		VertexStreamComponent mColorComponent;
+		RHIShaderResourceView* mPositionComponentSRV = nullptr;
+		RHIShaderResourceView* mTangetsSRV = nullptr;
+		RHIShaderResourceView* mColorComponentsSRV = nullptr;
+		RHIShaderResourceView* mTextureCoordinateSRV = nullptr;
+
+		int mLightMapCoordinateIndex = -1;
+		int mNumTexCoords = -1;
+		uint32 mColorIndexMask = ~0u;
+		uint32 mLODLightmapDataIndex = 0;
 	};
 }

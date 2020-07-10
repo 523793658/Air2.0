@@ -12,6 +12,7 @@ namespace Air
 	class SkyLightComponent;
 	class RTextureCube;
 	class Texture;
+	class PrimitiveSceneInfo;
 	enum EBasePassDrawListType
 	{
 		EBasePass_Default = 0,
@@ -51,6 +52,8 @@ namespace Air
 		virtual void updateSkyCaptureContents(const SkyLightComponent* captureComponent, bool bCaptureEmissiveOnly, std::shared_ptr<RTextureCube> sourceCubemap, Texture* outProcessedTexture, float& outAverageBrightness, SHVectorRGB3& outIrradianceEnvironmentMap) {}
 
 		virtual void setShaderMapsOnMaterialResources(const TMap<FMaterial*, MaterialShaderMap*>& materialsToUpdate) {}
+
+		virtual void getPrimitiveConstantShaderParameters_RenderThread(const PrimitiveSceneInfo* primitiveSceneInfo, bool& bHasPrecomputedVolumetricLightmap, Matrix& previousLocalToWorld, int32& singleCaptureIndex, bool& outputVelocity) {}
 
 		static EShadingPath getShadingPath(ERHIFeatureLevel::Type inFeatureLevel)
 		{

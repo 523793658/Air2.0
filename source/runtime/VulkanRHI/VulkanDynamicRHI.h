@@ -5,7 +5,7 @@
 namespace Air
 {
 	class VulkanDevice;
-
+	class VulkanConstantBuffer;
 	class VulkanDynamicRHI : public DynamicRHI
 	{
 	public:
@@ -35,6 +35,20 @@ namespace Air
 
 
 		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(RHIVertexBuffer* vertexBuffer, uint32 stride, uint8 format)final override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIStructuredBuffer* structuredBuffer, bool bUseUAVCounter, bool bAppendBuffer) override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIVertexBuffer* inVertexBuffer, uint8 bUseUAVCounter) override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHIIndexBuffer* inIndexBuffer, uint8 bUseUAVCounter) override;
+
+		virtual UnorderedAccessViewRHIRef RHICreateUnorderedAccessView(RHITexture* inTexture, uint32 bUseUAVCounter) override;
+
+		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView(RHIStructuredBuffer* inStructuredBuffer) override;
+
+		virtual StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo) override;
+
+		virtual void RHIUpdateConstantBuffer(RHIConstantBuffer* constantBufferRHI, const void* contents) override;
 
 		virtual VertexShaderRHIRef RHICreateVertexShader(const TArray<uint8>& code)final override;
 
@@ -114,6 +128,10 @@ namespace Air
 		void selectAndInitDevice();
 
 		static void getInstanceLayersAndExtensions(TArray<const ANSICHAR*>& outInstanceExtensions, TArray<const ANSICHAR*>& outInstanceLayers, bool& bOutDebugUtils);
+
+		template<bool RealUBs>
+		void updateConstantBuffer(VulkanConstantBuffer* inConstantBuffer, const void* contents);
+
 	protected:
 		bool bSupportsDebugUtilsExt = false;
 

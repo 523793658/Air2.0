@@ -10,35 +10,53 @@
 
 namespace Air
 {
+	enum class EVertexStreamUsage : uint8
+	{
+		Default = 0 << 0,
+		Instancing = 1 << 0,
+		Overridden = 1 << 1,
+		ManualFetch = 1 << 2,
+	};
+
+	ENUM_CLASS_FLAGS(EVertexStreamUsage);
+
 	struct VertexStreamComponent
 	{
-		const VertexBuffer* mVertexBuffer;
-		uint8 mOffset;
-		uint8 mStride;
-		TEnumAsByte<EVertexElementType> mType;
-		bool bUseInstanceIndex;
-
-		bool bSetByVertexFactoryInSetMesh;
+		const VertexBuffer* mVertexBuffer = nullptr;
+		uint32 mStreamOffset = 0;
+		uint8 mOffset = 0;
+		uint8 mStride = 0;
+		TEnumAsByte<EVertexElementType> mType = VET_None;
+		EVertexStreamUsage mVertexStreamUsage = EVertexStreamUsage::Default;
 
 		VertexStreamComponent()
-			:mVertexBuffer(nullptr)
-			,mOffset(0)
-			,mStride(0)
-			,mType(VET_None)
-			,bUseInstanceIndex(false)
-			,bSetByVertexFactoryInSetMesh(false)
 		{
 
 		}
 
-		VertexStreamComponent(const VertexBuffer* inVertexBuffer, uint32 inOffset, uint32 inStride, EVertexElementType inType, bool bInUseInstanceIndex = false, bool bInSetByVertexFactoryInSetMesh = false)
+		VertexStreamComponent(const VertexBuffer* inVertexBuffer, uint32 inOffset, uint32 inStride, EVertexElementType inType, EVertexStreamUsage usage = EVertexStreamUsage::Default)
+			:mVertexBuffer(inVertexBuffer)
+			, mStreamOffset(0)
+			, mOffset(inOffset)
+			, mStride(inStride)
+			, mType(inType)
+			, mVertexStreamUsage(usage)
+		{
+			BOOST_ASSERT(inStride <= 0xff);
+			BOOST_ASSERT(inOffset <= 0xff);
+		}
+
+
+		VertexStreamComponent(const VertexBuffer* inVertexBuffer, uint32 inStreamOffset, uint32 inOffset, uint32 inStride, EVertexElementType inType, EVertexStreamUsage usage = EVertexStreamUsage::Default)
 			:mVertexBuffer(inVertexBuffer)
 			,mOffset(inOffset)
 			,mStride(inStride)
 			,mType(inType)
-			,bUseInstanceIndex(bInUseInstanceIndex)
-			,bSetByVertexFactoryInSetMesh(bInSetByVertexFactoryInSetMesh)
-		{}
+			,mVertexStreamUsage(usage)
+		{
+			BOOST_ASSERT(inStride <= 0xff);
+			BOOST_ASSERT(inOffset <= 0xff);
+		}
 	};
 
 	class RENDER_CORE_API VertexFactoryShaderParameters
@@ -147,6 +165,8 @@ namespace Air
 			(*mModifyCompilationEnvironmentRef)(this, platform, material, outEnvironment);
 		}
 
+		bool supportsCachingMeshDrawCommand() const { return bSupportsCachingMeshDrawCommands; }
+
 		static int32 getNumVertexFactoryTypes() { return mNextHashIndex; }
 
 	private:
@@ -243,35 +263,38 @@ namespace Air
 		PositionAndNormalOnly,
 	};
 
+
+
 	class RENDER_CORE_API VertexFactory : public RenderResource
 	{
 	public:
+		VertexFactory(ERHIFeatureLevel::Type inFeatureLevel)
+			:RenderResource(inFeatureLevel)
+		{}
+
 		virtual VertexFactoryType* getType() const { return nullptr; }
 		const VertexDeclarationRHIRef& getDeclaration() const { return mDeclaration; }
 		struct VertexStream
 		{
-			const VertexBuffer* mVertexBuffer;
-			uint32 mStride;
-			uint32 mOffset;
-			bool bUseInstanceIndex;
-			bool bSetByVertexFactoryInSetMesh;
+			const VertexBuffer* mVertexBuffer = nullptr;
+			uint32 mStride = 0;
+			uint32 mOffset = 0;
+			EVertexStreamUsage mVertexStreamUsage = EVertexStreamUsage::Default;
+			uint8 mPadding = 0;
 			friend bool operator == (const VertexStream& a, const VertexStream&  b)
 			{
-				return a.mVertexBuffer == b.mVertexBuffer && a.mStride == b.mStride && a.mOffset == b.mOffset;
+				return a.mVertexBuffer == b.mVertexBuffer && a.mStride == b.mStride && a.mOffset == b.mOffset && a.mVertexStreamUsage == b.mVertexStreamUsage;
 			}
 
 			VertexStream()
-				:mVertexBuffer(nullptr)
-				,mStride(0)
-				,mOffset(0)
-				,bUseInstanceIndex(false)
-				,bSetByVertexFactoryInSetMesh(false)
 			{}
 		};
 
-		VertexElement accessPositionStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex);
+		/*VertexElement accessPositionStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex);*/
 
 		VertexElement accessStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex);
+
+		VertexElement accessStreamComponent(const VertexStreamComponent& component, uint8 attributeIndex, EVertexInputStreamType inputStreamType);
 
 		void VertexFactory::initPositionDeclaration(const VertexDeclarationElementList& elements);
 
@@ -280,10 +303,22 @@ namespace Air
 		virtual uint64 getStaticBatchElementVisibility(const class SceneView& view, const struct MeshBatch* batch) const { return 1; }
 
 		TArray<VertexStream, TFixedAllocator<MaxVertexElementCount>> mStreams;
+
+		inline int32 getPrimitiveIdStreamIndex(EVertexInputStreamType inputStreamType) const
+		{
+			return mPrimitiveIdStreamIndex[static_cast<uint8>(inputStreamType)];
+		}
+	protected:
+		bool bSupportsManualVertexFetch = false;
+		int8 mPrimitiveIdStreamIndex[3] = { -1, -1, -1 };
+
 	private:
-		TArray<VertexStream, TFixedAllocator<MaxVertexElementCount>> mPositionStream;
+		TArray<VertexStream, TInlineAllocator<2>> mPositionStream;
+		TArray<VertexStream, TInlineAllocator<3>> mPositionNormalStream;
+
 		VertexDeclarationRHIRef	mDeclaration;
 		VertexDeclarationRHIRef mPositionDeclaration;
+
 	};
 
 	class RENDER_CORE_API VertexFactoryParameterRef

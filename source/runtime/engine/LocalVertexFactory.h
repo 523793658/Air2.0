@@ -8,12 +8,15 @@ namespace Air
 	{
 		DECALRE_VERTEX_FACTORY_TYPE(LocalVertexFactory)
 	public:
-		LocalVertexFactory()
+		LocalVertexFactory(ERHIFeatureLevel::Type inFeatureLevel, const char* inDebugName)
+			:VertexFactory(inFeatureLevel)
+			,mColorStreamIndex(-1)
+			,mDebugName(inDebugName)
 		{
-
+			bSupportsManualVertexFetch = true;
 		}
 
-		struct DataType
+		struct DataType : public StaticMeshDataType
 		{
 			VertexStreamComponent mPositionComponents;
 
@@ -44,16 +47,27 @@ namespace Air
 		FORCEINLINE_DEBUGGABLE void setColorOverrideStream(RHICommandList& RHICmdList, const VertexBuffer* colorVertexBuffer) const
 		{
 			BOOST_ASSERT(colorVertexBuffer->isInitialized());
-			BOOST_ASSERT(isInitialized() && mData.mColorComponent.bSetByVertexFactoryInSetMesh && mColorStreamIndex > 0);
+			BOOST_ASSERT(isInitialized() && enumHasAnyFlags(EVertexStreamUsage::Overridden, mData.mColorComponent.mVertexStreamUsage)  && mColorStreamIndex > 0);
 			RHICmdList.setStreamSource(mColorStreamIndex, colorVertexBuffer->mVertexBufferRHI, 0);
 		}
 
 		void setData(const DataType& inData);
 
+		RHIConstantBuffer* getConstantBuffer() const
+		{
+			return mConstantBuffer.getReference();
+		}
 	protected:
 		DataType mData;
 		int32 mColorStreamIndex;
 		const DataType& getData() const { return mData; }
+		TConstantBufferRef<class LocalVertexFactoryShaderParameters> mConstantBuffer;
+		struct DebugName
+		{
+			DebugName(const char* inDebugName)
+			{}
+		private:
+		}mDebugName;
 	};
 
 	class LocalVertexFactoryShaderParameters : public VertexFactoryShaderParameters

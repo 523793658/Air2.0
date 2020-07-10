@@ -60,7 +60,7 @@ namespace Air
 	public:
 	
 
-		virtual class MaterialRenderProxy* getRenderProxy(bool selected, bool bHovered = false) const PURE_VIRTRUAL(MaterialInterface::getRenderProxy, return nullptr;);
+		virtual class MaterialRenderProxy* getRenderProxy() const PURE_VIRTRUAL(MaterialInterface::getRenderProxy, return nullptr;);
 
 		virtual MaterialResource* getMaterialResource(ERHIFeatureLevel::Type inFeatureLvel, EMaterialQualityLevel::Type qualityLevel = EMaterialQualityLevel::Num) PURE_VIRTRUAL(MaterialInterface::getMaterialResource, return nullptr;)
 
@@ -93,6 +93,7 @@ namespace Air
 
 		virtual void recacheConstantExpressions() const {};
 
+
 		ENGINE_API static uint32 getFeatureLevelsToCompileForAllMaterials() { return mFeatureLevelsForAllMaterials | (1 << GMaxRHIFeatureLevel); }
 
 		ENGINE_API virtual bool isTwoSided() const;
@@ -115,6 +116,10 @@ namespace Air
 			}
 		}
 
+		typedef TArray<class MaterialInterface const*, TInlineAllocator<8>> TMicRecursionGuard;
+
+		virtual std::shared_ptr<const class RMaterial> getMaterial_Concurrent(TMicRecursionGuard& recursionGurad) const PURE_VIRTRUAL(MaterialInterface::getMaterial_Concurrent, return std::shared_ptr<const class RMaterial>(););
+
 	protected:
 		void updateMaterialRenderProxy(MaterialRenderProxy& proxy);
 
@@ -130,6 +135,7 @@ namespace Air
 
 	public:
 		RenderCommandFence mParentReference;
+
 	};
 
 	

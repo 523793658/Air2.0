@@ -41,6 +41,7 @@ SET(SOURCE_FILE
     ${RenderCore_SOURCE_DIR}/ShaderCache.cpp  
     ${RenderCore_SOURCE_DIR}/ShaderParameterUtils.h  
     ${RenderCore_SOURCE_DIR}/ShaderParameterUtils.cpp  
+    ${RenderCore_SOURCE_DIR}/CrossCompilerCommon.h  
 )
 
 ADD_LIBRARY(${LIB_NAME} ${AIR_PREFERRED_LIB_TYPE} 

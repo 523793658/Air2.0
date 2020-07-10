@@ -139,12 +139,31 @@ namespace Air
 		virtual ResourceArrayInterface* getResourceArray() = 0;
 
 		virtual void serialize(Archive& ar) = 0;
+
+		virtual bool getAllowCPUAccess() const = 0;
+
+		virtual uint32 size() const = 0;
+
 	};
+
+	
 
 	class StaticMeshVertexBuffer : public VertexBuffer
 	{
 
 	public:
+		class TangentsVertexBuffer : public VertexBuffer
+		{
+			virtual wstring getFriendlyName() const override { return TEXT("TangentsVertexBuffer"); }
+		}_TangentsVertexBuffer;
+
+		class TexcoordVertexBuffer : public VertexBuffer
+		{
+			virtual wstring getFriendlyName() const override { return TEXT("TexcoordVertexBuffer"); }
+		}_TexcoordVertexBuffer;
+
+
+
 		FORCEINLINE uint32 getNumVertices() const
 		{
 			return mNumVertices;
@@ -175,12 +194,15 @@ namespace Air
 			return bUseFullPrecisionUVs;
 		}
 		void serialize(Archive& ar, bool bNeedsCPUAccess);
+
+		void convertHalfTexcoordsToFloat(const uint8* inData);
+
 		FORCEINLINE int32 getStride() const
 		{
 			return mStride;
 		}
 
-		ENGINE_API void init(const TArray<StaticMeshBuildVertex>& inVertices, uint32 inNumTexCoords);
+		ENGINE_API void init(const TArray<StaticMeshBuildVertex>& inVertices, uint32 inNumTexCoords, bool needCPUAccess);
 
 		FORCEINLINE void setVertexUV(uint32 vertexIndex, uint32 uvIndex, const float2& vec2D);
 
@@ -188,8 +210,41 @@ namespace Air
 
 		virtual void initRHI() override;
 
+		ENGINE_API void bindTangentVertexBuffer(const VertexFactory* vertexFactory, struct StaticMeshDataType& data) const;
+
+		ENGINE_API void bindTexCoordVertexBuffer(const VertexFactory* vertexFactory, const StaticMeshDataType& data) const;
+
+		ENGINE_API void bindPackedTexCoordVertexBuffer(const VertexFactory* vertexFactory, StaticMeshDataType& data) const;
+
+		ENGINE_API void bindLightMapVertexBuffer(const VertexFactory* vertexFactory, struct StaticMeshDataType& data, int lightMapCoordinateIndex) const;
+
+		VertexBufferRHIRef createTangentsRHIBuffer_RenderThread();
+		VertexBufferRHIRef createTangentsRHIBuffer_Async();
+		VertexBufferRHIRef createTexcoordRHIBuffer_RenderThread();
+		VertexBufferRHIRef createTexcoordRHIBuffer_Async();
+
+		void serializeMetaData(Archive& ar);
+
+		void initTangentAndTexcoordStrides();
+
 	private:
-		StaticMeshVertexDataInterface * mVertexData{ nullptr };
+		template<bool bRenderThread>
+		VertexBufferRHIRef createTangentsRHIBuffer_Interal();
+
+		template<bool bRenderThread>
+		VertexBufferRHIRef createTexcoordRHIBuffer_Internal();
+
+	private:
+		StaticMeshVertexDataInterface * mTangentsData{ nullptr };
+		ShaderResourceViewRHIRef mTangentSRV{ nullptr };
+
+		uint8* mTangentDataPtr;
+		uint8* mTexcoordDataPtr;
+
+		StaticMeshVertexDataInterface* mTexcoordData{ nullptr };
+		ShaderResourceViewRHIRef mTextureCoordinateSRV{ nullptr };
+
+
 
 		uint32 mNumTexcoords{ 0 };
 
@@ -199,13 +254,20 @@ namespace Air
 
 		uint32 mNumVertices{ 0 };
 
+		uint32 mTangentsStride{ 0 };
+
+		uint32 mTexcoordStride{ 0 };
+
 		bool bUseFullPrecisionUVs{ false };
 
 		bool bUseHighPrecisionTangentBasis{ false };
 
+		bool bNeedCPUAccess{ true };
+
 		void allocateData(bool bNeedsCPUAccess = true);
 	};
 
+	
 	class PositionVertexBuffer : public VertexBuffer
 	{
 	public:
@@ -235,7 +297,11 @@ namespace Air
 
 		virtual void initRHI() override;
 
+		ENGINE_API void bindPositionVertexBuffer(const class VertexFactory* vertexFactory, struct StaticMeshDataType& data) const;
+
 	private:
+		ShaderResourceViewRHIRef mPositionComponentSRV;
+
 		class PositionVertexData* mVertexData{ nullptr };
 
 		uint8* mData{ nullptr };
@@ -282,31 +348,35 @@ namespace Air
 		friend Archive& operator << (Archive& ar, StaticMeshSection& section);
 	};
 
+	struct StaticMeshVertexBuffers
+	{
+		StaticMeshVertexBuffer mStaticMeshVertexBuffer;
+		PositionVertexBuffer mPositionVertexBuffer;
+		ColorVertexBuffer mColorVertexBuffer;
+
+		
+	};
+
+	struct AdditionalStaticMeshIndexBuffers
+	{
+		RawStaticIndexBuffer mReservedIndexBuffer;
+		RawStaticIndexBuffer mRevervedDepthOnlyIndexBuffer;
+		RawStaticIndexBuffer mWireframeIndexBuffer;
+		RawStaticIndexBuffer mAdjacencyIndexBuffer;
+	};
+
+
 	struct StaticMeshLODResources
 	{
-		StaticMeshVertexBuffer mVertexBuffer;
-
-		PositionVertexBuffer mPositionVertexBuffer;
-
-		ColorVertexBuffer mColorVertexBuffer;
+		StaticMeshVertexBuffers mVertexBuffers;
 
 		RawStaticIndexBuffer mIndexBuffer;
 
-		RawStaticIndexBuffer mReversedIndexBuffer;
-
 		RawStaticIndexBuffer mDepthOnlyIndexBuffer;
 
-		RawStaticIndexBuffer mReversedDepthOnlyIndexBuffer;
-
-		RawStaticIndexBuffer mWireframeIndexBuffer;
-
-		RawStaticIndexBuffer mAdjacencyIndexBuffer;
-
-		LocalVertexFactory mVertexFactory;
-
-		LocalVertexFactory mVertexFactoryOverrideColorVertexBuffer;
-
 		TArray<StaticMeshSection> mSections;
+
+		AdditionalStaticMeshIndexBuffers* mAdditionalIndexBuffer;
 
 		uint32 bHasAdjacencyInfo : 1;
 		uint32 bHasDepthOnlyIndices : 1;
@@ -332,13 +402,15 @@ namespace Air
 
 		ENGINE_API int32 getNumTexCoords() const;
 
-		void initVertexFactory(LocalVertexFactory& inOutVertexFactory, RStaticMesh* inParentMesh, bool bInOverrideColorVertexBuffer);
-
+		
 	private:
 #if WITH_EDITOR
 		ENGINE_API void resolveSectionInfo(RStaticMesh* owner);
 #endif
+
+		void conditionalForce16BitIndexBuffer(EShaderPlatform maxShaderPlatform, RStaticMesh* parent);
 	};
+	struct StaticMeshVertexFactories;
 
 	class StaticMeshRenderData
 	{
@@ -346,6 +418,7 @@ namespace Air
 		StaticMeshRenderData();
 
 		TindirectArray<StaticMeshLODResources> mLODResources;
+		TindirectArray<StaticMeshVertexFactories> mLODVertexFactories;
 
 		float mScreenSize[MAX_STATIC_MESH_LODS];
 		BoxSphereBounds mBounds;
@@ -378,6 +451,12 @@ namespace Air
 
 	class StaticMeshComponent;
 
+	struct DynamicMeshVertex;
+
+	
+
+
+
 	class ENGINE_API StaticMeshSceneProxy : public PrimitiveSceneProxy
 	{
 	public:
@@ -400,16 +479,27 @@ namespace Air
 			int32 elementIndex,
 			uint8 inDepthPriorityGroup,
 			bool bUseSelectedMaterial,
-			bool bUseHoveredMaterial,
 			bool bAllowPreCulledIndices,
 			MeshBatch& outMeshBatch) const;
 
 		virtual PrimitiveViewRelevance getViewRelevance(const SceneView* view) const override;
 
+		void setMeshElementScreenSize(int32 lodIndex, bool bDitheredLODTransition, MeshBatch& outMeshBatch) const;
 	protected:
 		float getScreenSize(int32 lodIndex) const;
 
-		virtual void setIndexSource(int32 lodIndex, int32 elementIndex, MeshBatch& outMeshElement, bool bWireframe, bool bRequiresAdjacencyInformation, bool bUseInversedIndices, bool bAllowPreCulledIndices) const;
+		
+		uint32 setMeshElementGeometrySource(
+			int32 lodIndex,
+			int32 elementIndex,
+			bool bWireframe,
+			bool bRequiresdIndices,
+			bool bUseinversedIndices,
+			bool bAllowPreCulledIndices,
+			const VertexFactory* vertexFactory,
+			MeshBatch& outMeshElement) const;
+
+		bool isReversedCullingNeeded(bool bUseReversedIndices) const;
 	protected:
 		class LODInfo : public LightCacheInterface
 		{
@@ -452,7 +542,11 @@ namespace Air
 
 		uint32 bCastShadow : 1;
 
+		uint32 bReverseCulling : 1;
+
 		int32 mForcedLodModel;
+
+		int32 mClampedMinLOD;
 	};
 
 
@@ -488,20 +582,18 @@ namespace Air
 		}
 	};
 
-	template<typename UVTypeT, uint32 NumTexCoords>
+	template<typename UVTypeT>
 	struct TStaticMeshVertexUVsDatum
 	{
-		UVTypeT mUVs[NumTexCoords];
-		FORCEINLINE float2 getUV(uint32 texCoordIndex) const
+		UVTypeT mUVs;
+		FORCEINLINE float2 getUV() const
 		{
-			BOOST_ASSERT(texCoordIndex < NumTexCoords);
-			return mUVs[texCoordIndex];
+			return mUVs;
 		}
 
-		FORCEINLINE void setUV(uint32 texCoordIndex, float2 uv)
+		FORCEINLINE void setUV(float2 uv)
 		{
-			BOOST_ASSERT(texCoordIndex < NumTexCoords);
-			mUVs[texCoordIndex] = uv;
+			mUVs = uv;
 		}
 	};
 
@@ -549,97 +641,30 @@ namespace Air
 		return ConstExprStaticMeshVertexTypeID(bUseHighPrecisionTangentBasis, bUseFullPrecisionUVs, texCoordCount);
 	}
 
-	template<EStaticMeshVertexTangentBasisType TangentBasisTypeT, EStaticMeshVertexUVType UVTypeT, uint32 NumTexCoordsT>
-	struct TStaticMeshFullVertex : public TStaticMeshVertexTangentDatum<typename TStaticMeshVertexTangentTypeSelector<TangentBasisTypeT>::TangentTypeT>, public TStaticMeshVertexUVsDatum<typename TStaticMeshVertexUVsTypeSelector<UVTypeT>::UVsTypeT, NumTexCoordsT>
-	{
-		static_assert(NumTexCoordsT > 0, "Must have at least 1 texCoord.");
-		static const EStaticMeshVertexTangentBasisType tangentBasisType = TangentBasisTypeT;
-		static const EStaticMeshVertexUVType UVType = UVTypeT;
-		static const uint32 NumTexCoords = NumTexCoordsT;
-		static const uint32 VertexTypeID = ConstExprStaticMeshVertexTypeID(TangentBasisTypeT == EStaticMeshVertexTangentBasisType::HighPrecision, UVTypeT == EStaticMeshVertexUVType::HighPrecision, NumTexCoordsT);
+	
 
-		friend Archive& operator <<(Archive& ar, TStaticMeshFullVertex& vertex)
-		{
-			ar << vertex.mTangentX;
-			ar << vertex.mTangentZ;
-			for (uint32 uvIndex = 0; uvIndex < NumTexCoordsT; uvIndex++)
-			{
-				ar << vertex.mUVs[uvIndex];
-			}
-			return ar;
-		}
+
+
+
+
+
+	
+
+	
+
+	struct ENGINE_API StaticMeshVertexFactories
+	{
+		StaticMeshVertexFactories(ERHIFeatureLevel::Type inFeatureLevel)
+			:mVertexFactory(inFeatureLevel, "StaticMeshVertexFactories")
+			,mVertexFactoryOverrideColorVertexBuffer(inFeatureLevel, "StaticMeshVertexFactories_Override")
+		{}
+
+		LocalVertexFactory mVertexFactory;
+		LocalVertexFactory mVertexFactoryOverrideColorVertexBuffer;
+		void InitVertexFactory(const StaticMeshLODResources& lodResources, LocalVertexFactory& inOutVertexFactory, uint32 lodIndex, const RStaticMesh* inParentMesh, bool bInOverrideColorVertexBuffer);
+
+		void InitResources(const StaticMeshLODResources& lodResources, uint32 lodIndex, const RStaticMesh* parent);
+
+		void releaseResources();
 	};
-
-#define APPLY_TO_STATIC_MESH_VERTEX(tangentBasisType, UVType, UVCount, ...) \
-	{\
-		typedef TStaticMeshFullVertex<tangentBasisType, UVType, UVCount> VertexType;\
-		case VertexType::VertexTypeID: {__VA_ARGS__}break;\
-	}
-
-#define SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(TangentBasisType, UVType, ...) \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 1, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 2, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 3, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 4, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 5, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 6, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 7, __VA_ARGS__); \
-	APPLY_TO_STATIC_MESH_VERTEX(TangentBasisType, UVType, 8, __VA_ARGS__); 
-
-#define SELECT_STATIC_MESH_VERTEX_TYPE(bIsHighPrecisionTangentsBias, bIsHighPrecisionUVs, numTexCoords, ...)  \
-	{\
-		uint32 vertexTypeID = computeStaticMeshVertexTypeID(bIsHighPrecisionTangentsBias, bIsHighPrecisionUVs, numTexCoords);\
-		switch (vertexTypeID)\
-		{\
-			SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::Default,  __VA_ARGS__);\
-			SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::HighPrecision,  __VA_ARGS__);\
-			SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::Default,  __VA_ARGS__);\
-			SELECT_STATIC_MESH_VERTEX_TYPE_WITH_TEX_COORDS(EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::HighPrecision,  __VA_ARGS__);\
-		};\
-	}
-
-
-
-	FORCEINLINE void StaticMeshVertexBuffer::setVertexTangents(uint32 vertexIndex, float3 x, float3 y, float3 z)
-	{
-		BOOST_ASSERT(vertexIndex < getNumVertices());
-		if (getUseHighPrecisionTangentBasis())
-		{
-			reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::Default, 1>*>(mData + vertexIndex * mStride)->setTangents(x, y, z);
-
-		}
-		else
-		{
-			reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::Default, 1>*>(mData + vertexIndex * mStride)->setTangents(x, y, z);
-		}
-	}
-
-	FORCEINLINE void StaticMeshVertexBuffer::setVertexUV(uint32 vertexIndex, uint32 uvIndex, const float2& vec2D)
-	{
-		BOOST_ASSERT(vertexIndex < getNumVertices());
-		BOOST_ASSERT(uvIndex < getNumTexCoords());
-		if (getUseHighPrecisionTangentBasis())
-		{
-			if (getUseFullPrecisionUVs())
-			{
-				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::HighPrecision, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
-			}
-			else
-			{
-				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::HighPrecision, EStaticMeshVertexUVType::Default, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
-			}
-		}
-		else
-		{
-			if (getUseFullPrecisionUVs())
-			{
-				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::HighPrecision, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
-			}
-			else
-			{
-
-				reinterpret_cast<TStaticMeshFullVertex<EStaticMeshVertexTangentBasisType::Default, EStaticMeshVertexUVType::Default, MAX_STATIC_TEXCOORDS>*>(mData + vertexIndex * mStride)->setUV(uvIndex, vec2D);
-			}
-		}
-	}
 }

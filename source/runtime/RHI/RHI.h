@@ -731,4 +731,30 @@ static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignmen
 	{
 		return isFeatureLevelSupported(platform, ERHIFeatureLevel::SM4) && isMetalPlatform(platform) && (isPCPlatform(platform) || (platform == SP_METAL_MRT && RHIGetShaderLanguageVersion(platform) >= 4));
 	}
+
+	inline bool RHISupportsManualVertexFetch(EShaderPlatform inShaderPlatform)
+	{
+		return (!isOpenGLPlatform(inShaderPlatform) || isSwitchPlatform(inShaderPlatform) && !isMobilePlatform(inShaderPlatform));
+	}
+
+	class VertexElementTypeSupportInfo
+	{
+	public:
+		VertexElementTypeSupportInfo()
+		{
+			for (int32 i = 0; i < VET_MAX; i++)
+			{
+				mElementCaps[i] = true;
+			}
+		}
+
+		FORCEINLINE bool isSupported(EVertexElementType elementType) { return mElementCaps[elementType]; }
+
+		FORCEINLINE void setSupported(EVertexElementType elementType, bool supported) { mElementCaps[elementType] = supported; }
+	private:
+		bool mElementCaps[VET_MAX];
+	};
+
+	extern RHI_API class VertexElementTypeSupportInfo GVertexElementTypeSupport;
+	
 }

@@ -68,7 +68,7 @@ namespace Air
 			}
 			else
 			{
-				materialProxy = mMaterial->getRenderProxy(false);
+				materialProxy = mMaterial->getRenderProxy();
 			}
 
 

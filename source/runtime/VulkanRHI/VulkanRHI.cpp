@@ -13,6 +13,8 @@
 #include "VulkanResources.h"
 #include "VulkanConfiguration.h"
 #include "VulkanState.h"
+#include "VulkanContext.h"
+#include "VulkanShaderResource.h"
 namespace Air
 {
 	extern RHI_API bool GUseTexture3DBulkDataRHI;

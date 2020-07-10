@@ -30,7 +30,7 @@ namespace Air
 
 	void RenderResource::initResource()
 	{
-		if (!mInitialized)
+		if (!bInitialized)
 		{
 			mResourceLink = TLinkedList<RenderResource*>(this);
 			mResourceLink.linkHead(getResourceList());
@@ -39,14 +39,22 @@ namespace Air
 				initDynamicRHI();
 				initRHI();
 			}
-			mInitialized = true;
+			bInitialized = true;
+		}
+	}
+
+	RenderResource::~RenderResource()
+	{
+		if (bInitialized && !GIsCriticalError)
+		{
+			//AIR_LOG(LogRenderCore, Fatal, TEXT("A RenderResource was D"))
 		}
 	}
 
 	void RenderResource::releaseResource()
 	{
 		BOOST_ASSERT(isInRenderingThread());
-		if (mInitialized)
+		if (bInitialized)
 		{
 			if (GIsRHIInitialized)
 			{
@@ -54,7 +62,7 @@ namespace Air
 				releaseDynamicRHI();
 			}
 			mResourceLink.unLink();
-			mInitialized = false;
+			bInitialized = false;
 		}
 	}
 
@@ -119,7 +127,7 @@ namespace Air
 	void RenderResource::updateRHI()
 	{
 		BOOST_ASSERT(isInRenderingThread());
-		if (mInitialized && GIsRHIInitialized)
+		if (bInitialized && GIsRHIInitialized)
 		{
 			releaseRHI();
 			releaseDynamicRHI();

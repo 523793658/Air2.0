@@ -11,6 +11,7 @@
 #include "Containers/IndirectArray.h"
 #include "StaticParameterSet.h"
 #include "VertexFactory.h"
+#include "Containers/Set.h"
 namespace Air
 {
 	class Shader;
@@ -131,6 +132,11 @@ namespace Air
 		ENGINE_API const ShaderParametersMetadata& getConstantBufferStruct() const;
 
 		ENGINE_API void fillConstantBuffer(CONST MaterialRenderContext& materialRenderContext, const ConstantExpressionCache& constantExpressionCache, uint8* tempBuffer, int tempBufferSize) const;
+
+		inline bool hasExternalTextureExpressions() const
+		{
+			return false;
+		}
 	protected:
 		TArray<TRefCountPtr<MaterialConstantExpression>> mConstantVectorExpressions;
 		TArray<TRefCountPtr<MaterialConstantExpression>> mConstantScalarExpressions;
@@ -419,6 +425,8 @@ namespace Air
 
 		virtual float getOpacityMaskClipValue() const = 0;
 
+		virtual bool isCrackFreeDisplacementEnabled() const { return false; }
+
 		void removeOutstandingCompileId(int32 const oldOutstandingCompileShaderMapId)
 		{
 			mOutstandingCompileShaderMapIds.remove(oldOutstandingCompileShaderMapId);
@@ -678,6 +686,11 @@ namespace Air
 		bool isSelected() const { return bSelected; }
 		bool isHovered() const { return bHovered; }
 
+		bool isDeleted() const
+		{
+			return mDeletedFlag != 0;
+		}
+
 		virtual bool getVectorValue(const wstring parameterName, LinearColor* outValue, const MaterialRenderContext& context) const = 0;
 
 		virtual bool getScalarValue(const wstring parameterName, float* outValue, const MaterialRenderContext& context) const = 0;
@@ -688,12 +701,14 @@ namespace Air
 
 	private:
 #if !(BUILD_SHIPPING || BUILD_TEST)
-		mutable int32 mDeletedFlag : 1;
 		mutable int32 bIsStaticDrawListReferenced : 1;
 #endif
-
+		mutable int32 mDeletedFlag : 1;
 		bool bSelected : 1;
 		bool bHovered : 1;
+
+		ENGINE_API static TSet<MaterialRenderProxy*> mDeferredConstantExpressionCacheRequests;
+		ENGINE_API static TSet<MaterialRenderProxy*> mMaterialRenderProxyMap;
 	};
 
 	

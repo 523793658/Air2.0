@@ -5,25 +5,28 @@
 namespace Air
 {
 	template<typename VertexDataType>
-	class TStaticMeshVertexData : public StaticMeshVertexDataInterface,
-		public TResourceArray<VertexDataType, VERTEXBUFFER_ALIGNMENT>
+	class TStaticMeshVertexData : public StaticMeshVertexDataInterface
 	{
+		TResourceArray<VertexDataType, VERTEXBUFFER_ALIGNMENT> mData;
+
 	public:
+
+
+
 		typedef TResourceArray<VertexDataType, VERTEXBUFFER_ALIGNMENT> ArrayType;
 		TStaticMeshVertexData(bool inNeedsCPUAccess = false)
-			:TResourceArray<VertexDataType, VERTEXBUFFER_ALIGNMENT>(inNeedsCPUAccess)
 		{
 		}
 
 		virtual void resizeBuffer(uint32 numVertices)
 		{
-			if ((uint32)ArrayType::size() < numVertices)
+			if (mData.size() < numVertices)
 			{
-				ArrayType::addUninitialized(numVertices - ArrayType::size());
+				mData.addUninitialized(numVertices - mData.size());
 			}
-			else if ((uint32)ArrayType::size() > numVertices)
+			else if ((uint32)mData.size() > numVertices)
 			{
-				ArrayType::removeAt(numVertices, ArrayType::size() - numVertices);
+				mData.removeAt(numVertices, mData.size() - numVertices);
 			}
 		}
 
@@ -34,23 +37,27 @@ namespace Air
 
 		virtual uint8* getDataPointer()
 		{
-			return (uint8*)&(*this)[0];
+			return (uint8*)mData.getData();
 		}
 
 		virtual ResourceArrayInterface* getResourceArray()
 		{
-			return this;
+			return &mData;
 		}
 
 		virtual void serialize(Archive& ar)
 		{
-			TResourceArray<VertexDataType, VERTEXBUFFER_ALIGNMENT>::bulkSerialize(ar);
+			mData.bulkSerialize(ar);
 		}
-		TStaticMeshVertexData<VertexDataType>& operator = (const TArray<VertexDataType>&other)
+		
+		virtual bool getAllowCPUAccess() const override
 		{
-			TResourceArray<VertexDataType, VERTEXBUFFER_ALIGNMENT>::operator =(TArray<VertexDataType, TAlignedHeapAllocator<VERTEXBUFFER_ALIGNMENT>>(other));
-			return *this;
+			return mData.getAllowCPUAccess();
 		}
 
+		virtual uint32 size() const override
+		{
+			return mData.size();
+		}
 	};
 }

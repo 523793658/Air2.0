@@ -69,6 +69,8 @@ namespace Air
 
 		ENGINE_API virtual std::shared_ptr<const RMaterial> getMaterial() const override;
 
+		ENGINE_API virtual std::shared_ptr<const RMaterial> getMaterial_Concurrent(TMicRecursionGuard& recursionGurad) const override;
+
 		ENGINE_API virtual bool isMasked() const override;
 
 		ENGINE_API virtual MaterialResource* getMaterialResource(ERHIFeatureLevel::Type inFeatureLvel, EMaterialQualityLevel::Type qualityLevel = EMaterialQualityLevel::Num) override;
@@ -95,7 +97,7 @@ namespace Air
 
 		ENGINE_API virtual bool isPropertyActive(EMaterialProperty inProperty) const override;
 
-		virtual ENGINE_API MaterialRenderProxy* getRenderProxy(bool selected, bool bHovered = false) const override;
+		virtual ENGINE_API MaterialRenderProxy* getRenderProxy() const override;
 
 		void updatePermutationAllocations();
 
@@ -126,7 +128,7 @@ namespace Air
 	public:
 		StaticParameterSet mStaticParameters;
 
-		class MaterialInstanceResource* mResources[3];
+		class MaterialInstanceResource* mResource;
 
 		TArray<struct ScalarParameterValue> mScalarParameterValues;
 

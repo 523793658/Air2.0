@@ -45,7 +45,7 @@ namespace Air
 	public:
 		DrawVisibleMeshCommandsAnyThreadTask(
 			RHICommandList& inRHICmdList,
-			MeshCommandOneFrameArray& inVisibleMeshDrawCommands,
+			const MeshCommandOneFrameArray& inVisibleMeshDrawCommands,
 			const GraphicsMinimalPipelineStateSet& inGraphicsMinimalPipelineStateSet,
 			RHIVertexBuffer* inPrimitiveIdsBuffers,
 			int32 inBasePrimitiveIdsOffset,

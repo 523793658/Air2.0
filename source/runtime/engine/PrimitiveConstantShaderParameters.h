@@ -13,15 +13,16 @@ namespace Air
 		SHADER_PARAMETER_EX(float, LocalToWorldDeterminantSign, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float4, ObjectWorldPositionAndRadius)
 		SHADER_PARAMETER(float3, ObjectBounds)
-		SHADER_PARAMETER(float3 ,ActorWorldPosition)
+		SHADER_PARAMETER(float3, ActorWorldPosition)
 		SHADER_PARAMETER_EX(float, DecalReceiverMask, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float4, ObjectOrientation, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float4, NonUniformScale, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float4, InvNonUniformScale, EShaderPrecisionModifier::Half)
-	END_GLOBAL_SHADER_PARAMETER_STRUCT(PrimitiveConstantShaderParameters)
+		END_GLOBAL_SHADER_PARAMETER_STRUCT(PrimitiveConstantShaderParameters)
 
 		inline PrimitiveConstantShaderParameters getPrimitiveConstantShaderParameters(
 			const Matrix& localToWorld,
+			const Matrix& previousLocalToWorld,
 			float3 actorPosition,
 			const BoxSphereBounds& worldBounds,
 			const BoxSphereBounds& localBounds,
@@ -60,12 +61,13 @@ namespace Air
 	)
 	{
 		BOOST_ASSERT(isInRenderingThread());
-		return TConstantBufferRef<PrimitiveConstantShaderParameters>::createConstantBufferImmediate(getPrimitiveConstantShaderParameters(localToWorld, worldBounds.mOrigin, worldBounds, localBounds, bReceivesDecals), ConstantBuffer_MultiFrame);
+		return TConstantBufferRef<PrimitiveConstantShaderParameters>::createConstantBufferImmediate(getPrimitiveConstantShaderParameters(localToWorld, localToWorld, worldBounds.mOrigin, worldBounds, localBounds, bReceivesDecals), ConstantBuffer_MultiFrame);
 	}
 
 	inline PrimitiveConstantShaderParameters getIdentityPrimitiveParameters()
 	{
 		return getPrimitiveConstantShaderParameters(
+			Matrix(Plane(1, 0, 0, 0), Plane(0, 1, 0, 0), Plane(0, 0, 1, 0), Plane(0, 0, 0, 1)),
 			Matrix(Plane(1, 0, 0, 0), Plane(0, 1, 0, 0), Plane(0, 0, 1, 0), Plane(0, 0, 0, 1)),
 			float3(0.0f, 0.0f, 0.0f),
 			BoxSphereBounds(EForceInit::ForceInit),

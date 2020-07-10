@@ -97,4 +97,14 @@ namespace Air
 		}
 
 	}
+
+	IMPLEMENT_GLOBAL_SHADER_PARAMETER_STRUCT(ForwardLightData, "ForwardLightData");
+
+	ForwardLightData::ForwardLightData()
+	{
+		Memory::memzero(*this);
+		ForwardLocalLightBuffer = nullptr;
+		NumCulledLightsGrid = nullptr;
+		CulledLightDataGrid = nullptr;
+	}
 }

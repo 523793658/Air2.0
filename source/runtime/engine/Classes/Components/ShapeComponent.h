@@ -37,7 +37,9 @@ namespace Air
 	class CustomVertexFactory : public LocalVertexFactory
 	{
 	public:
-		CustomVertexFactory() {}
+		CustomVertexFactory() 
+			:LocalVertexFactory(ERHIFeatureLevel::SM5, "CustomVertexFactory")
+		{}
 
 		void init_RenderThread(const CustomMeshVertexBuffer* vertexBuffer);
 

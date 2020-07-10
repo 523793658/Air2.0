@@ -141,6 +141,8 @@ namespace Air
 
 		wstring mLODGroup;
 
+		int32 mMinLOD;
+
 		bool bAllowCPUAccess;
 	};
 }

@@ -36,7 +36,7 @@ namespace Air
 
 		inline const BoxSphereBounds& getLocalBounds() const { return mLocalBounds; }
 
-		inline SceneInterface& getScene() { return *mScene; }
+		inline SceneInterface& getScene() const { return *mScene; }
 
 		inline int32 getVisibilityId() const { return mVisibilityId; }
 
@@ -44,15 +44,17 @@ namespace Air
 
 		virtual void OnTransformChanged(){}
 
+		inline bool hasViewDependentPDG() const { return bUseViewOwnerDepthPriorityGroup; }
+
 		inline bool shouldRenderInMainPass()const { return bRenderInMainPass; }
 
 		ENGINE_API void updateConstantBuffer();
 
 		ENGINE_API void verifyUsedMaterial(const class MaterialRenderProxy* materialRenderProxy) const;
 
-		inline const TConstantBuffer<PrimitiveConstantShaderParameters>& getConstantBuffer() const
+		inline RHIConstantBuffer* getConstantBuffer() const
 		{
-			return mConstantBuffer;
+			return mConstantBuffer.getReference();
 		}
 
 		virtual void getDynamicMeshElements(const TArray<const SceneView*>& views, const SceneViewFamily& viewFamily, uint32 VisibilityMap, class MeshElementCollector& collector) const {}
@@ -80,6 +82,18 @@ namespace Air
 
 		inline bool castsDynamicShadow() const { return bCastDynamicShadow; }
 		inline bool castsStaticShadow() const { return bCastStaticShadow; }
+
+		inline bool castsVolumetricTranslucentShadow() const { return bCastVolumetricTranslucentShadow; }
+
+		inline bool doesVFRequirePrimitiveConstantBuffer() const {
+			return bVFRequiresPrimitiveConstantBuffer;
+		}
+
+		virtual uint8 getStaticDepthPriorityGroup() const
+		{
+			BOOST_ASSERT(!hasViewDependentPDG());
+			return mStaticDepthPriorityGroup;
+		}
 	private:
 		friend class Scene;
 		Matrix mLocalToWorld;
@@ -93,7 +107,7 @@ namespace Air
 		PrimitiveComponentId mPrimitiveComponentId;
 		PrimitiveSceneInfo* mPrimitiveSceneInfo;
 		
-		TConstantBuffer<PrimitiveConstantShaderParameters> mConstantBuffer;
+		TConstantBufferRef<PrimitiveConstantShaderParameters> mConstantBuffer;
 
 
 		float mMinDrawDistance;
@@ -105,8 +119,16 @@ namespace Air
 		uint32 bStaticElementsAlwaysUseProxyPrimitiveConstantBuffer : 1;
 		uint32 bDisableStaticPath : 1;
 		uint32 bCastDynamicShadow : 1;
+		uint32 bCastVolumetricTranslucentShadow : 1;
 		uint32 bCastStaticShadow : 1;
 		uint32 bStaticLighting : 1;
+		uint32 bUseViewOwnerDepthPriorityGroup : 1;
+		uint32 bReceivesDecals : 1;
+		
+		uint8 mStaticDepthPriorityGroup : SDPG_NumBits;
+		uint8 mViewOwnerDepthPriorityGroup : SDPG_NumBits;
+	protected:
+		uint32 bVFRequiresPrimitiveConstantBuffer : 1;
 	};
 
 	class SimpleLightEntry

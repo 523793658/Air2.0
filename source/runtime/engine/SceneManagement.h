@@ -306,6 +306,8 @@ namespace Air
 	{
 	public:
 		virtual void drawMesh(const MeshBatch& mesh, float screenSize) = 0;
+
+		virtual void reserveMemoryForMeshes(int32 meshNum) = 0;
 	};
 
 	class LightInteraction
