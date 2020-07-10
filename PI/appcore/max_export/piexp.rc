@@ -1,0 +1,168 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// 英语(美国) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 165
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 69
+    END
+
+    IDD_ASCIIEXPORT_DLG, DIALOG
+    BEGIN
+        RIGHTMARGIN, 408
+        TOPMARGIN, 2
+        BOTTOMMARGIN, 397
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "#include ""veroverrides.h""\r\n"
+    "#include ""maxversion.r""\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOG 0, 0, 172, 76
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About PI Export"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,60,55,50,14
+    RTEXT           "PI Engine!!!!",IDC_STATIC,10,13,151,36
+    GROUPBOX        "",IDC_STATIC,7,7,158,44
+END
+
+IDD_ASCIIEXPORT_DLG DIALOGEX 0, 0, 417, 404
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "PI Export"
+FONT 8, "??", 400, 0, 0x86
+BEGIN
+    CONTROL         "Skeleton Animation",IDC_RADIO_SKELETON,"Button",BS_AUTORADIOBUTTON | WS_GROUP,43,255,88,13
+    CONTROL         "Vertex Animation",IDC_RADIO_VERTEX,"Button",BS_AUTORADIOBUTTON,136,255,80,13
+    CONTROL         "UV_Animation",IDC_RADIO_UV,"Button",BS_AUTORADIOBUTTON,217,256,64,10
+    DEFPUSHBUTTON   "OK",IDOK,271,20,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,271,42,50,14
+    CONTROL         "",IDC_BEGIN_FRAME,"CustEdit",WS_TABSTOP,113,312,25,10
+    CONTROL         "",IDC_ANIM_BEGIN_SPIN,"SpinnerControl",0x0,139,312,7,10
+    CONTROL         "",IDC_END_FRAME,"CustEdit",WS_TABSTOP,113,331,25,10
+    CONTROL         "",IDC_ANIM_END_SPIN,"SpinnerControl",0x0,139,331,7,10
+    LTEXT           "start frame",IDC_STATIC,43,312,50,13
+    EDITTEXT        IDC_EXPORT_ANIM_NAME,113,293,40,12,ES_AUTOHSCROLL
+    LTEXT           "animation name",IDC_STATIC,43,293,57,13
+    LTEXT           "end frame",IDC_STATIC,43,331,50,13
+    LTEXT           "interval",IDC_STATIC_INTERVAL,43,274,33,13
+    EDITTEXT        IDC_INTERVAL,113,272,40,12,ES_AUTOHSCROLL
+    CONTROL         "low shading",IDC_CHECK_USE_LOW_SHADING,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,43,79,76,10
+    GROUPBOX        "Animation",IDC_STATIC,32,240,253,132
+    GROUPBOX        "Export Type",IDC_STATIC,32,33,211,32
+    CONTROL         "Obj",IDC_RADIO_OBJ,"Button",BS_AUTORADIOBUTTON | WS_GROUP,43,47,28,10
+    CONTROL         "Animation",IDC_RADIO_ANIMATION,"Button",BS_AUTORADIOBUTTON,104,47,52,10
+    GROUPBOX        "Obj",IDC_STATIC,32,67,211,168
+    CONTROL         "increment export",IDC_CHECK_INCREMENT_EXPORT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,43,94,76,10
+    GROUPBOX        "Elements",IDC_STATIC,41,143,195,86
+    CONTROL         "Shadingphong",IDC_CHECK_SHADING_PHONG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,52,175,64,10
+    CONTROL         "Diffuse",IDC_CHECK_DIFFUSE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,126,175,44,10
+    CONTROL         "Specular",IDC_CHECK_SPECULAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,52,193,48,10
+    CONTROL         "Normal",IDC_CHECK_NORMAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,126,212,40,10
+    CONTROL         "ModelBase",IDC_CHECK_MODEL_BASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,52,155,52,10
+    CONTROL         "Skeleton",IDC_CHECK_SKELETON,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,126,155,48,10
+    CONTROL         "Alpha",IDC_CHECK_ALPHA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,126,193,36,10
+    CONTROL         "Glow",IDC_CHECK_GLOW,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,52,212,32,10
+    CONTROL         "export tangent",IDC_CHECK2_TANGENT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,43,109,104,10
+    CONTROL         "export scale",IDC_CHECK_SCALE,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,44,345,83,14
+    CONTROL         "sort by model",IDC_CHECK2_SORT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,43,124,104,10
+    CONTROL         "Ragdoll",IDC_RADIO_RAGDOLL,"Button",BS_AUTORADIOBUTTON,170,47,44,10
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_ASCIIEXP            "PIExp"
+    IDS_CATEGORY            "Standard"
+    IDS_EXTENSION1          "model"
+    IDS_LONGDESC            "3ds max PI engine model exporter"
+    IDS_SHORTDESC           "PI model exporter"
+    IDS_COPYRIGHT           "PI Engine!"
+    IDS_PROGRESS_MSG        "Exporting file..."
+    IDS_VERSIONSTRING       "PIExport Version"
+    IDS_LIBDESCRIPTION      "PI engine model exporter"
+END
+
+#endif    // 英语(美国) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+#include "veroverrides.h"
+#include "maxversion.r"
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
