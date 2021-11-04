@@ -694,4 +694,7 @@ extern RENDER_CORE_API ShaderParametersMetadata* findConstantBufferStructByName(
 
 #define SHADER_PARAMETER_STRUCT_ARRAY(StructType, MemberName, ArrayDecl) \
 	INTERNAL_SHADER_PARAMETER_EXPLICIT(CBMT_NESTED_STRUCT, TShaderParameterStructTypeInfo<StructType, ArrayDecl>, StructType, MemberName,ArrayDecl,,EShaderPrecisionModifier::Float, TEXT(#StructType), true)
+
+#define SHADER_PARAMETER_UAV(ShaderType, MemberName) \
+	INTERNAL_SHADER_PARAMETER_EXPLICIT(CBMT_UAV, TShaderResourceParameterTypeInfo<RHIUnorderedAccessView*>, RHIUnorderedAccessView*, MemberName,, = nullptr, EShaderPrecisionModifier::Float, TEXT(#ShaderType), false)
 }

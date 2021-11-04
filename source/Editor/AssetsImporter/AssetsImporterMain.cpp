@@ -1,9 +1,9 @@
 #include "Classes/Factories/Factory.h"
-using namespace Air;
+//using namespace Air;
 int main()
 {
 	
-	Factory::initAllFactory();
+	Air::Factory::initAllFactory();
 
 	return 0;
 }

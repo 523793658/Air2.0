@@ -1,7 +1,7 @@
 #include "RHICommandList.h"
 
 #include "MaterialShader.h"
-#include "Containers/String.h"
+#include "Containers/FString.h"
 #include "Serialization/MemoryWriter.h"
 #include "ScenePrivate.h"
 #include "ParameterCollection.h"

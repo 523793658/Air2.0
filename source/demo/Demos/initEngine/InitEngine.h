@@ -2,20 +2,20 @@
 #include "core/Application.h"
 #include "ApplicationManager.h"
 #include "Classes/Engine/World.h"
-namespace Demo
+namespace Air
 {
 	class FreeCamera
 	{
 	private:
-		ViewportCameraTransform& mCamera;
+		Air::ViewportCameraTransform& mCamera;
 
 		bool bIsMoving{ false };
 		bool bIsRotating{ false };
-		int2 mLastMousePosition;
-		float3 mSpeed{ 0,0,0 };
+		Air::int2 mLastMousePosition;
+		Air::float3 mSpeed{ 0,0,0 };
 	public:
 
-		FreeCamera(ViewportCameraTransform& camera)
+		FreeCamera(Air::ViewportCameraTransform& camera)
 			:mCamera(camera)
 		{
 		}
@@ -34,7 +34,6 @@ namespace Demo
 	};
 
 
-	using namespace Air;
 	class DemoInitEngine : public Application
 	{
 		GENERATED_RCLASS_BODY(DemoInitEngine, Application);

@@ -115,14 +115,6 @@ namespace Air
 			return mMaterialRenderProxy->getMaterial(inFeatureLevel)->isMasked();
 		}
 
-		FORCEINLINE void checkConstantBuffers() const
-		{
-			for (int32 elementIdx = 0; elementIdx < mElements.size(); elementIdx++)
-			{
-				BOOST_ASSERT(isValidRef(mElements[elementIdx].mPrimitiveConstantBuffer) || mElements[elementIdx].mPrimitiveConstantBufferResource != nullptr);
-			}
-		}
-
 		FORCEINLINE bool isTranslucent(ERHIFeatureLevel::Type inFeatureLevel) const
 		{
 			return isTranslucentBlendMode(mMaterialRenderProxy->getMaterial(inFeatureLevel)->getBlendMode());

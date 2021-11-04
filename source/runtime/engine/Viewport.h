@@ -46,7 +46,7 @@ namespace Air
 
 		IntRect calculateViewExtents(float aspectRatio, const IntRect& viewRect);
 
-		virtual float getDesiredAspectRatio() const;
+		ENGINE_API virtual float getDesiredAspectRatio() const;
 
 		virtual bool hasMouseCapture() const { return true; }
 

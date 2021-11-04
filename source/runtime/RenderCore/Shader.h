@@ -10,6 +10,9 @@
 #include "Serialization/ArchiveProxy.h"
 #include "ShaderParameters.h"
 #include "ShaderPermutation.h"
+#include "Misc/ScopeLock.h"
+#include "Containers/HashTable.h"
+#include "Serialization/MemoryImage.h"
 namespace Air
 {
 	extern RENDER_CORE_API SHAHash GGlobalShaderMapHash;
@@ -139,20 +142,33 @@ namespace Air
 		}
 	};
 
-#define DECLARE_EXPORTED_SHADER_TYPE(ShaderClass, ShaderMetaTypeShortcut, RequiredAPI, ...)  \
-	public :\
-	using PermutationDomain = ShaderPermutationNone;\
-	using ShaderMetaType = ShaderMetaTypeShortcut##ShaderType;\
-	static RequiredAPI ShaderMetaType mStaticType;	\
-	static Shader* constructSerializedInstance() {return new ShaderClass();}	\
-	static Shader* constructCompiledInstance(const ShaderMetaType::CompiledShaderInitializerType& initializer)	 \
-	{\
-		return new ShaderClass(initializer);\
-	}\
-	virtual uint32 getTypeSize() const override{return sizeof(*this);}
 
-#define DECLARE_SHADER_TYPE(ShaderClass, ShaderMetaTypeShortcut)	\
-	DECLARE_EXPORTED_SHADER_TYPE(ShaderClass, ShaderMetaTypeShortcut,)
+#define INTERNAL_DECLARE_SHADER_TYPE_COMMON(ShaderClass, ShaderMetaTypeShortcut, RequiredAPI) \
+	public: \
+	using ShaderMetaType = ShaderMetaTypeShortcut##ShaderType; \
+	using ShaderMapType = ShaderMetaTypeShortcut##ShaderMap; \
+	\
+	static RequiredAPI ShaderMetaType mStaticType; \
+	\
+	SHADER_DECLARE_VTABLE(ShaderClass)
+	
+
+
+#define DECLARE_EXPORTED_SHADER_TYPE(ShaderClass, ShaderMetaTypeShortcut, RequiredAPI, ...)  \
+	INTERNAL_DECLARE_SHADER_TYPE_COMMON(ShaderClass, ShaderMetaTypeShortcut, RequiredAPI); \
+	public:
+
+#define DECLARE_SHADER_TYPE(ShaderClass, ShaderMetaTypeShortcut, ...)	\
+	DECLARE_EXPORTED_SHADER_TYPE(ShaderClass, ShaderMetaTypeShortcut,, ##_VA_ARGS__)
+
+#define SHADER_TYPE_VTABLE(ShaderClass) \
+	ShaderClass::constructSerializedInstance, \
+	ShaderClass::constructCompiledInstance, \
+	ShaderClass::modifyCompilationEnvironmentImpl, \
+	ShaderClass::shouldCompilePermutationImpl, \
+	ShaderClass::validateCompiledResult
+	
+
 
 #define IMPLEMENT_SHADER_TYPE(TemplatePrefix, ShaderClass, SourceFilename, FunctionName, Frequency) \
 	TemplatePrefix	\
@@ -161,13 +177,10 @@ namespace Air
 		SourceFilename,	\
 		FunctionName,	\
 		Frequency,	\
-		1, \
-		ShaderClass::constructSerializedInstance,	\
-		ShaderClass::constructCompiledInstance,	\
-		ShaderClass::modifyCompilationEnvironment,\
-		ShaderClass::shouldCompilePermutation,	\
-		ShaderClass::validateCompiledResult, \
-		ShaderClass::getStreamOutElements\
+		ShaderClass::PermutationDomain::mPermutationCount, \
+		SHADER_TYPE_VTABLE(ShaderClass), \
+		sizeof(ShaderClass), \
+		ShaderClass::getRootParametersMetadata() \
 	);
 
 #define IMPLEMENT_SHADER_TYPE2(ShaderClass, Frequency)	\
@@ -249,6 +262,497 @@ namespace Air
 
 		int32 mSpecificPermutationId;
 	};
+
+
+	class RENDER_CORE_API ShaderMapResource : public RenderResource, public DeferredCleanupInterface
+	{
+	public:
+		static bool arePlatformsCompatible(EShaderPlatform currentPlatform, EShaderPlatform targetPlatform);
+
+		EShaderPlatform getPlatform() const { return mPlatform; }
+
+		void AddRef();
+
+		void Release();
+
+		inline int32 GetNumRefs() const { return mNumRef; }
+
+		virtual void releaseRHI();
+
+		inline int32 getNumShaders() const
+		{
+			return mNumRHIShaders;
+		}
+
+		inline bool hasShader(int32 shaderIndex) const
+		{
+			return mRHIShaders[shaderIndex].load(std::memory_order_acquire) != nullptr;
+		}
+
+		inline RHIShader* getShader(int32 shaderIndex)
+		{
+			RHIShader* shader = mRHIShaders[shaderIndex].load(std::memory_order_acquire);
+			if (shader == nullptr)
+			{
+				ScopeLock scopeLock(&mRHIShadersCreationGuard);
+				shader = mRHIShaders[shaderIndex].load(std::memory_order_relaxed);
+				if (shader == nullptr)
+				{
+					shader = createShader(shaderIndex);
+					mRHIShaders[shaderIndex].store(shader, std::memory_order_release);
+				}
+			}
+			return shader;
+		}
+
+		void beginCreateAllShaders();
+
+		virtual uint32 getSizeBytes() const = 0;
+
+	protected:
+		explicit ShaderMapResource(EShaderPlatform inPlatform, int32 numShaders);
+
+		virtual ~ShaderMapResource();
+
+		uint32 getAllocatedSize() const
+		{
+			uint32 size = mNumRHIShaders * sizeof(std::atomic<RHIShader*>);
+			return size;
+		}
+
+		RHIShader* createShader(int32 shaderIndex);
+
+		virtual TRefCountPtr<RHIShader> createRHIShader(int32 shaderIndex) = 0;
+
+		virtual bool tryRelease() { return true; }
+
+		void releaseShaders();
+
+	private:
+		CriticalSection mRHIShadersCreationGuard;
+
+		std::unique_ptr<std::atomic<RHIShader*>[]> mRHIShaders;
+
+		int32 mNumRHIShaders;
+
+		EShaderPlatform mPlatform;
+
+		int32 mNumRef;
+	};
+
+	class RENDER_CORE_API ShaderMapResource_InlineCode : public ShaderMapResource
+	{
+	public:
+		ShaderMapResource_InlineCode(EShaderPlatform InPlatform, ShaderMapResourceCode* InCode)
+			: ShaderMapResource(InPlatform, InCode->mShaderEntries.size())
+			, Code(InCode)
+		{}
+
+		// FShaderMapResource interface
+		virtual TRefCountPtr<RHIShader> createRHIShader(int32 ShaderIndex) override;
+		virtual uint32 getSizeBytes() const override { return sizeof(*this) + getAllocatedSize(); }
+
+		TRefCountPtr<ShaderMapResourceCode> Code;
+	};
+
+	class ShaderMapResourceCode : public ThreadSafeRefCountedObject
+	{
+	public:
+		struct ShaderEntry
+		{
+			TArray<uint8> mCode;
+			int32 mUncompressedSize;
+			EShaderFrequency mFrequency;
+
+			friend Archive& operator << (Archive& ar, ShaderEntry& entry)
+			{
+				uint8 freq = entry.mFrequency;
+				ar << entry.mCode << entry.mUncompressedSize << freq;
+				entry.mFrequency = (EShaderFrequency)freq;
+				return ar;
+			}
+		};
+
+		RENDER_CORE_API ~ShaderMapResourceCode();
+
+		RENDER_CORE_API void finalize();
+
+		RENDER_CORE_API void serialize(Archive& ar, bool bLoadedByCookedMaterial);
+
+		RENDER_CORE_API uint32 getSizeBytes() const;
+
+		RENDER_CORE_API void addShaderCompilerOutput(const ShaderCompilerOutput& output);
+
+		int32 findShaderIndex(const SHAHash& inHash) const;
+
+		SHAHash mResourceHash;
+		TArray<SHAHash> mShaderHashes;
+		TArray<ShaderEntry> mShaderEntries;
+#if WITH_EDITORONLY_DATA
+		TArray<TArray<uint8>> mPlatformDebugData;
+		TArray<SHAHash> mPlatformDebugDataHashes;
+#endif // WITH_EDITORONLY_DATA
+	};
+
+	class RENDER_CORE_API ShaderMapPointerTable
+	{
+	public:
+		template<typename T>
+		int32 AddIndexedPointer(void* ptr);
+
+		template<typename T>
+		void* GetIndexedPointer(uint32 i) const;
+
+		TArray<ShaderType*> mShaderTypes;
+		TArray<VertexFactoryType*> mVFType;
+	};
+
+	template<>
+	int32 ShaderMapPointerTable::AddIndexedPointer<ShaderType>(void* ptr)
+	{
+		mShaderTypes.push_back((ShaderType*)ptr);
+		return mShaderTypes.size() - 1;
+	}
+
+	template<>
+	int32 ShaderMapPointerTable::AddIndexedPointer<VertexFactoryType>(void* ptr)
+	{
+		mVFType.push_back((VertexFactoryType*)ptr);
+		return mVFType.size() - 1;
+	}
+	
+	template<>
+	void* ShaderMapPointerTable::GetIndexedPointer<ShaderType>(uint32 i) const
+	{
+		return mShaderTypes[i];
+	}
+
+	template<>
+	void* ShaderMapPointerTable::GetIndexedPointer<VertexFactoryType>(uint32 i) const
+	{
+		return mVFType[i];
+	}
+	class ShaderPipeline;
+
+
+	
+	class RENDER_CORE_API ShaderMapContent
+	{
+	public:
+		struct ProjectShaderPipelineToKey
+		{
+			inline bool operator()(const HashedName& name, const ShaderPipeline* inShaderPipeline){ return inShaderPipeline->mTypeName == name; }
+		};
+
+
+		EShaderPlatform getShaderPlatform() const { return mPlatform; }
+		void validate(const ShaderMapBase& InShaderMap);
+
+		/** Finds the shader with the given type.  Asserts on failure. */
+		template<typename ShaderType>
+		ShaderType* GetShader(int32 PermutationId = 0) const
+		{
+			Shader* shader = getShader(&ShaderType::mStaticType, PermutationId);
+			checkf(Shader != nullptr, TEXT("Failed to find shader type %s in Platform %s"), ShaderType::mStaticType.GetName(), *legacyShaderPlatformToShaderFormat(mPlatform).ToString());
+			return static_cast<ShaderType*>(Shader);
+		}
+
+		/** Finds the shader with the given type.  Asserts on failure. */
+		template<typename ShaderType>
+		ShaderType* getShader(const typename ShaderType::FPermutationDomain& PermutationVector) const
+		{
+			return getShader<ShaderType>(PermutationVector.toDimensionValueId());
+		}
+
+		/** Finds the shader with the given type.  May return NULL. */
+		Shader* getShader(ShaderType* ShaderType, int32 PermutationId = 0) const
+		{
+			return getShader(ShaderType->getHashedName(), PermutationId);
+		}
+
+		/** Finds the shader with the given type name.  May return NULL. */
+		Shader* getShader(const HashedName& TypeName, int32 PermutationId = 0) const;
+
+		/** Finds the shader with the given type. */
+		bool hasShader(const HashedName& TypeName, int32 PermutationId) const
+		{
+			const Shader* shader = getShader(TypeName, PermutationId);
+			return shader != nullptr;
+		}
+
+		bool hasShader(const ShaderType* Type, int32 PermutationId) const
+		{
+			return hasShader(Type->getHashedName(), PermutationId);
+		}
+
+		inline TArrayView<Shader* const> getShaders() const
+		{
+			return mShaders;
+		}
+
+		inline TArrayView<ShaderPipeline* const> getShaderPipelines() const
+		{
+			return mShaderPipelines;
+		}
+
+		void addShader(const HashedName& TypeName, int32 PermutationId, Shader* shader);
+
+		Shader* findOrAddShader(const HashedName& TypeName, int32 PermutationId, Shader* Shader);
+
+		void addShaderPipeline(ShaderPipeline* Pipeline);
+
+		ShaderPipeline* findOrAddShaderPipeline(ShaderPipeline* Pipeline);
+
+		/**
+		 * Removes the shader of the given type from the shader map
+		 * @param Type Shader type to remove the entry for
+		 */
+		void removeShaderTypePermutaion(const HashedName& TypeName, int32 PermutationId);
+
+		inline void removeShaderTypePermutaion(const ShaderType* Type, int32 PermutationId)
+		{
+			removeShaderTypePermutaion(Type->getHashedName(), PermutationId);
+		}
+
+		void removeShaderPipelineType(const ShaderPipelineType* shaderPipelineType);
+
+		/** Builds a list of the shaders in a shader map. */
+		void getShaderList(const ShaderMapBase& InShaderMap, const SHAHash& InMaterialShaderMapHash, TMap<ShaderId, TShaderRef<Shader>>& OutShaders) const;
+
+		/** Builds a list of the shaders in a shader map. Key is FShaderType::TypeName */
+		void getShaderList(const ShaderMapBase& InShaderMap, TMap<HashedName, TShaderRef<Shader>>& OutShaders) const;
+
+		/** Builds a list of the shader pipelines in a shader map. */
+		void getShaderPipelineList(const ShaderMapBase& InShaderMap, TArray<ShaderPipelineRef>& OutShaderPipelines, ShaderPipeline::EFilter Filter) const;
+
+#if WITH_EDITOR
+		uint32 getMaxTextureSamplersShaderMap(const ShaderMapBase& InShaderMap) const;
+
+		void getOutdatedTypes(const ShaderMapBase& InShaderMap, TArray<const ShaderType*>& OutdatedShaderTypes, TArray<const ShaderPipelineType*>& OutdatedShaderPipelineTypes, TArray<const VertexFactoryType*>& OutdatedFactoryTypes) const;
+
+		void saveShaderStableKeys(const ShaderMapBase& InShaderMap, EShaderPlatform TargetShaderPlatform, const struct FStableShaderKeyAndValue& SaveKeyVal);
+#endif // WITH_EDITOR
+
+		/** @return true if the map is empty */
+		inline bool isEmpty() const
+		{
+			return mShaders.size() == 0;
+		}
+
+		/** @return The number of shaders in the map. */
+		uint32 getNumShaders() const;
+
+		/** @return The number of shader pipelines in the map. */
+		inline uint32 getNumShaderPipelines() const
+		{
+			return mShaderPipelines.size();
+		}
+
+		/** clears out all shaders and deletes shader pipelines held in the map */
+		void empty();
+
+		inline ShaderPipeline* getShaderPipeline(const HashedName& PipelineTypeName) const
+		{
+			const int32 Index = std::binary_search(mShaderPipelines.begin(), mShaderPipelines.end(), PipelineTypeName, ProjectShaderPipelineToKey());
+			return (Index != INDEX_NONE) ? mShaderPipelines[Index] : nullptr;
+		}
+
+		inline ShaderPipeline* getShaderPipeline(const ShaderPipelineType* PipelineType) const
+		{
+			return getShaderPipeline(PipelineType->getHashedName());
+		}
+
+		inline bool hasShaderPipeline(const HashedName& PipelineTypeName) const { return getShaderPipeline(PipelineTypeName) != nullptr; }
+		inline bool hasShaderPipeline(const ShaderPipelineType* PipelineType) const { return (getShaderPipeline(PipelineType) != nullptr); }
+
+		uint32 getMaxNumInstructionsForShader(const ShaderMapBase& InShaderMap, ShaderType* ShaderType) const;
+
+		void finalize(const ShaderMapResourceCode* Code);
+
+		void UpdateHash(SHA1& Hasher) const;
+
+	protected:
+
+		void EmptyShaderPipelines();
+
+
+		using HashTypeDefault = THashTable<DefaultAllocator>;
+		HashTypeDefault mShaderHash;
+		TArray<void*> mShaderTypes;
+		TArray<int32> mShaderPermutations;
+		TArray<Shader*> mShaders;
+		TArray<ShaderPipeline*> mShaderPipelines;
+
+		EShaderPlatform mPlatform;
+	};
+
+
+	class RENDER_CORE_API ShaderMapBase
+	{
+	public:
+		virtual ~ShaderMapBase();
+
+		ShaderMapResourceCode* getResourceCode();
+
+		inline ShaderMapResource* getResource() const { return mResource; }
+
+		inline ShaderMapResource* getResourceChecked() const { BOOST_ASSERT(mResource); return mResource; }
+
+		inline const ShaderMapPointerTable* getPointerTable() const { BOOST_ASSERT(mPointerTable); return mPointerTable; }
+
+		inline const ShaderMapContent* getContent() const { return mContent; }
+
+		inline ShaderMapContent* getMutableContent()
+		{
+			return mContent;
+		}
+
+		inline EShaderPlatform getShaderPlatform() const { return mContent ? mContent->getShaderPlatform() : SP_NumPlatforms; }
+
+		void assignContent(ShaderMapContent* inContent);
+		void finalizeContent();
+		bool serialize(Archive& ar, bool bInlineShaderResource, bool bLoadedByCookedMaterial, bool bInlineShaderCode = false);
+
+	protected:
+		explicit ShaderMapBase();
+
+		void destroyContent();
+
+		virtual ShaderMapPointerTable* createPointerTable() const = 0;
+
+	private:
+		TRefCountPtr<ShaderMapResource> mResource;
+		TRefCountPtr<ShaderMapResourceCode> mCode;
+		ShaderMapPointerTable* mPointerTable;
+		ShaderMapContent* mContent;
+	};
+	class ShaderType;
+	template<typename ShaderType, typename PointerTableType>
+	class TShaderRefBase
+	{
+	public:
+		TShaderRefBase() : mShaderContent(nullptr), mShaderMap(nullptr) {}
+		TShaderRefBase(ShaderType* InShader, const ShaderMapBase& InShaderMap) : mShaderContent(InShader), mShaderMap(&InShaderMap) {}
+		TShaderRefBase(const TShaderRefBase&) = default;
+
+		template<typename OtherShaderType, typename OtherPointerTableType>
+		TShaderRefBase(const TShaderRefBase<OtherShaderType, OtherPointerTableType>&Rhs) : mShaderContent(Rhs.GetShader()), mShaderMap(Rhs.GetShaderMap()) {}
+
+		TShaderRefBase& operator=(const TShaderRefBase&) = default;
+
+		template<typename OtherShaderType, typename OtherPointerTableType>
+		TShaderRefBase& operator=(const TShaderRefBase<OtherShaderType, OtherPointerTableType>&Rhs)
+		{
+			mShaderContent = Rhs.GetShader();
+			mShaderMap = Rhs.GetShaderMap();
+			return *this;
+		}
+
+		template<typename OtherShaderType, typename OtherPointerTableType>
+		static TShaderRefBase<ShaderType, PointerTableType> cast(const TShaderRefBase<OtherShaderType, OtherPointerTableType>&Rhs)
+		{
+			return TShaderRefBase<ShaderType, PointerTableType>(static_cast<ShaderType*>(Rhs.GetShader()), Rhs.GetShaderMapChecked());
+		}
+
+		template<typename OtherShaderType, typename OtherPointerTableType>
+		static TShaderRefBase<ShaderType, PointerTableType> reinterpretCast(const TShaderRefBase<OtherShaderType, OtherPointerTableType>&Rhs)
+		{
+			return TShaderRefBase<ShaderType, PointerTableType>(reinterpret_cast<ShaderType*>(Rhs.GetShader()), Rhs.GetShaderMapChecked());
+		}
+
+		inline bool isValid() const { return mShaderContent != nullptr; }
+		inline bool isNull() const { return mShaderContent == nullptr; }
+
+		inline void reset() { mShaderContent = nullptr; mShaderMap = nullptr; }
+
+		inline ShaderType* getShader() const { return mShaderContent; }
+		inline const ShaderMapBase* getShaderMap() const { return mShaderMap; }
+		inline const ShaderMapBase& getShaderMapChecked() const { check(mShaderMap); return *mShaderMap; }
+		inline ShaderType* getType() const { return mShaderContent->getType(getPointerTable()); }
+		inline VertexFactoryType* getVertexFactoryType() const { return mShaderContent->getVertexFactoryType(GetPointerTable()); }
+		inline ShaderMapResource& getResourceChecked() const { ShaderMapResource* Resource = getResource(); check(Resource); return *Resource; }
+		const PointerTableType& getPointerTable() const;
+		ShaderMapResource* getResource() const;
+
+		inline ShaderType* operator->() const { return mShaderContent; }
+
+		inline RHIShader* getRHIShaderBase(EShaderFrequency Frequency) const
+		{
+			RHIShader* RHIShader = nullptr;
+			if (mShaderContent)
+			{
+				BOOST_ASSERT(mShaderContent->getFrequency() == Frequency);
+				RHIShader = getResourceChecked().getShader(mShaderContent->getResourceIndex());
+				BOOST_ASSERT(RHIShader->getFrequency() == Frequency);
+			}
+			return RHIShader;
+		}
+
+		/** @return the shader's vertex shader */
+		inline RHIVertexShader* getVertexShader() const
+		{
+			return static_cast<RHIVertexShader*>(getRHIShaderBase(SF_Vertex));
+		}
+		/** @return the shader's pixel shader */
+		inline RHIPixelShader* getPixelShader() const
+		{
+			return static_cast<RHIPixelShader*>(getRHIShaderBase(SF_Pixel));
+		}
+		/** @return the shader's hull shader */
+		inline RHIHullShader* getHullShader() const
+		{
+			return static_cast<RHIHullShader*>(getRHIShaderBase(SF_Hull));
+		}
+		/** @return the shader's domain shader */
+		inline RHIDomainShader* getDomainShader() const
+		{
+			return static_cast<RHIDomainShader*>(getRHIShaderBase(SF_Domain));
+		}
+		/** @return the shader's geometry shader */
+		inline RHIGeometryShader* getGeometryShader() const
+		{
+			return static_cast<RHIGeometryShader*>(getRHIShaderBase(SF_Geometry));
+		}
+		/** @return the shader's compute shader */
+		inline RHIComputeShader* getComputeShader() const
+		{
+			return static_cast<RHIComputeShader*>(getRHIShaderBase(SF_Compute));
+		}
+
+#if RHI_RAYTRACING
+		/*inline RHIRayTracingShader* GetRayTracingShader() const
+		{
+			FRHIRayTracingShader* RHIShader = nullptr;
+			if (ShaderContent)
+			{
+				const EShaderFrequency Frequency = ShaderContent->GetFrequency();
+				checkSlow(Frequency == SF_RayGen
+					|| Frequency == SF_RayMiss
+					|| Frequency == SF_RayHitGroup
+					|| Frequency == SF_RayCallable);
+				RHIShader = static_cast<FRHIRayTracingShader*>(GetResourceChecked().GetShader(ShaderContent->GetResourceIndex()));
+				checkSlow(RHIShader->GetFrequency() == Frequency);
+			}
+			return RHIShader;
+		}
+
+		inline uint32 GetRayTracingMaterialLibraryIndex() const
+		{
+			checkSlow(ShaderContent);
+			checkSlow(ShaderContent->GetFrequency() == SF_RayHitGroup);
+			return GetResourceChecked().GetRayTracingMaterialLibraryIndex(ShaderContent->GetResourceIndex());
+		}*/
+#endif // RHI_RAYTRACING
+
+
+	private:
+		ShaderType* mShaderContent;
+		const ShaderMapBase* mShaderMap;
+	};
+
+
+	template<typename ShaderType>
+	using TShaderRef = TShaderRefBase<ShaderType, ShaderMapPointerTable>;
 
 	class ShaderResource : public RenderResource, public DeferredCleanupInterface
 	{
@@ -338,8 +842,6 @@ namespace Air
 
 		virtual void initRHI();
 		virtual void releaseRHI();
-
-		virtual void finishCleanup();
 
 		RENDER_CORE_API static ShaderResource* findShaderResourceById(const ShaderResourceId& id);
 
@@ -584,143 +1086,128 @@ namespace Air
 		void bindForRootShaderParameters(const Shader* shader, const ShaderParameterMap& parameterMaps);
 	};
 
+	struct ShaderPermutationParameters
+	{
+		const EShaderPlatform mPlatform;
+		const int32 mPermutationId;
+		explicit ShaderPermutationParameters(EShaderPlatform inPlatform, int32 inPermutationId = 0)
+			:mPlatform(inPlatform)
+			,mPermutationId(inPermutationId)
+		{
 
-	class RENDER_CORE_API Shader : public DeferredCleanupInterface
+		}
+	};
+
+#define SHADER_DECLARE_VTABLE(ShaderClass) \
+	static Shader* constructSerializedInstance() {return new ShaderClass();} \
+	static Shader* constructCompiledInstance(const typename Shader::CompiledShaderInitializerType& initializer) \
+	{ return new ShaderClass(static_cast<const typename ShaderMetaType::CompiledShaderInitializerType&>(initializer)); }\
+	static void modifyCompilationEnvironmentImpl(const ShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment) \
+	{\
+		const typename ShaderClass::PermutationDomain permutationVector(parameters.mPermutationId); \
+		mPermutationVector.modifyCompilationEnvironment(outEnvironment); \
+		ShaderClass::modifyCompilationEnvironment(static_cast<const typename ShaderClass::PermutationParameters&>(parameters), outEnvironment); \
+	} \
+	static bool shouldCompilePermutationImple(const ShaderPermutationParameters& parameters) \
+	{return ShaderClass::shouldCompilePermutation(static_cast<const typename ShaderClass::PermutationParameters&>(parameters));}
+
+	struct ShaderCompiledShaderInitializerType
+	{
+		ShaderType* mType;
+		ShaderTarget mTarget;
+		const TArray<uint8>& mCode;
+		const ShaderParameterMap& mParameterMap;
+		const SHAHash& mOutputHash;
+		SHAHash mMaterialShaderMapHash;
+		const ShaderPipelineType* mShaderPipeline;
+		VertexFactoryType* mVertexFactoryType;
+		uint32 mNumInstructions;
+		uint32 mNumTextureSamplers;
+		uint32 mCodeSize;
+		int32 mPermutationId;
+
+		RENDER_CORE_API ShaderCompiledShaderInitializerType(
+			ShaderType* inType,
+			int32 inPermutationId,
+			const ShaderCompilerOutput& compilerOutput,
+			const SHAHash& inMaterialShaderMapHash,
+			const ShaderPipelineType* inShaderPipeline,
+			VertexFactoryType* inVertexFactoryType
+		);
+	};
+
+
+	class RENDER_CORE_API Shader
 	{
 		friend class ShaderType;
 	public:
-		struct CompiledShaderInitializerType
-		{
-			ShaderType* mType;
-			ShaderTarget mTarget;
-			const TArray<uint8> & mCode;
-			const ShaderParameterMap& mParameterMap;
-			const SHAHash& mOutputHash;
-			ShaderResource* mResource;
-			SHAHash mMaterialShaderMapHash;
-			const ShaderPipelineType* mShaderPipeline;
-			VertexFactoryType* mVertexFactoryType;
-			int32 mPermutationId;
-
-			CompiledShaderInitializerType(
-				ShaderType* inType,
-				int32 inPermutationId,
-				const ShaderCompilerOutput& compilerOutput,
-				ShaderResource* inResource,
-				const SHAHash& inMaterialShaderMapHash,
-				const ShaderPipelineType* inShaderPipeline,
-				VertexFactoryType* inVertexFactoryType
-			) :
-				mType(inType),
-				mPermutationId(inPermutationId),
-				mTarget(compilerOutput.mTarget),
-				mCode(compilerOutput.mShaderCode.getReadAccess()),
-				mParameterMap(compilerOutput.mParameterMap),
-				mOutputHash(compilerOutput.mOutputHash),
-				mResource(inResource),
-				mMaterialShaderMapHash(inMaterialShaderMapHash),
-				mShaderPipeline(inShaderPipeline),
-				mVertexFactoryType(inVertexFactoryType)
-			{}
-		};
+		using PermutationDomain = ShaderPermutationNone;
+		using PermutationParameters = ShaderPermutationParameters;
+		using CompiledShaderInitializerType = ShaderCompiledShaderInitializerType;
+		using ShaderMetaType = ShaderType;
 
 		Shader();
 
-		Shader(const CompiledShaderInitializerType& initializer);
+		Shader(const ShaderCompiledShaderInitializerType& initializer);
 
 		virtual ~Shader();
 
-		virtual uint32 getTypeSize() const
-		{
-			return sizeof(*this);
-		}
-		virtual void finishCleanup();
+		static void modifyCompilationEnvironment(const ShaderPermutationParameters&, ShaderCompilerEnvironment&) {}
 
-		void beginInitializeResources()
-		{
-			beginInitResource(mResource);
+		static bool shouldCompilePermutation(const ShaderPermutationParameters&) { return true; }
+
+		static bool validateCompiledResult(EShaderPlatform inPlatform, const ShaderParameterMap& inParameterMap, TArray<wstring>& outError) {
+			return true;
 		}
 
-		inline int32 getPermutationId() const { return mPermutationId; }
+		const SHAHash& getHash() const;
 
-		inline ShaderType* getType() const { return mType; }
+		const SHAHash& getVertexFactoryHash() const;
 
-		ShaderId getId() const;
+		const SHAHash& getOutputHash() const;
+
+		void finalize(const ShaderMapResourceCode* code);
+
+		inline ShaderType* getType()const { return mType; }
+
+		inline VertexFactoryType* getVertexFactoryType()const { return mVFType; }
+
+		inline int32 getResourceIndex() const { BOOST_ASSERT(mResourceIndex != INDEX_NONE); return mResourceIndex; }
+
+		inline EShaderPlatform getShaderPlatform() const { return mTarget.getPlatform(); }
+
+		inline EShaderFrequency GetFrequency() const { return mTarget.getFrequency(); }
 
 		inline const ShaderTarget getTarget() const { return mTarget; }
 
-		inline void checkShaderIsValid() const
-		{
-			BOOST_ASSERT(mCanary == ShaderMagic_Initialized);
-		}
+		inline inline uint32 getNumInstructions() const { return mNumInstructions; }
 
-		inline Shader* getShaderChecked()
-		{
-			checkShaderIsValid();
-			return this;
-		}
+		inline uint32 getNumTextureSamplers() const { return mNumTextureSamplers; }
 
-		const ShaderParameterMapInfo& getParameterMapInfo() const {
-			return mResource->mParameterMapInfo;
-		}
+		inline uint32 getCodeSize() const { return mCodeSize; }
 
-
-		void setResource(ShaderResource* inResource);
-
-		void AddRef();
-		void Release();
-		void Register();
-		void deRegister();
-		void registerSerializedResource();
-
-		virtual const VertexFactoryParameterRef* getVertexFactoryParameterRef() const { return nullptr; }
-		
-		virtual uint32 getAllocatedSize() const
-		{
-			return mConstantBufferParameters.getAllocatedSize() + mConstantBufferParameterStructs.getAllocatedSize();
-		}
-
-		bool serializeBase(Archive& ar, bool bShadersInline);
-		virtual bool serialize(Archive& ar) { return false; }
-	public:
-		inline RHIVertexShader* getVertexShader()
-		{
-			return mResource->getVertexShader();
-		}
-
-		inline RHIHullShader* getHullShader()
-		{
-			return mResource->getHullShader();
-		}
-
-		inline RHIDomainShader* getDomainShader()
-		{
-			return mResource->getDomainShader();
-		}
-
-		inline RHIGeometryShader* getGeometryShader()
-		{
-			return mResource->getGeometryShader();
-		}
-
-		inline RHIPixelShader* getPixelShader()
-		{
-			return mResource->getPixelShader();
-		}
-
-		inline RHIComputeShader* getComputeShader()
-		{
-			return mResource->getComputeShader();
-		}
+		inline void setNumInstructions(uint32 value) { mNumInstructions = value; }
 
 		template<typename ConstantBufferStructType>
 		FORCEINLINE_DEBUGGABLE const TShaderConstantBufferParameter<ConstantBufferStructType>& getConstantBufferParameter() const
 		{
-			ShaderParametersMetadata* searchStruct = &ConstantBufferStructType::StaticStructMetadata;
+			const ShaderConstantBufferParameter& foundParameter = getConstantBufferParameter(&ConstantBufferStructType::StaticStructMetadata);
+			return static_cast<const TShaderConstantBufferParameter<ConstantBufferStructType>&>(foundParameter);
+		}
+
+		FORCEINLINE_DEBUGGABLE const ShaderConstantBufferParameter& getConstantBufferParameter(const ShaderParametersMetadata* searchStruct) const
+		{
+			const HashedName searchName = searchStruct->getShaderVariableHashedName();
+			return getConstantBufferParameter(searchName);
+		}
+
+		FORCEINLINE_DEBUGGABLE const ShaderConstantBufferParameter& getConstantBufferParameter(const HashedName searchName) const
+		{
 			int32 foundIndex = INDEX_NONE;
-			for (int32 structIndex = 0, count = mConstantBufferParameterStructs.size(); structIndex < count; structIndex++)
+			TArrayView<const HashedName> constantBufferParameterStructsView(mConstantBufferParameterStructs);
+			for (int32 structIndex = 0, count = constantBufferParameterStructsView.size(); structIndex < count; structIndex++)
 			{
-				if (mConstantBufferParameterStructs[structIndex] == searchStruct)
+				if (constantBufferParameterStructsView[structIndex] == searchName)
 				{
 					foundIndex = structIndex;
 					break;
@@ -728,58 +1215,55 @@ namespace Air
 			}
 			if (foundIndex != INDEX_NONE)
 			{
-				const TShaderConstantBufferParameter<ConstantBufferStructType>& foundParameter = (const TShaderConstantBufferParameter<ConstantBufferStructType>&)*mConstantBufferParameters[foundIndex];
-				foundParameter.mSetParametersId = mSetParametersId;
+				const ShaderConstantBufferParameter& foundParameter = mConstantBufferParameters[foundIndex];
 				return foundParameter;
 			}
 			else
 			{
-				static TShaderConstantBufferParameter<ConstantBufferStructType> unboundParameter;
-				unboundParameter.setInitialized();
-				return unboundParameter;
+				static ShaderConstantBufferParameter UnboundParamter;
+				return UnboundParamter;
 			}
 		}
 
-		static void getStreamOutElements(StreamOutElementList& elementList, TArray<uint32>& streamStrides, int32& rasterizedStream) {}
+		const ShaderParametersMetadata* findAutomaticallyBoundConstantBufferStruct(int32 baseIndex) const;
+
+		void dumpDebugInfo() const;
 
 		static inline const ShaderParametersMetadata* getRootParametersMetadata()
 		{
 			return nullptr;
 		}
-	protected:
-		TArray<ShaderParametersMetadata*> mConstantBufferParameterStructs;
-		TArray<ShaderConstantBufferParameter*> mConstantBufferParameters;
 
 	private:
+		void buildParameterMapInfo(const TMap<wstring, ParameterAllocation>& parameterMap);
+
+	protected:
+		ShaderParameterBindings mBindings;
+		ShaderParameterMapInfo mParameterMapInfos;
+
+		TArray<HashedName> mConstantBufferParameterStructs;
+		TArray<ShaderConstantBufferParameter> mConstantBufferParameters;
+
 		SHAHash mOutputHash;
-		ShaderResource* mSerializedResource;
-
-		TRefCountPtr<ShaderResource> mResource;
-
-		SHAHash mMaterialShaderMapHash;
-		const ShaderPipelineType* mShaderPipeline;
-		VertexFactoryType* mVFType;
 
 		SHAHash mVFSourceHash;
-		ShaderType* mType;
+
 		SHAHash mSourceHash;
 
-		int32 mPermutationId;
+	private:
+		ShaderType* mType;
+
+		VertexFactoryType* mVFType;
 
 		ShaderTarget mTarget;
 
-		mutable uint32 mNumRefs;
+		int32 mResourceIndex;
 
-		mutable uint32 mSetParametersId;
+		uint32 mNumInstructions;
 
-		uint32 mCanary;
+		uint32 mNumTextureSamplers;
 
-	public:
-		ShaderParameterBindings mBindings;
-	public:
-		static const uint32 ShaderMagic_Uninitialized = 0xbd9922df;
-		static const uint32 ShaderMagic_CleaningUp = 0xdc67f93b;
-		static const uint32 ShaderMagic_Initialized = 0x335b43ab;
+		uint32 mCodeSize;
 	};
 
 
@@ -793,75 +1277,142 @@ namespace Air
 		{
 			Global,
 			Material,
-			MeshMaterial
+			MeshMaterial,
+			Niagara,
+			OCIO,
+			NumShaderTypes,
 		};
 
 		typedef class Shader* (*ConstructSerializedType)();
-		typedef void(*GetStreamOutElementsType)(StreamOutElementList& elementList, TArray<uint32>& streamStrides, int32 & RasterizerStream);
+		typedef Shader* (*ConstructCompiledType)(const Shader::CompiledShaderInitializerType& initializer);
+		typedef bool (*ShouldCompilePermutationType)(const ShaderPermutationParameters&);
+		typedef void (*ModifyCompilationEnvironmentType)(const ShaderPermutationParameters&, ShaderCompilerEnvironment&);
+		typedef void (*validateCompiledResultType)(EShaderPlatform, const ShaderParameterMap&, TArray<wstring>&);
 
-		GetStreamOutElementsType mGetStreamOutElementsRef;
 
-		ShaderType(EShaderTypeForDynamicCast inShaderTypeForDynamicCast, const TCHAR* inName, const TCHAR* inSourceFilename, const TCHAR* inFunctionName, uint32 inFrequency, int32 inTotalPermutationCount, ConstructSerializedType inConstructSerializedRef, GetStreamOutElementsType inGetStreamOutElementsRef);
-		~ShaderType();
 
-		FORCEINLINE MeshMaterialShaderType* getMeshMaterialShaderType()
+		ShaderType(
+			EShaderTypeForDynamicCast inShaderTypeForDynamicCast,
+			const TCHAR* inName,
+			const TCHAR* inSourceFilename,
+			const TCHAR* inFounctionName,
+			uint32 inFrequency,
+			int32 totalPermutationCount,
+			ConstructSerializedType inConstructSerializeRef,
+			ConstructCompiledType inConstructCompiledRef,
+			ModifyCompilationEnvironmentType inModifyCompilationEnvironmentRef,
+			ShouldCompilePermutationType inShouldCompilePermutationRef,
+			validateCompiledResultType inValidateCompiledResultRef,
+			uint32 inTypeSize,
+			const ShaderParametersMetadata* inRootParametersMetadata);
+		virtual ~ShaderType();
+
+		Shader* constructForDeserialization() const;
+
+		Shader* constructCompiled(const Shader::CompiledShaderInitializerType& initiaizer) const;
+
+		bool shouldCompilePermutation(const ShaderPermutationParameters& parameters)const;
+
+		void modifyCompilationEnvironment(const ShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)const;
+
+		bool validateCompiledResult(EShaderPlatform platform, const ShaderParameterMap& paramterMap, TArray<wstring>& outError)const;
+
+		const SHAHash& getSourceHash(EShaderPlatform shaderPlatform) const;
+
+		/** Serializes a shader type reference by name. */
+		RENDER_CORE_API friend Archive& operator<<(Archive& Ar, ShaderType*& Ref);
+
+		/** Hashes a pointer to a shader type. */
+		friend uint32 getTypeHash(ShaderType* Ref)
 		{
-			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::MeshMaterial) ? reinterpret_cast<MeshMaterialShaderType*>(this) : nullptr;
+			return Ref ? getTypeHash(Ref->mHashedName) : 0u;
 		}
 
-
-
-		FORCEINLINE const MeshMaterialShaderType* getMeshMaterialShaderType() const
+		// Dynamic casts.
+		FORCEINLINE GlobalShaderType* getGlobalShaderType()
 		{
-			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::MeshMaterial) ? reinterpret_cast<const MeshMaterialShaderType*>(this) : nullptr;
+			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Global) ? reinterpret_cast<GlobalShaderType*>(this) : nullptr;
 		}
-
-		FORCEINLINE const MaterialShaderType* getMaterialShaderType() const
+		FORCEINLINE const GlobalShaderType* getGlobalShaderType() const
 		{
-			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Material) ? reinterpret_cast<const MaterialShaderType*>(this) : nullptr;
+			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Global) ? reinterpret_cast<const GlobalShaderType*>(this) : nullptr;
 		}
-
 		FORCEINLINE MaterialShaderType* getMaterialShaderType()
 		{
 			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Material) ? reinterpret_cast<MaterialShaderType*>(this) : nullptr;
 		}
-
-		static TLinkedList<ShaderType*>*& getTypeList();
-
-		bool limitShaderResourceToThisType() const
+		FORCEINLINE const MaterialShaderType* getMaterialShaderType() const
 		{
-			return mGetStreamOutElementsRef != &Shader::getStreamOutElements;
+			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Material) ? reinterpret_cast<const MaterialShaderType*>(this) : nullptr;
+		}
+		FORCEINLINE MeshMaterialShaderType* getMeshMaterialShaderType()
+		{
+			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::MeshMaterial) ? reinterpret_cast<MeshMaterialShaderType*>(this) : nullptr;
+		}
+		FORCEINLINE const MeshMaterialShaderType* getMeshMaterialShaderType() const
+		{
+			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::MeshMaterial) ? reinterpret_cast<const MeshMaterialShaderType*>(this) : nullptr;
+		}
+		/*FORCEINLINE const FNiagaraShaderType* GetNiagaraShaderType() const
+		{
+			return (ShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Niagara) ? reinterpret_cast<const FNiagaraShaderType*>(this) : nullptr;
+		}
+		FORCEINLINE FNiagaraShaderType* GetNiagaraShaderType()
+		{
+			return (ShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Niagara) ? reinterpret_cast<FNiagaraShaderType*>(this) : nullptr;
+		}
+		FORCEINLINE const FOpenColorIOShaderType* GetOpenColorIOShaderType() const
+		{
+			return (ShaderTypeForDynamicCast == EShaderTypeForDynamicCast::OCIO) ? reinterpret_cast<const FOpenColorIOShaderType*>(this) : nullptr;
+		}
+		FORCEINLINE FOpenColorIOShaderType* GetOpenColorIOShaderType()
+		{
+			return (ShaderTypeForDynamicCast == EShaderTypeForDynamicCast::OCIO) ? reinterpret_cast<FOpenColorIOShaderType*>(this) : nullptr;
+		}*/
+
+		inline EShaderTypeForDynamicCast getTypeForDynamicCast() const
+		{
+			return mShaderTypeForDynamicCast;
 		}
 
-		inline const TCHAR* getShaderFilename() const
-		{
-			return mSourceFilename;
-		}
-
-		inline const TCHAR* getFunctionName() const
-		{
-			return mFunctionName;
-		}
-
-		inline const SerializationHistory& getSerializationHistory() const
-		{
-			return mSerializationHistory;
-		}
-
-		inline const TCHAR* getName() const
-		{
-			return mName;
-		}
-
+		
 		inline EShaderFrequency getFrequency() const
 		{
 			return (EShaderFrequency)mFrequency;
 		}
-
-		inline void removeFromShaderIdMap(ShaderId id)
+		inline const TCHAR* getName() const
 		{
-			BOOST_ASSERT(isInGameThread());
-			mShaderIdMap.erase(id);
+			return mName;
+		}
+		inline const wstring& getFName() const
+		{
+			return mTypeName;
+		}
+		inline const HashedName& getHashedName() const
+		{
+			return mHashedName;
+		}
+		inline const TCHAR* getShaderFilename() const
+		{
+			return mSourceFilename;
+		}
+		inline const HashedName& getHashedShaderFilename() const
+		{
+			return mHashedSourceFilename;
+		}
+		inline const TCHAR* getFunctionName() const
+		{
+			return mFunctionName;
+		}
+		inline uint32 getTypeSize() const
+		{
+			return mTypeSize;
+		}
+
+		inline int32 getNumShaders() const
+		{
+			// TODO count this
+			return 0;
 		}
 
 		inline int32 getPermutationCount() const
@@ -869,114 +1420,142 @@ namespace Air
 			return mTotalPermutationCount;
 		}
 
-		void flushShaderFileCache(const TMap<wstring, TArray<const TCHAR*>>& shaderFileToConstantBufferVariables);
-
-		RENDER_CORE_API friend Archive& operator << (Archive& ar, ShaderType*& type);
-
-		Shader* findShaderById(const ShaderId& id);
-
-		Shader* constructForDeserialization() const
+		inline const TMap<const TCHAR*, CachedConstantBufferDeclaration>& getReferencedUniformBufferStructsCache() const
 		{
-			return (*mConstructSerializedRef)();
+			return mReferencedConstantBufferStructsCache;
 		}
 
-		const SHAHash& getSourceHash(EShaderPlatform shaderPlatform) const;
-
-		void addToShaderIdMap(ShaderId id, Shader* shader);
-
-
-		static TMap<wstring, ShaderType*> & getNameToTypeMap();
-
-		static void initialize(const TMap<wstring, TArray<const TCHAR*>>& shaderFileToConstantBufferVariables);
-
-		void getStreamOutElements(StreamOutElementList& elementList, TArray<uint32>& streamStrides, int32& rasterizedStream)
+		/** Returns the meta data for the root shader parameter struct. */
+		inline const ShaderParametersMetadata* getRootParametersMetadata() const
 		{
-			(*mGetStreamOutElementsRef)(elementList, streamStrides, rasterizedStream);
+			return mRootParametersMetadata;
 		}
 
-		inline const TMap<const TCHAR*, CachedConstantBufferDeclaration>& getReferencedShaderParametersMetadatasCache() const
+		/** Adds include statements for uniform buffers that this shader type references, and builds a prefix for the shader file with the include statements. */
+		void addReferencedUniformBufferIncludes(ShaderCompilerEnvironment& OutEnvironment, wstring& OutSourceFilePrefix, EShaderPlatform Platform);
+
+		void flushShaderFileCache(const TMap<wstring, TArray<const TCHAR*> >& ShaderFileToUniformBufferVariables)
 		{
-			return mReferencedShaderParametersMetadatasCache;
+			mReferencedConstantBufferStructsCache.empty();
+			generateReferencedConstantBuffers(mSourceFilename, mName, ShaderFileToUniformBufferVariables, mReferencedConstantBufferStructsCache);
+			bCachedConstantBufferStructDeclarations = false;
 		}
 
-		FORCEINLINE const GlobalShaderType* getGlobalShaderType() const
-		{
-			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Global) ? reinterpret_cast<const GlobalShaderType*>(this) : nullptr;
-		}
-
-		FORCEINLINE GlobalShaderType* getGlobalShaderType()
-		{
-			return (mShaderTypeForDynamicCast == EShaderTypeForDynamicCast::Global) ? reinterpret_cast<GlobalShaderType*>(this) : nullptr;
-		}
-
-		void addReferencedConstantBufferIncludes(ShaderCompilerEnvironment& outEnvironment, wstring& outSourceFilePrefix, EShaderPlatform platform);
-
+		void dumpDebugInfo();
+		void getShaderStableKeyParts(struct FStableShaderKeyAndValue& SaveKeyVal);
 	private:
 		EShaderTypeForDynamicCast mShaderTypeForDynamicCast;
-		uint32 mHashIndex;
 		const TCHAR* mName;
 		wstring mTypeName;
+		HashedName mHashedName;
+		HashedName mHashedSourceFilename;
 		const TCHAR* mSourceFilename;
 		const TCHAR* mFunctionName;
 		uint32 mFrequency;
+		uint32 mTypeSize;
 		int32 mTotalPermutationCount;
 
 		ConstructSerializedType mConstructSerializedRef;
-		TMap<ShaderId, Shader*> mShaderIdMap;
+		ConstructCompiledType mConstructCompiledRef;
+		ModifyCompilationEnvironmentType mModifyCompilationEnvironmentRef;
+		ShouldCompilePermutationType mShouldCompilePermutationRef;
+		validateCompiledResultType mValidateCompiledResultRef;
+
+		const ShaderParametersMetadata* const mRootParametersMetadata;
+
 		TLinkedList<ShaderType*> mGlobalListLink;
 
-		SerializationHistory mSerializationHistory;
+		friend void RENDER_CORE_API dumpShaderStats(EShaderPlatform platform, EShaderFrequency frequency);
 
-		TMap<const TCHAR*, CachedConstantBufferDeclaration> mReferencedShaderParametersMetadatasCache;
+		static bool bInitializedSerializationHistory;
 
-		bool bCachedShaderParametersMetadataDeclarations[SP_NumPlatforms];
+	protected:
+		bool bCachedConstantBufferStructDeclarations;
 
-
-		static bool bInitialiezedSerializationHistory;
+		TMap<const TCHAR*, CachedConstantBufferDeclaration> mReferencedConstantBufferStructsCache;
 	};
 
 
 	class RENDER_CORE_API ShaderPipelineType
 	{
 	public:
-		static TLinkedList<ShaderPipelineType*>*& getTypeList();
-
-		static void initialize();
-		static void uninitialize();
-		FORCEINLINE const TArray<const ShaderType*> & getStages() const
-		{
-			return mStages;
-		}
-
-		const TCHAR* getName() const { return mName; }
-
-		const SHAHash& getSourceHash()const;
-
-		RENDER_CORE_API friend Archive& operator << (Archive& ar, const ShaderPipelineType*& type);
+		// Set bShouldOptimizeUnusedOutputs to true if we want unique FShaders for each shader pipeline
+	// Set bShouldOptimizeUnusedOutputs to false if the FShaders will point to the individual shaders in the map
+		ShaderPipelineType(
+			const TCHAR* InName,
+			const ShaderType* InVertexShader,
+			const ShaderType* InHullShader,
+			const ShaderType* InDomainShader,
+			const ShaderType* InGeometryShader,
+			const ShaderType* InPixelShader,
+			bool bInShouldOptimizeUnusedOutputs);
+		~ShaderPipelineType();
 
 		FORCEINLINE bool hasTessellation() const { return mAllStages[SF_Domain] != nullptr; }
-
 		FORCEINLINE bool hasGeometry() const { return mAllStages[SF_Geometry] != nullptr; }
-
 		FORCEINLINE bool hasPixelShader() const { return mAllStages[SF_Pixel] != nullptr; }
 
-		bool shoudlOptimizeUnusedOutputs(EShaderPlatform platform) const { return bShoudlOptimizeUnusedOutputs && RHISupportsShaderPipelines(platform); }
+		FORCEINLINE const ShaderType* getShader(EShaderFrequency Frequency) const
+		{
+			BOOST_ASSERT(Frequency < SF_NumFrequencies);
+			return mAllStages[Frequency];
+		}
 
-		bool isMeshMaterialTypePipeline() const { return mStages[0]->getMaterialShaderType() != nullptr; }
+		FORCEINLINE wstring getFName() const { return mTypeName; }
+		FORCEINLINE TCHAR const* getName() const { return mName; }
+		FORCEINLINE const HashedName& getHashedName() const { return mHashedName; }
+		FORCEINLINE const HashedName& getHashedPrimaryShaderFilename() const { return mHashedPrimaryShaderFilename; }
 
-		bool isGlobalTypePipeline() const { return mStages[0]->getGlobalShaderType() != nullptr; }
+		// Returns an array of valid stages, sorted from PS->GS->DS->HS->VS, no gaps if missing stages
+		FORCEINLINE const TArray<const ShaderType*>& getStages() const { return mStages; }
 
-		bool isMaterialTypePipeline() const { return mStages[0]->getMaterialShaderType() != nullptr; }
+		static TLinkedList<ShaderPipelineType*>*& getTypeList();
 
+		static const TArray<ShaderPipelineType*>& getSortedTypes(ShaderType::EShaderTypeForDynamicCast Type);
 
+		/** @return The global shader pipeline name to type map */
+		static TMap<HashedName, ShaderPipelineType*>& getNameToTypeMap();
+		static const ShaderPipelineType* getShaderPipelineTypeByName(const HashedName& Name);
+
+		/** Initialize static members, this must be called before any shader types are created. */
+		static void initialize();
+		static void uninitialize();
+
+		static TArray<const ShaderPipelineType*> GetShaderPipelineTypesByFilename(const TCHAR* Filename);
+
+		/** Serializes a shader type reference by name. */
+		RENDER_CORE_API friend Archive& operator<<(Archive& Ar, const ShaderPipelineType*& Ref);
+
+		/** Hashes a pointer to a shader type. */
+		friend uint32 GetTypeHash(ShaderPipelineType* Ref) { return Ref ? Ref->mHashIndex : 0; }
+		friend uint32 GetTypeHash(const ShaderPipelineType* Ref) { return Ref ? Ref->mHashIndex : 0; }
+
+		// Check if this pipeline is built of specific types
+		bool IsGlobalTypePipeline() const { return mStages[0]->getGlobalShaderType() != nullptr; }
+		bool IsMaterialTypePipeline() const { return mStages[0]->getMaterialShaderType() != nullptr; }
+		bool IsMeshMaterialTypePipeline() const { return mStages[0]->getMeshMaterialShaderType() != nullptr; }
+
+		FORCEINLINE bool ShouldOptimizeUnusedOutputs(EShaderPlatform Platform) const
+		{
+			return bShouldOptimizeUnusedOutputs && RHISupportsShaderPipelines(Platform);
+		}
+
+		/** Calculates a Hash based on this shader pipeline type stages' source code and includes */
+		const SHAHash& GetSourceHash(EShaderPlatform ShaderPlatform) const;
 	private:
 		const TCHAR* const mName;
+		wstring mTypeName;
+		HashedName mHashedName;
+		HashedName mHashedPrimaryShaderFilename;
 
 		TArray<const ShaderType*> mStages;
 
 		const ShaderType* mAllStages[SF_NumFrequencies];
 
-		bool bShoudlOptimizeUnusedOutputs;
+		TLinkedList<ShaderPipelineType*> mGlobalListLink;
+
+		uint32 mHashIndex;
+		bool bShouldOptimizeUnusedOutputs;
 
 		static bool bInitialized;
 	};
@@ -1014,56 +1593,132 @@ namespace Air
 	class RENDER_CORE_API ShaderPipeline
 	{
 	public:
-		const ShaderPipelineType* mPipelineType;
-		TRefCountPtr<Shader> mVertexShader;
-		TRefCountPtr<Shader> mHullShader;
-		TRefCountPtr<Shader> mDomainShader;
-		TRefCountPtr<Shader> mGeometryShader;
-		TRefCountPtr<Shader> mPixelShader;
-
-
-		ShaderPipeline(const ShaderPipelineType* inPipelineType, const TArray<Shader*>& inStages);
-
-		ShaderPipeline(const ShaderPipelineType* inPipelineType, const TArray<TRefCountPtr<Shader>>& inStages);
-
+		explicit ShaderPipeline(const ShaderPipelineType* InType) : mTypeName(InType->getHashedName()) { Memory::memzero(&mPermutationIds, sizeof(mPermutationIds)); }
 		~ShaderPipeline();
 
-		Shader* getShader(EShaderFrequency frequency)
+		void AddShader(Shader* shader, int32 PermutationId);
+
+		inline uint32 GetNumShaders() const
 		{
-			switch (frequency)
+			uint32 NumShaders = 0u;
+			for (uint32 i = 0u; i < SF_NumGraphicsFrequencies; ++i)
 			{
-			case Air::SF_Vertex:
-				return mVertexShader.getReference();
-			case Air::SF_Hull:
-				return mHullShader.getReference();
-			case Air::SF_Domain:
-				return mDomainShader.getReference();
-			case Air::SF_Pixel:
-				return mPixelShader.getReference();
-			case Air::SF_Geometry:
-				return mGeometryShader.getReference();
-			default:
-				BOOST_ASSERT(false);
+				if (mShaders[i])
+				{
+					++NumShaders;
+				}
+			}
+			return NumShaders;
+		}
+
+		// Find a shader inside the pipeline
+		template<typename ShaderType>
+		ShaderType* getShader()
+		{
+			const ShaderType& Type = ShaderType::mStaticType;
+			const EShaderFrequency Frequency = Type.getFrequency();
+			if (Frequency < SF_NumGraphicsFrequencies && mShaders[Frequency].IsValid())
+			{
+				Shader* shader = mShaders[Frequency];
+				if (shader->getType() == &Type)
+				{
+					return static_cast<ShaderType*>(shader);
+				}
 			}
 			return nullptr;
 		}
+
+		Shader* getShader(EShaderFrequency Frequency)
+		{
+			BOOST_ASSERT(Frequency < SF_NumGraphicsFrequencies);
+			return mShaders[Frequency];
+		}
+
+		const Shader* getShader(EShaderFrequency Frequency) const
+		{
+			BOOST_ASSERT(Frequency < SF_NumGraphicsFrequencies);
+			return mShaders[Frequency];
+		}
+
+		inline TArray<TShaderRef<Shader>> getShaders(const ShaderMapBase& InShaderMap) const
+		{
+			TArray<TShaderRef<Shader>> Result;
+			for (uint32 i = 0u; i < SF_NumGraphicsFrequencies; ++i)
+			{
+				if (mShaders[i])
+				{
+					Result.add(TShaderRef<Shader>(mShaders[i], InShaderMap));
+				}
+			}
+			return Result;
+		}
+
+		void validate(const ShaderPipelineType* InPipelineType) const;
+
+		void finalize(const ShaderMapResourceCode* Code);
+
 		enum EFilter
 		{
-			EAll,
-			EOnlyShared,
-			EOnlyUnique,
+			EAll,			// All pipelines
+			EOnlyShared,	// Only pipelines with shared shaders
+			EOnlyUnique,	// Only pipelines with unique shaders
 		};
 
-		
-		void validate();
+		/** Saves stable keys for the shaders in the pipeline */
+#if WITH_EDITOR
+		void saveShaderStableKeys(const ShaderMapPointerTable& InPtrTable, EShaderPlatform TargetShaderPlatform, const struct StableShaderKeyAndValue& SaveKeyVal) const;
+#endif // WITH_EDITOR
+
+		HashedName mTypeName;
+		Shader* mShaders[SF_NumGraphicsFrequencies];
+		int32 mPermutationIds[SF_NumGraphicsFrequencies];
 
 	};
 
 	inline bool operator<(const ShaderPipeline& lhs, const ShaderPipeline& rhs)
 	{
-		CompareShaderPipelineType comparator;
-		return comparator(*lhs.mPipelineType, *rhs.mPipelineType);
+		return lhs.mTypeName.getHash() < rhs.mTypeName.getHash();
 	}
+	class ShaderPipelineRef
+	{
+	public:
+		ShaderPipelineRef() : mShaderPipeline(nullptr), mShaderMap(nullptr) {}
+		ShaderPipelineRef(ShaderPipeline* inPipeline, const ShaderMapBase& inShaderMap) :mShaderPipeline(inPipeline), mShaderMap(&inShaderMap)
+		{}
+
+		inline bool isValid() const { return mShaderPipeline != nullptr; }
+		inline bool isNull() const { return mShaderPipeline == nullptr; }
+
+		template<typename ShaderType>
+		TShaderRef<ShaderType> getShader() const
+		{
+			return TShaderRef<ShaderType>(mShaderPipeline->getShader<ShaderType>(), *mShaderMap);
+		}
+
+		TShaderRef<Shader> getShader(EShaderFrequency frequency)const
+		{
+			return TShaderRef<Shader>(mShaderPipeline->getShader(frequency), *mShaderMap);
+		}
+
+		inline TArray<TShaderRef<Shader>> getShaders() const
+		{
+			return mShaderPipeline->getShaders(*mShaderMap);
+		}
+
+		inline ShaderPipeline* getPipeline() const {
+			return mShaderPipeline;
+		}
+
+		ShaderMapResource* getResource() const;
+
+		const ShaderMapPointerTable& getPointerTable() const;
+
+		inline ShaderPipeline* operator->() const { BOOST_ASSERT(mShaderPipeline); return mShaderPipeline; }
+
+	private:
+		ShaderPipeline* mShaderPipeline;
+		const ShaderMapBase* mShaderMap;
+	};
 
 	
 	

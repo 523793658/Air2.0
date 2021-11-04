@@ -1,6 +1,5 @@
 #pragma once
 #include "EngineMininal.h"
-#include "RHIResource.h"
 namespace Air
 {
 	class RenderTarget

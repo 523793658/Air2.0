@@ -6,7 +6,6 @@
 #include "HAL/PlatformTLS.h"
 #include "HAL/AirMemory.h"
 #include "HAL/PlatformMisc.h"
-#include "DynamicRHI.h"
 #include "HAL/RunnableThread.h"
 #include "RenderCommandFence.h"
 #include "boost/lexical_cast.hpp"

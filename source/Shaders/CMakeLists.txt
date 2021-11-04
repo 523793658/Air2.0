@@ -1,0 +1,42 @@
+
+SET(SOURCE_FILE
+    ${AIR_ROOT_DIR}/Shaders/BasePassPixelShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/BasePassVertexCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/BasePassVertexShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/Common.hlsl
+    ${AIR_ROOT_DIR}/Shaders/LocalVertexFactory.hlsl
+    ${AIR_ROOT_DIR}/Shaders/LocalVertexFactoryCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/MaterialTemplate.hlsl
+    ${AIR_ROOT_DIR}/Shaders/PixelShaderOutputCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/VertexFactoryCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/BasePassCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/InstancedStereo.hlsl
+    ${AIR_ROOT_DIR}/Shaders/Definitions.hlsl
+    ${AIR_ROOT_DIR}/Shaders/DeferredShadingCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ResolvePixelShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ResolveVertexShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/OneColorShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/DeferredLightPixelShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/DeferredLightVertexShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/DeferredLightingCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/Random.hlsl
+    ${AIR_ROOT_DIR}/Shaders/LightAccumulator.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ShadingModels.hlsl
+    ${AIR_ROOT_DIR}/Shaders/BRDF.hlsl
+    ${AIR_ROOT_DIR}/Shaders/PostProcessTonemap.hlsl
+    ${AIR_ROOT_DIR}/Shaders/HdrCustomResolveShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/PostProcessCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/TonemapCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/SkyBox.hlsl
+    ${AIR_ROOT_DIR}/Shaders/PostProcessBloom.hlsl
+    ${AIR_ROOT_DIR}/Shaders/SkyLighting.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ReflectionEnvironmentShared.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ReflectionEnvironmentComputeShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ReflectionEnvironmentShaders.hlsl
+    ${AIR_ROOT_DIR}/Shaders/ScreenVertexShader.hlsl
+    ${AIR_ROOT_DIR}/Shaders/SHCommon.hlsl
+    ${AIR_ROOT_DIR}/Shaders/MonteCarlo.hlsl
+)
+add_custom_target(ALLShaders  
+    SOURCES ${SOURCE_FILE}
+)

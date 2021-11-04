@@ -236,8 +236,8 @@ namespace Air
 		static constexpr const TCHAR* DefineName = TEXT(InDefineName);\
 	}
 
-#define SHADER_PERMUTATION_BOOL(ClassName, InDefineName) \
-	class ClassName : public ShaderPermutationBool {\
+#define SHADER_PERMUTATION_BOOL(InDefineName) \
+	public ShaderPermutationBool {\
 	public: \
 		static constexpr const TCHAR* DefineName = TEXT(InDefineName);\
 	}

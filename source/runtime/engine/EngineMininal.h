@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "CoreObject.h"
+#include "CoreUObject.h"
 #include "CoreGlobals.h"
 #ifdef engine_EXPORTS
 #define ENGINE_API DLLEXPORT

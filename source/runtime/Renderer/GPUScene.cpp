@@ -3,13 +3,35 @@
 #include "ScenePrivate.h"
 #include "PrimitiveConstantShaderParameters.h"
 #include "ByteBuffer.h"
+#include "UnifiedBuffer.h"
 namespace Air
 {
 	int32 GGPUSceneUploadEveryFrame = 0;
 
 	int32 GGPUSceneMaxPooledUploadBufferSize = 256000;
 
-	void updateGPUScene(RHICommandList& RHICmdList, Scene& scene)
+	template<typename ResourceType>
+	ResourceType* getMirrorGPU(Scene& scene);
+
+	template<>
+	RWBufferStructured* getMirrorGPU<RWBufferStructured>(Scene& scene)
+	{
+		return &scene.mGPUScene.mPrimitiveBuffer;
+	}
+
+	template<>
+	TextureRWBuffer2D* getMirrorGPU<TextureRWBuffer2D>(Scene& scene)
+	{
+		return &scene.mGPUScene.mPrimitiveTexture;
+	}
+
+	static int32 getMaxPrimitivesUpdate(uint32 numUploads, uint32 inStrideInFloat4s)
+	{
+		return Math::min((uint32)(GetMaxBufferDimension() / inStrideInFloat4s), numUploads);
+	}
+
+	template<typename ResourceType>
+	void UpdateGPUSceneInternal(RHICommandListImmediate& RHICmdList, Scene& scene)
 	{
 		if (useGPUScene(GMaxRHIShaderPlatform, scene.getFeatureLevel()))
 		{
@@ -30,65 +52,43 @@ namespace Air
 
 			bool bResizedPrimitiveData = false;
 			bool bResizedLightmapData = false;
-			{
-				const int32 numPrimitiveEntries = scene.mPrimitives.size();
-				const uint32 primitiveSceneNumFloat4s = numPrimitiveEntries * PrimitiveSceneShaderData::PrimitiveDataStrideInFloat4s;
-				bResizedPrimitiveData = resizeBufferIfNeeded(RHICmdList, scene.mGPUScene.mPrimitiveBuffer, Math::roundUpToPowerOfTwo(primitiveSceneNumFloat4s));
-			}
-			{
-				/*const int32 numLightmapDataEntries = scene.mGPUScene.mLightmapDataAllocator.getMaxSize();
-				const uint32 lightmapDataNumFloat4s = numLightmapDataEntries * LightmapSceneShaderData*/
-			}
 
+			ResourceType* mirrorResourceGPU = getMirrorGPU<ResourceType>(scene);
+			{
+				const uint32 sizeReserve = Math::roundUpToPowerOfTwo(Math::max(scene.mPrimitives.size(), 256));
+				bResizedPrimitiveData = resizeResourceIfNeeded(RHICmdList, *mirrorResourceGPU, sizeReserve * sizeof(PrimitiveSceneShaderData::mData), TEXT("PrimitiveData"));
+			}
+			{
+				/*const uint32 SizeReserve = Math::roundUpToPowerOfTwo(Math::max(scene.mGPUScene.mLightmapDataAllocator.getMaxSize(), 256));
+				bResizedLightmapData = resizeResourceIfNeeded(RHICmdList, scene.mGPUScene.mLightmapDataBuffer, SizeReserve * sizeof(lightmapsceneshaderda))*/
+			}
 			const int32 numPrimitiveDataUploads = scene.mGPUScene.mPrimitivesToUpdate.size();
-
+			int32 numLightmapDataUploads = 0;
 			if (numPrimitiveDataUploads > 0)
 			{
-				ScatterUploadBuilder primitivesUpdateBuilder(numPrimitiveDataUploads, PrimitiveSceneShaderData::PrimitiveDataStrideInFloat4s, scene.mGPUScene.mPrimitivesUploadScatterBuffer, scene.mGPUScene.mPrimitivesUploadDataBuffer);
+				const int32 maxPrimitivesUploads = getMaxPrimitivesUpdate(numPrimitiveDataUploads, PrimitiveSceneShaderData::PrimitiveDataStrideInFloat4s);
 
-				int32 numLightmapDataUploads = 0;
-
-				for (int32 index : scene.mGPUScene.mPrimitivesToUpdate)
+				for (int primitiveOffset = 0; primitiveOffset < numPrimitiveDataUploads; primitiveOffset += maxPrimitivesUploads)
 				{
-					if (index < scene.mPrimitiveSceneProxies.size())
-					{
-						PrimitiveSceneProxy* primitiveSceneProxy = scene.mPrimitiveSceneProxies[index];
-						numLightmapDataUploads += primitiveSceneProxy->getPrimitiveSceneInfo()->getNumLightmapDataEntries();
-
-						PrimitiveSceneShaderData primitiveSceneData(primitiveSceneProxy);
-						primitivesUpdateBuilder.add(index, &primitiveSceneData.mData[0]);
-					}
-					scene.mGPUScene.mPrimitivesMarkedToUpdate[index] = false;
-				}
-				if (bResizedPrimitiveData)
-				{
-					RHICmdList.transitionResource(EResourceTransitionAccess::ERWBarrier, EResourceTransitionPipeline::EComputeToCompute, scene.mGPUScene.mPrimitiveBuffer.mUAV);
-				}
-				else
-				{
-					RHICmdList.transitionResource(EResourceTransitionAccess::EWritable, EResourceTransitionPipeline::EGfxToCompute, scene.mGPUScene.mPrimitiveBuffer.mUAV);
-				}
-
-				primitivesUpdateBuilder.uploadTo_Flush(RHICmdList, scene.mGPUScene.mPrimitiveBuffer);
-
-				RHICmdList.transitionResource(EResourceTransitionAccess::EReadable, EResourceTransitionPipeline::EComputeToGfx, scene.mGPUScene.mPrimitiveBuffer.mUAV);
-
-				//if(ggpusenevalid)
-				if (numLightmapDataUploads > 0)
-				{
-					/*ScatterUploadBuilder lightmapDataUploadBuilder(numLightmapDataUploads, LightmapSceneShaderData)*/
-				}
-
-				scene.mGPUScene.mPrimitivesToUpdate.reset();
-
-				if (scene.mGPUScene.mPrimitivesUploadDataBuffer.mNumBytes > (uint32)GGPUSceneMaxPooledUploadBufferSize || scene.mGPUScene.mPrimitivesUploadScatterBuffer.mNumBytes > (uint32)GGPUSceneMaxPooledUploadBufferSize)
-				{
-					scene.mGPUScene.mPrimitivesUploadDataBuffer.release();
-					scene.mGPUScene.mPrimitivesUploadScatterBuffer.release();
+					scene.mGPUScene.mPrimititveUploadbuff
 				}
 			}
 		}
-		BOOST_ASSERT(scene.mGPUScene.mPrimitivesToUpdate.size() == 0);
+	}
+
+
+
+
+	void updateGPUScene(RHICommandListImmediate& RHICmdList, Scene& scene)
+	{
+		if (GPUSceneUseTexture2D(scene.getShaderPlatform()))
+		{
+			UpdateGPUSceneInternal<TextureRWBuffer2D>(RHICmdList, scene);
+		}
+		else
+		{
+			UpdateGPUSceneInternal<RWBufferStructured>(RHICmdList, scene);
+		}
 	}
 
 	int32 GrowOnlySpanAllocator::allocate(int32 num)

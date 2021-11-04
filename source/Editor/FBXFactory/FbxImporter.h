@@ -10,8 +10,6 @@
 
 namespace AirFbx
 {
-	using namespace Air;
-
 
 	struct FbxMeshInfo
 	{

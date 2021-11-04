@@ -1,5 +1,5 @@
 #pragma once
-#include "Object.h"
+#include "UObject/Object.h"
 #include "EditorConfig.h"
 #include "Modules/ModuleInterface.h"
 namespace Air

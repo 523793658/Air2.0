@@ -1,0 +1,6 @@
+#pragma once
+#ifdef COREOBJECT_SOURCE
+#define COREUOBJECT_API DLLEXPORT
+#else
+#define COREUOBJECT_API DLLIMPORT
+#endif

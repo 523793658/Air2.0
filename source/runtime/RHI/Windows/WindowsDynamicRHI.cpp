@@ -1,16 +1,17 @@
 #include "RHI.h"
 #include "Modules/ModuleManager.h"
-#include "DynamicRHI.h"
 #include "Misc/Parse.h"
 #include "Misc/CommandLine.h"
 #include "RHI.h"
 #include "Misc/App.h"
+#include "HAL/PlatformMisc.h"
 #include "HAL/PlatformProperties.h"
+#include "DynamicRHI.h"
 #if PLATFORM_WINDOWS
 namespace Air
 {
 	static const TCHAR* GLoadedRHIModuleName;
-
+	class IDynamicRHIModule;
 	static bool shouldPreferD3D12()
 	{
 #if 0

@@ -1,7 +1,6 @@
 #include "ReflectionEnvironmentCapture.h"
 #include "GlobalShader.h"
 #include "sceneRendering.h"
-#include "RHIUtilities.h"
 #include "RHIStaticStates.h"
 #include "ShaderParameterUtils.h"
 #include "ScreenRendering.h"

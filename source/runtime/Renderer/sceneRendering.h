@@ -9,7 +9,6 @@
 #include "PostProcess/SceneRenderTargets.h"
 #include "GlobalShader.h"
 #include "MeshDrawCommands.h"
-#include "RHIUtilities.h"
 #include "PrimitiveConstantShaderParameters.h"
 namespace Air
 {

@@ -94,6 +94,15 @@ namespace Air
 			BOOST_ASSERT(!hasViewDependentPDG());
 			return mStaticDepthPriorityGroup;
 		}
+
+		inline SceneInterface& GetScene() const { return *mScene; }
+		virtual void getPreSkinnedLocalBounds(BoxSphereBounds& outBounds) const {
+			outBounds = mLocalBounds;
+		}
+
+		inline const float3& getActorPosition() const { return mActorPosition; }
+
+		inline const bool receivesDecals() const { return bReceivesDecals; }
 	private:
 		friend class Scene;
 		Matrix mLocalToWorld;

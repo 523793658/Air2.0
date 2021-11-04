@@ -3,7 +3,7 @@
 #include "Async/TaskGraphInterfaces.h"
 #include "Classes/Engine/World.h"
 #include "Containers/Set.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "Misc/App.h"
 namespace Air
 {

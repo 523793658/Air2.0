@@ -1,6 +1,6 @@
 #pragma once
 #include "CoreType.h"
-#include "RHIResource.h""
+#include "RHIDefinitions.h"
 #include "RHICommandList.h"
 namespace Air
 {
@@ -84,23 +84,6 @@ namespace Air
 		}
 	}
 
-	inline void transitionSetRenderTargetsHelper(RHICommandList& RHICmdList, RHITexture* newRenderTarget, RHITexture* newDepthStencilTarget, FExclusiveDepthStencil depthStencilAccess)
-	{
-		int32 transitionIndex = 0;
-		RHITexture* transitions[2];
-		if (newRenderTarget)
-		{
-			transitions[transitionIndex] = newRenderTarget;
-			++transitionIndex;
-		}
-		if (newDepthStencilTarget && depthStencilAccess.IsDepthWrite())
-		{
-			transitions[transitionIndex] = newDepthStencilTarget;
-			++transitionIndex;
-		}
-		RHICmdList.transitionResources(EResourceTransitionAccess::EWritable, transitions, transitionIndex);
-	}
-
 	inline void setRenderTarget(RHICommandList& RHICmdList, RHITexture* newRenderTarget, RHITexture* newDepthStencilTarget, ESimpleRenderTargetMode mode, FExclusiveDepthStencil depthStencilAccess = FExclusiveDepthStencil::DepthWrite_StencilWrite, bool bWritableBarrier = false)
 	{
 		ERenderTargetLoadAction colorLoadAction, depthLoadAction;
@@ -115,42 +98,6 @@ namespace Air
 		RHISetRenderTargetsInfo info(1, &colorView, RHIDepthRenderTargetView(newDepthStencilTarget, depthLoadAction, depthStoreAction, depthStencilAccess));
 		RHICmdList.setRenderTargetAndClear(info);
 	}
-
-	inline void setRenderTarget(RHICommandList& RHICmdList, RHITexture* newRenderTarget, RHITexture* newDepthStencilTarget, bool bWritableBarrier = false)
-	{
-		RHIRenderTargetView RTV(newRenderTarget);
-		RHIDepthRenderTargetView depthRTV(newDepthStencilTarget);
-		if (bWritableBarrier)
-		{
-			transitionSetRenderTargetsHelper(RHICmdList, newRenderTarget, newDepthStencilTarget, FExclusiveDepthStencil::DepthWrite_StencilWrite);
-		}
-		RHICmdList.setRenderTargets(1, &RTV, &depthRTV, 0, nullptr);
-	}
-
-	inline void setRenderTarget(RHICommandList& RHICmdList, RHITexture* newRenderTarget, int32 mipIndex, int32 arraySliceIndex, RHITexture* newDepthStencilTarget, bool bWritableBarrier = false)
-	{
-		RHIRenderTargetView rtv(newRenderTarget, mipIndex, arraySliceIndex);
-		RHIDepthRenderTargetView DepthRTV(newDepthStencilTarget);
-		if (bWritableBarrier)
-		{
-			transitionSetRenderTargetsHelper(RHICmdList, newRenderTarget, newDepthStencilTarget, FExclusiveDepthStencil::DepthWrite_StencilWrite);
-		}
-		RHICmdList.setRenderTargets(1, &rtv, &DepthRTV, 0, nullptr);
-	}
-
-	
-
-	//inline void RHICreateTargetableShaderResource2DArray(
-	//	uint32 width, 
-	//	uint32 height,
-	//	uint32 size,
-	//	uint8 format,
-	//	uint32 numMips,
-	//	uint32 flags,
-	//	uint32 targetableTextureFlags,
-	//	RHIResourceCreateInfo& createInfo,
-	//	Texture2DRHIRef
-	//)
 
 	inline void RHICreateTargetableShaderResourceCube(
 		uint32 linearSize,
@@ -357,7 +304,7 @@ namespace Air
 
 	inline void transitionRenderPassTargets(RHICommandList& RHICmdList, const RHIRenderPassInfo& RPInfo)
 	{
-		RHITexture* transitions[MaxSimultaneousRenderTargets + 1];
+		RHITransitionInfo transitions[MaxSimultaneousRenderTargets];
 		int32 transitionIndex = 0;
 		uint32 numColorRenderTargets = RPInfo.getNumColorRenderTargets();
 		for (uint32 index = 0; index < numColorRenderTargets; index++)
@@ -365,19 +312,16 @@ namespace Air
 			const RHIRenderPassInfo::ColorEntry& colorRenderTarget = RPInfo.mColorRenderTargets[index];
 			if (colorRenderTarget.mRenderTarget != nullptr)
 			{
-				transitions[transitionIndex] = colorRenderTarget.mRenderTarget;
+				transitions[transitionIndex] = RHITransitionInfo(colorRenderTarget.mRenderTarget, ERHIAccess::Unknown, ERHIAccess::RTV);
 				transitionIndex++;
 			}
 		}
-
 		const RHIRenderPassInfo::DepthStencilEntry& depthStencilTarget = RPInfo.mDepthStencilRenderTarget;
-		if (depthStencilTarget.mDepthStencilTarget != nullptr && RPInfo.mDepthStencilRenderTarget.mExculusiveDepthStencil.IsDepthWrite())
+		if (depthStencilTarget.mDepthStencilTarget != nullptr && (RPInfo.mDepthStencilRenderTarget.mExculusiveDepthStencil.IsAnyWrite()))
 		{
-			transitions[transitionIndex] = depthStencilTarget.mDepthStencilTarget;
-			transitionIndex++;
+			RHICmdList.transitionResource(RPInfo.mDepthStencilRenderTarget.mExculusiveDepthStencil, depthStencilTarget.mDepthStencilTarget);
 		}
-
-		RHICmdList.transitionResources(EResourceTransitionAccess::EWritable, transitions, transitionIndex);
+		RHICmdList.transition(makeArrayView(transitions, transitionIndex));
 	}
 
 	struct RWBuffer
@@ -438,4 +382,90 @@ namespace Air
 	};
 
 	
+
+	struct TextureRWBuffer2D
+	{
+		Texture2DRHIRef mBuffer;
+		UnorderedAccessViewRHIRef mUAV;
+		ShaderResourceViewRHIRef mSRV;
+		uint32 mNumBytes;
+
+		TextureRWBuffer2D()
+			:mNumBytes(0)
+		{}
+
+		~TextureRWBuffer2D()
+		{
+
+		}
+
+		static constexpr ETextureCreateFlags DefaultTextureInitFlag = TexCreate_ShaderResource | TexCreate_UAV;
+
+		void initialize(const uint32 bytesPerElement, const uint32 sizeX, const uint32 sizeY, const EPixelFormat format, ETextureCreateFlags flags = DefaultTextureInitFlag)
+		{
+			BOOST_ASSERT(GMaxRHIFeatureLevel == ERHIFeatureLevel::SM5
+				|| isVulkanPlatform(GMaxRHIShaderPlatform)
+				|| isMetalPlatform(GMaxRHIShaderPlatform)
+				|| (GMaxRHIFeatureLevel == ERHIFeatureLevel::ES3_1 && GSupportsResourceView)
+			);
+			mNumBytes = sizeX * sizeY * bytesPerElement;
+			RHIResourceCreateInfo createInfo;
+			mBuffer = RHICreateTexture2D(
+				sizeX, sizeY, format, 1, 1, flags, createInfo
+			);
+			mUAV = RHICreateUnorderedAccessView(mBuffer, 0);
+			mSRV = RHICreateShaderResourceView(mBuffer, 0);
+		}
+
+
+		void acquireTransientResource()
+		{
+			RHIAcquireTransientResource(mBuffer);
+		}
+
+		void discardTransientResource()
+		{
+			RHIDiscardTransientResource(mBuffer);
+		}
+		void Release()
+		{
+			int32 bufferRefCount = mBuffer ? mBuffer->GetRefCount() : -1;
+			if (bufferRefCount == 1)
+			{
+				discardTransientResource();
+			}
+			mNumBytes = 0;
+			mBuffer.safeRelease();
+			mUAV.safeRelease();
+			mSRV.safeRelease();
+		}
+	};
+
+	struct ByteAddressBuffer
+	{
+		StructuredBufferRHIRef mBuffer;
+		ShaderResourceViewRHIRef mSRV;
+		uint32 mNumBytes;
+
+		ByteAddressBuffer() : mNumBytes(0) {}
+
+		void initialize(uint32 inNumBytes, uint32 additionalUsage = 0, const TCHAR* inDebugName = nullptr)
+		{
+			mNumBytes = inNumBytes;
+			BOOST_ASSERT(GMaxRHIFeatureLevel == ERHIFeatureLevel::SM5);
+			BOOST_ASSERT(mNumBytes % 4 == 0);
+			RHIResourceCreateInfo createInfo;
+			mBuffer = RHICreateStructuredBuffer(4, mNumBytes, BUF_ShaderResource | BUF_ByteAddressBuffer | additionalUsage, ERHIAccess::SRVMask, createInfo);
+			mSRV = RHICreateShaderResourceView(mBuffer);
+		}
+
+		void release()
+		{
+			mNumBytes = 0;
+			mBuffer.safeRelease();
+			mSRV.safeRelease();
+		}
+	};
+
+	extern RHI_API ERHIAccess RHIGetDefaultResourceState(EBufferUsageFlags inUsage, bool bInHasInitialData);
 }

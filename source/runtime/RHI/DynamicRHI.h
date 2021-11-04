@@ -2,15 +2,13 @@
 #include "CoreMinimal.h"
 #include "RHIConfig.h"
 #include "RHIDefinitions.h"
-#include "RHIResource.h"
 #include "RHIContext.h"
 #include "Modules/ModuleInterface.h"
 namespace Air
 {
 
-
-	
-
+	class RHIVertexBuffer;
+	class RHIViewport;
 
 	class RHI_API DynamicRHI
 	{
@@ -27,7 +25,10 @@ namespace Air
 
 		virtual void RHIReleaseThreadOwnership() = 0;
 
+		virtual void RHIPerFrameRHIFlushComplete()
+		{
 
+		}
 
 		virtual void RHIResizeViewport(RHIViewport* viewport, uint32 sizeX, uint32 sizeY, bool isFullscreen, EPixelFormat preferredPixelFormat) = 0;
 
@@ -36,7 +37,7 @@ namespace Air
 
 		virtual ViewportRHIRef RHICreateViewport(void* windowHandle, uint32 sizeX, uint32 sizeY, bool isFullscree, EPixelFormat preferredPixelFormat) = 0;
 
-		virtual Texture2DRHIRef RHICreateTexture2D(uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamplers, uint32 flags, RHIResourceCreateInfo& createInfo) = 0;
+		virtual Texture2DRHIRef RHICreateTexture2D(uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamplers, uint32 flags, ERHIAccess inResourceState, RHIResourceCreateInfo& createInfo) = 0;
 
 		virtual TextureCubeRHIRef RHICreateTextureCube(uint32 size, uint8 format, uint32 numMips, uint32 flags, RHIResourceCreateInfo& createInfo) = 0;
 
@@ -113,11 +114,11 @@ namespace Air
 		virtual StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo) = 0;
 
 
-		virtual Texture2DRHIRef RHICreateTexture2D_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamples, uint32 flags, RHIResourceCreateInfo& createInfo);
+		virtual Texture2DRHIRef RHICreateTexture2D_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamples, uint32 flags, ERHIAccess inResourceState, RHIResourceCreateInfo& createInfo);
 
 		virtual TextureCubeRHIRef RHICreateTextureCube_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 size, uint8 format, uint32 numMips, uint32 flags, RHIResourceCreateInfo& createInfo);
 
-		virtual StructuredBufferRHIRef RHICreateStructuredBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo);
+		virtual StructuredBufferRHIRef RHICreateStructuredBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 stride, uint32 size, uint32 inUsage, ERHIAccess inResourceState, RHIResourceCreateInfo& createInfo);
 
 		virtual ShaderResourceViewRHIRef RHICreateShaderResourceView_RenderThread(class RHICommandListImmediate& RHICmdList, RHITexture* texture, const RHITextureSRVCreateInfo& createInfo);
 
@@ -216,7 +217,13 @@ namespace Air
 
 		virtual void RHIBindDebugLabelName(RHIUnorderedAccessView* unorderedAccessViewRHI, const TCHAR* name) {}
 
+		virtual void RHICreateTransition(RHITransition* transition, ERHIPipeline srcPipelines, ERHIPipeline dstPipelines, ERHICreateTransitionFlags createFlags, TArrayView<const RHITransitionInfo> infos)
+		{
 
+		}
+
+		virtual void RHIReleaseTransition(RHITransition* transtion)
+		{}
 	};
 
 
@@ -313,5 +320,16 @@ namespace Air
 		return GDynamicRHI->RHIUpdateConstantBuffer(constantBufferRHI, contents);
 	}
 
+	FORCEINLINE const RHITransition* RHICreateTransition(ERHIPipeline srcPipeline, ERHIPipeline dstPipelines, ERHICreateTransitionFlags createFlags, TArrayView<const RHITransitionInfo> infos)
+	{
+		RHITransition* transition = new (Memory::malloc(RHITransition::getTotalAllocationSize(), RHITransition::getAlignment()))RHITransition(srcPipeline, dstPipelines);
+		GDynamicRHI->RHICreateTransition(transition, srcPipeline, dstPipelines, createFlags, infos);
+		return transition;
+	}
+
+	FORCEINLINE void RHIReleaseTransition(RHITransition* transition)
+	{
+		GDynamicRHI->RHIReleaseTransition(transition);
+	}
 	
 }

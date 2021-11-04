@@ -12,4 +12,8 @@ namespace Air
 		TArray<uint32> mUnorderedAccessViewMap;
 		TArray<uint32> mResourceTableLayoutHashes;
 	};
+	struct CachedConstantBufferDeclaration;
+
+
+	extern void generateReferencedConstantBuffers(const TCHAR* sourceFile, const TCHAR* shaderTypeName, const TMap<wstring, TArray<const TCHAR*>>& shaderFileToConstantBufferVaribles, TMap<const TCHAR*, CachedConstantBufferDeclaration>& constantBufferEntries);
 }

@@ -1,6 +1,6 @@
 #pragma once
 #include "Containers/Array.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "Classes/Engine/EngineBaseTypes.h"
 #include "DemoViewportClient.h"
 #include "DemoEngine.h"

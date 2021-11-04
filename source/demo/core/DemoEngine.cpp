@@ -27,7 +27,7 @@ namespace Air
 
 	void DemoEngine::initDemoApplication()
 	{
-		mApplication = Demo::ApplicationManager::initApplication();
+		mApplication = ApplicationManager::initApplication();
 	}
 	
 	void DemoEngine::intoDemo(URL url)

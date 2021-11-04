@@ -1,6 +1,5 @@
 #include "SystemTextures.h"
 #include "PostProcess/RenderTargetPool.h"
-#include "RHIUtilities.h"
 namespace Air
 {
 	TGlobalResource<SystemTextures> GSystemTextures;

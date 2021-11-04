@@ -1,11 +1,17 @@
 #pragma once
 #include "RHIConfig.h"
+#include "Misc/EnumClassFlags.h"
+
+#ifndef USE_STATIC_SHADER_PLATFORM_ENUMS
+#define USE_STATIC_SHADER_PLATFORM_ENUMS 0
+#endif
+
 namespace Air
 {
 
 #ifndef RHI_RAYTRACING
 #if (PLATFORM_WINDOWS && PLATFORM_64BITS)
-#define	RHI_RAYTRACING	1
+#define	RHI_RAYTRACING	0
 #else
 #define RHI_RAYTRACING	0
 #endif
@@ -57,75 +63,70 @@ namespace Air
 
 	enum EShaderPlatform
 	{
-		SP_PCD3D_SM5		= 0,
-		SP_OPENGL_SM4		= 1,
-		SP_PS4				= 2,
-		/** Used when running in Feature Level ES2 in OpenGL. */
-		SP_OPENGL_PCES2 = 3,
-		SP_XBOXONE_D3D12 = 4,
-		SP_PCD3D_SM4 = 5,
-		SP_OPENGL_SM5 = 6,
-		/** Used when running in Feature Level ES2 in D3D11. */
-		SP_PCD3D_ES2 = 7,
-		SP_OPENGL_ES2_ANDROID = 8,
-		SP_OPENGL_ES2_WEBGL = 9,
-		SP_OPENGL_ES2_IOS = 10,
-		SP_METAL = 11,
-		SP_OPENGL_SM4_MAC = 12,
-		SP_METAL_MRT = 13,
-		SP_OPENGL_ES31_EXT = 14,
-		/** Used when running in Feature Level ES3_1 in D3D11. */
-		SP_PCD3D_ES3_1 = 15,
-		/** Used when running in Feature Level ES3_1 in OpenGL. */
-		SP_OPENGL_PCES3_1 = 16,
-		SP_METAL_SM5 = 17,
-		SP_VULKAN_PCES3_1 = 18,
-		SP_METAL_SM4 = 19,
-		SP_VULKAN_SM4 = 20,
-		SP_VULKAN_SM5 = 21,
-		SP_VULKAN_ES3_1_ANDROID = 22,
-		SP_METAL_MACES3_1 = 23,
-		SP_METAL_MACES2 = 24,
-		SP_OPENGL_ES3_1_ANDROID = 25,
-		SP_SWITCH = 26,
-		SP_SWITCH_FORWARD = 27,
+		SP_PCD3D_SM5 = 0,
+		SP_PS4 = 1,
+		SP_XBOXONE_D3D12 = 2,
+		SP_OPENGL_ES2_ANDROID_REMOVED = 3,
+		SP_OPENGL_ES2_WEBGL_REMOVED = 4,
+		SP_METAL = 5,
+		SP_METAL_MRT = 6,
+		SP_PCD3D_ES3_1 = 7,
+		SP_OPENGL_PCES3_1 = 8,
+		SP_METAL_SM5 = 9,
+		SP_VULKAN_PCES3_1 = 10,
+		SP_METAL_SM5_NOTESS = 11,
+		SP_VULKAN_SM5 = 12,
+		SP_VULKAN_ES3_1_ANDROID = 13,
+		SP_METAL_MACES3_1 = 14,
+		SP_OPENGL_ES3_1_ANDROID = 15,
+		SP_SWITCH = 16,
+		SP_SWITCH_FORWARD = 17,
+		SP_METAL_MRT_MAC = 18,
+		SP_VULKAN_SM5_LUMIN = 19,
+		SP_VULKAN_ES3_1_LUMIN = 20,
+		SP_METAL_TVOS = 21,
+		SP_METAL_MRT_TVOS = 22,
+#define DDPI_NUM_STATIC_SHADER_PLATFORMS 16
+		SP_StaticPlatform_First = 17,
 
-		SP_NumPlatforms = 28,
-		SP_NumBits = 5,
+		SP_StaticPlatform_Last = (SP_StaticPlatform_First + DDPI_NUM_STATIC_SHADER_PLATFORMS - 1),
+		SP_VULKAN_SM5_ANDROID = SP_StaticPlatform_Last + 1,
+
+		SP_NumPlatforms,
+		SP_NumBits = 7,
 	};
 
-	inline bool isSimulatedPlatform(EShaderPlatform platform)
-	{
-		switch (platform)
-		{
-		case SP_OPENGL_PCES2:
-		case SP_PCD3D_ES2:
-		case SP_PCD3D_ES3_1:
-		case SP_OPENGL_PCES3_1:
-		case SP_METAL_MACES3_1:
-		case SP_METAL_MACES2:
-		case SP_VULKAN_PCES3_1:
-			return true;
-		default:
-			return false;
-		}
-		return false;
-	}
-
+	
 
 	inline ERHIFeatureLevel::Type getMaxSupportedFeatureLevel(EShaderPlatform inShaderPlatform)
 	{
 		switch (inShaderPlatform)
 		{
 		case SP_PCD3D_SM5:
+		case SP_PS4:
+		case SP_XBOXONE_D3D12:
+		case SP_METAL_SM5:
+		case SP_METAL_MRT:
+		case SP_METAL_MRT_TVOS:
+		case SP_METAL_MRT_MAC:
+		case SP_METAL_SM5_NOTESS:
+		case SP_VULKAN_SM5:
+		case SP_VULKAN_SM5_LUMIN:
+		case SP_SWITCH:
+		case SP_VULKAN_SM5_ANDROID:
 			return ERHIFeatureLevel::SM5;
-
-		case SP_OPENGL_SM4:
-			return ERHIFeatureLevel::SM4;
-		default:
-			break;
+		case SP_METAL:
+		case SP_METAL_TVOS:
+		case SP_METAL_MACES3_1:
+		case SP_PCD3D_ES3_1:
+		case SP_OPENGL_PCES3_1:
+		case SP_VULKAN_PCES3_1:
+		case SP_VULKAN_ES3_1_ANDROID:
+		case SP_VULKAN_ES3_1_LUMIN:
+		case SP_OPENGL_ES3_1_ANDROID:
+		case SP_SWITCH_FORWARD:
+			return ERHIFeatureLevel::ES3_1;
 		}
-		return ERHIFeatureLevel::Num;
 	}
 
 	inline bool isFeatureLevelSupported(EShaderPlatform inShaderPlatform, ERHIFeatureLevel::Type inFeatureLevel)
@@ -137,10 +138,8 @@ namespace Air
 	{
 		switch (platform)
 		{
-		case SP_PCD3D_SM4:
 		case SP_PCD3D_SM5:
 		case SP_PCD3D_ES3_1:
-		case SP_PCD3D_ES2:
 			return true;
 		case SP_XBOXONE_D3D12:
 			return bIncludeXboxone;
@@ -152,20 +151,26 @@ namespace Air
 
 	enum EShaderFrequency
 	{
-		SF_Vertex				= 0,
-		SF_Hull					= 1,
-		SF_Domain				= 2,
-		SF_Pixel				= 3,
-		SF_Geometry				= 4,
-		SF_Compute				= 5,
-		SF_NumStandardFrequencices = 6,
+		SF_Vertex = 0,
+		SF_Hull = 1,
+		SF_Domain = 2,
+		SF_Pixel = 3,
+		SF_Geometry = 4,
+		SF_Compute = 5,
+		SF_RayGen = 6,
+		SF_RayMiss = 7,
+		SF_RayHitGroup = 8,
+		SF_RayCallable = 9,
 
-		SF_RayGen				= 6,
-		SF_RayMiss				= 7,
-		SF_RayHitGroup			= 8,
-		SF_RayCallable			= 9,
-		SF_NumFrequencies		= 10,
-		SF_NumBits				= 4,
+		SF_NumFrequencies = 10,
+
+		// Number of standard SM5-style shader frequencies for graphics pipeline (excluding compute)
+		SF_NumGraphicsFrequencies = 5,
+
+		// Number of standard SM5-style shader frequencies (including compute)
+		SF_NumStandardFrequencies = 6,
+
+		SF_NumBits = 4,
 	};
 
 	enum ECubeFace
@@ -257,6 +262,60 @@ namespace Air
 		// Hint to the driver that this resource is managed properly by the engine for Alternate-Frame-Rendering in mGPU usage.
 		TexCreate_AFRManual = 1 << 29,
 	};
+	ENUM_CLASS_FLAGS(ETextureCreateFlags);
+
+
+	class StaticShaderPlatformNames
+	{
+	private:
+		static const uint32 NumPlatforms = DDPI_NUM_STATIC_SHADER_PLATFORMS;
+
+		struct FPlatform
+		{
+			wstring Name;
+			wstring ShaderPlatform;
+			wstring ShaderFormat;
+		} Platforms[NumPlatforms];
+
+		StaticShaderPlatformNames()
+		{
+
+		}
+
+	public:
+		static inline StaticShaderPlatformNames const& Get()
+		{
+			static StaticShaderPlatformNames Names;
+			return Names;
+		}
+
+		static inline bool IsStaticPlatform(EShaderPlatform Platform)
+		{
+			return Platform >= SP_StaticPlatform_First && Platform <= SP_StaticPlatform_Last;
+		}
+
+		inline const wstring& GetShaderPlatform(EShaderPlatform Platform) const
+		{
+			return Platforms[GetStaticPlatformIndex(Platform)].ShaderPlatform;
+		}
+
+		inline const wstring& GetShaderFormat(EShaderPlatform Platform) const
+		{
+			return Platforms[GetStaticPlatformIndex(Platform)].ShaderFormat;
+		}
+
+		inline const wstring& GetPlatformName(EShaderPlatform Platform) const
+		{
+			return Platforms[GetStaticPlatformIndex(Platform)].Name;
+		}
+
+	private:
+		static inline uint32 GetStaticPlatformIndex(EShaderPlatform Platform)
+		{
+			BOOST_ASSERT(IsStaticPlatform(Platform));
+			return uint32(Platform) - SP_StaticPlatform_First;
+		}
+	};
 
 	enum class ERHIZBuffer
 	{
@@ -267,52 +326,58 @@ namespace Air
 
 	inline bool isOpenGLPlatform(const EShaderPlatform platform)
 	{
-		return platform == SP_OPENGL_SM4 || platform == SP_OPENGL_SM4_MAC || platform == SP_OPENGL_SM5 || platform == SP_OPENGL_PCES2 || platform == SP_OPENGL_PCES3_1 || platform == SP_OPENGL_ES2_ANDROID || platform == SP_OPENGL_ES2_WEBGL || platform == SP_OPENGL_ES2_IOS || platform == SP_OPENGL_ES31_EXT || platform == SP_OPENGL_ES3_1_ANDROID || platform == SP_SWITCH || platform == SP_SWITCH_FORWARD;
+		return platform == SP_OPENGL_PCES3_1 || platform == SP_OPENGL_ES3_1_ANDROID;
 	}
 
 
 
 	inline bool isPCPlatform(const EShaderPlatform Platform)
 	{
-		return Platform == SP_PCD3D_SM5 || Platform == SP_PCD3D_SM4 || Platform == SP_PCD3D_ES2 || Platform == SP_PCD3D_ES3_1 ||
-			Platform == SP_OPENGL_SM4 || Platform == SP_OPENGL_SM4_MAC || Platform == SP_OPENGL_SM5 || Platform == SP_OPENGL_PCES2 || Platform == SP_OPENGL_PCES3_1 ||
-			Platform == SP_METAL_SM4 || Platform == SP_METAL_SM5 ||
-			Platform == SP_VULKAN_PCES3_1 || Platform == SP_VULKAN_SM4 || Platform == SP_VULKAN_SM5 || Platform == SP_METAL_MACES3_1 || Platform == SP_METAL_MACES2;
+		return Platform == SP_PCD3D_SM5 || Platform == SP_PCD3D_ES3_1 ||
+			Platform == SP_OPENGL_PCES3_1 || Platform == SP_METAL_SM5 ||
+			Platform == SP_VULKAN_PCES3_1 || Platform == SP_VULKAN_SM5 || Platform == SP_METAL_MACES3_1;
 	}
 
 	inline bool isVulkanMobilePlatform(const EShaderPlatform platform)
 	{
-		return platform == SP_VULKAN_ES3_1_ANDROID || platform == SP_VULKAN_PCES3_1 || platform == SP_VULKAN_SM4 || platform == SP_VULKAN_SM5;
+		return platform == SP_VULKAN_ES3_1_ANDROID || platform == SP_VULKAN_PCES3_1 || platform == SP_VULKAN_SM5;
 	}
 
 	inline bool RHIHasTiledGPU(const EShaderPlatform platform)
 	{
-		return (platform == SP_METAL_MRT) || platform == SP_METAL || platform == SP_OPENGL_ES2_IOS || platform == SP_OPENGL_ES2_ANDROID || platform == SP_OPENGL_ES3_1_ANDROID;
+		return platform == SP_METAL || platform == SP_METAL_TVOS
+			|| platform == SP_OPENGL_ES3_1_ANDROID
+			|| platform == SP_VULKAN_ES3_1_ANDROID;
 	}
 
-	inline bool isES2Platform(const EShaderPlatform plaform)
-	{
-		return plaform == SP_PCD3D_ES2 || plaform == SP_OPENGL_PCES2 || plaform == SP_OPENGL_ES2_ANDROID || plaform == SP_OPENGL_ES2_WEBGL || plaform == SP_OPENGL_ES2_IOS || plaform == SP_METAL_MACES2;
-	}
+	
 
 	inline bool isMobilePlatform(const EShaderPlatform platform)
 	{
-		return isES2Platform(platform) || platform == SP_METAL || platform == SP_PCD3D_ES3_1 || platform == SP_OPENGL_PCES3_1 || platform == SP_VULKAN_ES3_1_ANDROID || platform == SP_VULKAN_PCES3_1 || platform == SP_METAL_MACES3_1 || platform == SP_OPENGL_ES3_1_ANDROID || platform == SP_SWITCH_FORWARD;
+		return
+			platform == SP_METAL || platform == SP_METAL_MACES3_1 || platform == SP_METAL_TVOS
+			|| platform == SP_PCD3D_ES3_1
+			|| platform == SP_OPENGL_PCES3_1 || platform == SP_OPENGL_ES3_1_ANDROID
+			|| platform == SP_VULKAN_ES3_1_ANDROID || platform == SP_VULKAN_PCES3_1 || platform == SP_VULKAN_ES3_1_LUMIN
+			|| platform == SP_SWITCH_FORWARD;
 	}
 
 	inline bool isMetalPlatform(const EShaderPlatform platform)
 	{
-		return platform == SP_METAL || platform == SP_METAL_MACES2 || platform == SP_METAL_MACES3_1 || platform == SP_METAL_MRT || platform == SP_METAL_SM4 || platform == SP_METAL_SM5;
+		return platform == SP_METAL || platform == SP_METAL_MRT || platform == SP_METAL_TVOS || platform == SP_METAL_MRT_TVOS
+			|| platform == SP_METAL_SM5_NOTESS || platform == SP_METAL_SM5
+			|| platform == SP_METAL_MACES3_1 || platform == SP_METAL_MRT_MAC;
 	}
 
 	inline bool isVulkanPlatform(const EShaderPlatform platform)
 	{
-		return platform == SP_VULKAN_SM5 || platform == SP_VULKAN_SM4 || platform == SP_VULKAN_PCES3_1 || platform == SP_VULKAN_ES3_1_ANDROID;
+		return platform == SP_VULKAN_SM5 || platform == SP_VULKAN_SM5_LUMIN || platform == SP_VULKAN_PCES3_1
+			|| platform == SP_VULKAN_ES3_1_ANDROID || platform == SP_VULKAN_ES3_1_LUMIN || platform == SP_VULKAN_SM5_ANDROID;
 	}
 
 	inline bool isAndroidOpenGLESPlatform(EShaderPlatform platform)
 	{
-		return platform == SP_OPENGL_ES2_ANDROID || SP_OPENGL_ES3_1_ANDROID;
+		return platform == SP_OPENGL_ES3_1_ANDROID;
 	}
 
 	
@@ -606,9 +671,19 @@ namespace Air
 		BUF_KeepCPUAccessible = 0x0400,
 		BUF_ZeroStride = 0x0800,
 		BUF_FastVRAM	= 0x1000,
-		BUF_AnyDynamic = (BUF_Dynamic | BUF_Volatile),
-	};
+		BUF_Transient	= 0x2000,
+		BUF_Shared		= 0x4000,
+		UBF_AccelerationStructure = 0x8000,
 
+		BUF_VertexBuffer = 0x10000,
+		BUF_IndexBuffer = 0x20000,
+		BUF_StructuredBuffer	= 0x40000,
+
+		BUF_AnyDynamic = (BUF_Dynamic | BUF_Volatile),
+
+
+	};
+	ENUM_CLASS_FLAGS(EBufferUsageFlags);
 	enum { MAX_TEXTURE_MIP_COUNT = 14 };
 
 	enum class EClearDepthStencil
@@ -689,4 +764,305 @@ namespace Air
 			&& !isMetalPlatform(platform)
 			&& !isOpenGLPlatform(platform);
 	}
+
+	struct GenericStaticShaderPlatform final
+	{
+		inline GenericStaticShaderPlatform(const EShaderPlatform inPlatform)
+			:mPlatform(inPlatform)
+		{
+		}
+
+		inline operator EShaderPlatform() const
+		{
+			return mPlatform;
+		}
+
+
+		inline bool operator != (const EShaderPlatform& other)
+		{
+			return other != mPlatform;
+		}
+
+		inline bool operator == (const EShaderPlatform& other)
+		{
+			return other == mPlatform;
+		}
+	private:
+		const EShaderPlatform mPlatform;
+	};
+
+	extern RHI_API const wstring LANGUAGE_D3D;
+	extern RHI_API const wstring LANGUAGE_Metal;
+	extern RHI_API const wstring LANGUAGE_OpenGL;
+	extern RHI_API const wstring LANGUAGE_Vulkan;
+	extern RHI_API const wstring LANGUAGE_Sony;
+	extern RHI_API const wstring LANGUAGE_Nintendo;
+
+#if USE_STATIC_SHADER_PLATFORM_ENUMS
+#else
+	using StaticShaderPlatform = GenericStaticShaderPlatform;
+#endif // USE_STATIC_SHADER_PLATFORM_ENUMS
+	inline bool isSimulatedPlatform(const StaticShaderPlatform platform)
+	{
+		switch (platform)
+		{
+		case SP_PCD3D_ES3_1:
+		case SP_OPENGL_PCES3_1:
+		case SP_METAL_MACES3_1:
+		case SP_VULKAN_PCES3_1:
+			return true;
+		default:
+			return false;
+		}
+		return false;
+	}
+
+
+	class RHI_API FGenericDataDrivenShaderPlatformInfo
+	{
+		wstring Language;
+		ERHIFeatureLevel::Type MaxFeatureLevel;
+		uint32 bIsMobile : 1;
+		uint32 bIsMetalMRT : 1;
+		uint32 bIsPC : 1;
+		uint32 bIsConsole : 1;
+		uint32 bIsAndroidOpenGLES : 1;
+
+		uint32 bSupportsMobileMultiView : 1;
+		uint32 bSupportsVolumeTextureCompression : 1;
+		uint32 bSupportsDistanceFields : 1; // used for DFShadows and DFAO - since they had the same checks
+		uint32 bSupportsDiaphragmDOF : 1;
+		uint32 bSupportsRGBColorBuffer : 1;
+		uint32 bSupportsCapsuleShadows : 1;
+		uint32 bSupportsVolumetricFog : 1; // also used for FVVoxelization
+		uint32 bSupportsIndexBufferUAVs : 1;
+		uint32 bSupportsInstancedStereo : 1;
+		uint32 bSupportsMultiView : 1;
+		uint32 bSupportsMSAA : 1;
+		uint32 bSupports4ComponentUAVReadWrite : 1;
+		uint32 bSupportsRenderTargetWriteMask : 1;
+		uint32 bSupportsRayTracing : 1;
+		uint32 bSupportsRayTracingIndirectInstanceData : 1; // Whether instance transforms can be copied from the GPU to the TLAS instances buffer
+		uint32 bSupportsGPUSkinCache : 1;
+		uint32 bSupportsGPUScene : 1;
+		uint32 bSupportsByteBufferComputeShaders : 1;
+		uint32 bSupportsPrimitiveShaders : 1;
+		uint32 bSupportsUInt64ImageAtomics : 1;
+		uint32 bSupportsTemporalHistoryUpscale : 1;
+		uint32 bSupportsRTIndexFromVS : 1;
+		uint32 bSupportsWaveOperations : 1; // Whether HLSL SM6 shader wave intrinsics are supported
+		uint32 bRequiresExplicit128bitRT : 1;
+		uint32 bSupportsGen5TemporalAA : 1;
+		uint32 bTargetsTiledGPU : 1;
+		uint32 bNeedsOfflineCompiler : 1;
+
+		// NOTE: When adding fields, you must also add to ParseDataDrivenShaderInfo!
+		uint32 bContainsValidPlatformInfo : 1;
+
+		FGenericDataDrivenShaderPlatformInfo()
+		{
+			Memory::memzero(this, sizeof(*this));
+			MaxFeatureLevel = ERHIFeatureLevel::Num;
+		}
+
+	public:
+		static void initialize();
+		static void parseDataDrivenShaderInfo(const ConfigSection& Section, FGenericDataDrivenShaderPlatformInfo& Info);
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsLanguageD3D(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].Language == LANGUAGE_D3D;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsLanguageMetal(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].Language == LANGUAGE_Metal;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsLanguageOpenGL(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].Language == LANGUAGE_OpenGL;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsLanguageVulkan(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].Language == LANGUAGE_Vulkan;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsLanguageSony(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].Language == LANGUAGE_Sony;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsLanguageNintendo(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].Language == LANGUAGE_Nintendo;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const ERHIFeatureLevel::Type getMaxFeatureLevel(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].MaxFeatureLevel;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsMobile(const EShaderPlatform Platform)
+		{
+			return Infos[Platform].bIsMobile;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsMetalMRT(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bIsMetalMRT;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsPC(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bIsPC;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsConsole(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bIsConsole;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getIsAndroidOpenGLES(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bIsAndroidOpenGLES;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsMobileMultiView(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsMobileMultiView;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsVolumeTextureCompression(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsVolumeTextureCompression;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsDistanceFields(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsDistanceFields;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsDiaphragmDOF(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsDiaphragmDOF;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsRGBColorBuffer(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsRGBColorBuffer;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsCapsuleShadows(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsCapsuleShadows;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsVolumetricFog(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsVolumetricFog;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsIndexBufferUAVs(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsIndexBufferUAVs;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsInstancedStereo(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsInstancedStereo;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsMultiView(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsMultiView;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsMSAA(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsMSAA;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupports4ComponentUAVReadWrite(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupports4ComponentUAVReadWrite;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsRenderTargetWriteMask(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsRenderTargetWriteMask;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsRayTracing(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsRayTracing;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsRayTracingIndirectInstanceData(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsRayTracingIndirectInstanceData;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsGPUSkinCache(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsGPUSkinCache;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getTargetsTiledGPU(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bTargetsTiledGPU;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getNeedsOfflineCompiler(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bNeedsOfflineCompiler;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsByteBufferComputeShaders(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsByteBufferComputeShaders;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsWaveOperations(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsWaveOperations;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsTemporalHistoryUpscale(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsTemporalHistoryUpscale;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsGPUScene(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsGPUScene;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getRequiresExplicit128bitRT(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bRequiresExplicit128bitRT;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsGen5TemporalAA(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsGen5TemporalAA;
+		}
+
+		static FORCEINLINE_DEBUGGABLE const bool getSupportsUInt64ImageAtomics(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bSupportsUInt64ImageAtomics;
+		}
+
+	private:
+		static FGenericDataDrivenShaderPlatformInfo Infos[SP_NumPlatforms];
+
+	public:
+		static bool isValid(const StaticShaderPlatform Platform)
+		{
+			return Infos[Platform].bContainsValidPlatformInfo;
+		}
+	};
+
+
 }

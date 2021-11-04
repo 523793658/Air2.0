@@ -1,9 +1,8 @@
 #pragma once
 #include "RenderCore.h"
 #include "Containers/LinkList.h"
-#include "RHIResource.h"
 #include "HAL/CriticalSection.h"
-#include "RHI.h"
+#include "RHIResource.h"
 #include <limits>
 namespace Air
 {

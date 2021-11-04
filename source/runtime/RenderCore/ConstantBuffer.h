@@ -2,7 +2,6 @@
 #include "CoreType.h"
 #include "RenderCore.h"
 #include "RHIDefinitions.h"
-#include "RHIResource.h"
 #include "Containers/LinkList.h"
 #include "Template/AlignmentTemplates.h"
 #include "Containers/Map.h"

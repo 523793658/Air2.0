@@ -1,21 +1,20 @@
 #pragma once
 #include "core/Application.h"
 #include "SimpleReflection.h"
-namespace Demo
+namespace Air
 {
-	using namespace Air;
 	class ApplicationManager
 	{
 	public:
-		static void addApplication(string className);
+		static void addApplication(Air::string className);
 
 		static void printInfo();
 
-		static Application* createApplication(int index);
+		static Air::Application* createApplication(int index);
 
-		static Application* initApplication();
+		static Air::Application* initApplication();
 	private:
-		static TArray<string> mApplicationList;
+		static Air::TArray<Air::string> mApplicationList;
 	};
 
 

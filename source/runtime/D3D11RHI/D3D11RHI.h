@@ -1,5 +1,4 @@
 #pragma once
-#include "DynamicRHI.h"
 #include "D3D11Typedefs.h"
 #include "D3D11Resource.h"
 #ifdef D3D11RHI_EXPORTS

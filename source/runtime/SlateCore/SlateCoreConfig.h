@@ -1,0 +1,6 @@
+#pragma once
+#ifdef SLATECORE_SOURCE
+#define SLATECORE_API DLLEXPORT
+#else
+#define SLATECORE_API DLLIMPORT
+#endif

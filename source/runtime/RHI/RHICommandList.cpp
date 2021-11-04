@@ -1,7 +1,6 @@
 #include "HAL/PlatformProcess.h"
-
+#include "RHI.h"
 #include "RHICommandList.h"
-#include "DynamicRHI.h"
 #include "Async/TaskGraphInterfaces.h"
 
 
@@ -629,7 +628,7 @@ namespace Air
 	void RHIAsyncComputeCommandListImmediate::immediateDispatch(RHIAsyncComputeCommandListImmediate& RHIComputeCmdList)
 	{
 		BOOST_ASSERT(isInRenderingThread());
-		RHIComputeCmdList.submitCommandsHint();
+		RHIComputeCmdList.submitCommandHint();
 
 		if (!RHIComputeCmdList.bypass())
 		{

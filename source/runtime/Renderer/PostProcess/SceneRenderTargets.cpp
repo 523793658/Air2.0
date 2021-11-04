@@ -6,7 +6,6 @@
 #include "PostProcess/RenderTargetPool.h"
 #include "RenderResource.h"
 #include "SystemTextures.h"
-#include "RHIUtilities.h"
 #include "RHIStaticStates.h"
 #include "GlobalShader.h"
 #include "StaticBoundShaderState.h"

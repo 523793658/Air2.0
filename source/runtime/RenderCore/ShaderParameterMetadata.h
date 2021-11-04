@@ -3,12 +3,12 @@
 #include "RHIDefinitions.h"
 #include "Containers/LinkList.h"
 #include "RHIResource.h"
-#include "RHI.h"
+#include "Serialization/MemoryImage.h"
 namespace Air
 {
 
 	struct ResourceTableEntry;
-
+	struct RHIConstantBufferLayout;
 	namespace EShaderPrecisionModifier
 	{
 		enum Type
@@ -129,6 +129,8 @@ namespace Air
 
 		const TCHAR* getShaderVariableName() const { return mShaderVariableName; }
 
+		const HashedName& getShaderVariableHashedName() const { return mShaderVariableHashedName; }
+
 		void addResourceTableEntries(TMap<wstring, ResourceTableEntry>& resourceTableMap, TMap<wstring, uint32>& resourceTableLayoutHashes) const;
 
 		const TCHAR* getStructTypeName() const { return mStructTypeName; }
@@ -141,6 +143,7 @@ namespace Air
 	private:
 		const TCHAR* const mStructTypeName;
 		const TCHAR* const mShaderVariableName;
+		HashedName mShaderVariableHashedName;
 		const uint32 mSize;
 		const EUseCase mUseCase;
 

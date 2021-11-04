@@ -1,13 +1,19 @@
 #pragma once
-#include "RHI.h"
 #include "Containers/LockFreeListImpl.h"
 #include "HAL/PlatformAtomics.h"
 #include "Template/RefCounting.h"
 #include "Template/AlignmentTemplates.h"
 #include "Misc/SecureHash.h"
 #include "Misc/Crc.h"
+#include "RHIConfig.h"
+#include "RHIResource.h"
+#include "RHI.h"
+
 namespace Air
 {
+	extern RHI_API bool GRHINeedsExtraDeletionLatency;
+
+
 	class RHI_API RHIResource
 	{
 	public:
@@ -414,8 +420,7 @@ namespace Air
 	{
 	public:
 		RHIComputeFence(wstring inName)
-			:mName(inName),
-			mWriteEnqueued(false)
+			:mName(inName)
 		{}
 
 		FORCEINLINE wstring getName() const
@@ -425,23 +430,14 @@ namespace Air
 
 		FORCEINLINE bool getWriteEnqueued() const
 		{
-			return mWriteEnqueued;
+			return mTransition != nullptr;
 		}
-
-		virtual void reset()
-		{
-			mWriteEnqueued = false;
-		}
-
-		virtual void writeFence()
-		{
-			mWriteEnqueued = true;
-		}
-
 
 	private:
 		wstring mName;
-		bool mWriteEnqueued;
+
+	public:
+		const RHITransition* mTransition = nullptr;
 	};
 
 
@@ -743,6 +739,17 @@ namespace Air
 		{
 			return Value != DepthNop_StencilNop;
 		}
+
+		inline bool isUsingDepth() const
+		{
+			return (ExtractDepth() != DepthNop);
+		}
+
+		inline bool isUsingStencil() const
+		{
+			return (ExtractStencil() != StencilNop);
+		}
+
 		inline bool IsDepthWrite() const
 		{
 			return ExtractDepth() == DepthWrite;
@@ -786,6 +793,51 @@ namespace Air
 		bool operator !=(const FExclusiveDepthStencil& rhs) const
 		{
 			return Value != rhs.Value;
+		}
+
+		inline void getAccess(ERHIAccess& depthAccess, ERHIAccess& stencilAccess) const 
+		{
+			depthAccess = ERHIAccess::None;
+			constexpr ERHIAccess dsvReadOnlyMask = ERHIAccess::DSVRead | ERHIAccess::SRVGraphics | ERHIAccess::SRVCompute;
+
+			constexpr ERHIAccess dsvReadWriteMask = ERHIAccess::DSVRead | ERHIAccess::DSVWrite;
+
+			if (isUsingDepth())
+			{
+				depthAccess = IsDepthWrite() ? dsvReadWriteMask : dsvReadOnlyMask;
+			}
+			stencilAccess = ERHIAccess::None;
+			if (isUsingStencil())
+			{
+				stencilAccess = IsStencilWrite() ? dsvReadWriteMask : dsvReadOnlyMask;
+			}
+		}
+
+		template<typename TFunction>
+		inline void enumerateSubresource(TFunction function) const
+		{
+			if (!IsUsingDepthStencil())
+			{
+				return;
+			}
+			ERHIAccess depthAccess = ERHIAccess::None;
+			ERHIAccess stencilAccess = ERHIAccess::None;
+			getAccess(depthAccess, stencilAccess);
+			if (depthAccess == stencilAccess)
+			{
+				function(depthAccess, RHITransitionInfo::kAllSubresources);
+			}
+			else
+			{
+				if (depthAccess != ERHIAccess::None)
+				{
+					function(depthAccess, RHITransitionInfo::kDepthPlaneSlice);
+				}
+				if (stencilAccess != ERHIAccess::None)
+				{
+					function(stencilAccess, RHITransitionInfo::kStencilPlaneSlice);
+				}
+			}
 		}
 
 		inline bool IsValid(FExclusiveDepthStencil& Current) const
@@ -1828,4 +1880,5 @@ namespace Air
 		{}
 		GraphicsPipelineStateInitializer mInitializer;
 	};
+
 }

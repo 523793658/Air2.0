@@ -1,0 +1,14 @@
+﻿Log file open, 11/04/21 17:45:42
+LogInit: Display: Running engine without a game
+LogModuleManager: Warning: ModuleManager: Unable to load module 'PakFile' because the file 'E:/Air2.0.0/bin/win_x64/UE4Editor-PakFile.dll' was not found.
+LogPlatformFile: Not using cached read wrapper
+LogModuleManager: Warning: ModuleManager: Unable to load module 'SandboxFile' because the file 'E:/Air2.0.0/bin/win_x64/UE4Editor-SandboxFile.dll' was not found.
+LogModuleManager: Warning: ModuleManager: Unable to load module 'StreamingFile' because the file 'E:/Air2.0.0/bin/win_x64/UE4Editor-StreamingFile.dll' was not found.
+LogModuleManager: Warning: ModuleManager: Unable to load module 'CookedIterativeFile' because the file 'E:/Air2.0.0/bin/win_x64/UE4Editor-CookedIterativeFile.dll' was not found.
+LogModuleManager: Warning: ModuleManager: Unable to load module 'NetworkFile' because the file 'E:/Air2.0.0/bin/win_x64/UE4Editor-NetworkFile.dll' was not found.
+LogTaskGraph: Started task graph with 4 named threads and 58 total threads with 3 sets of task threads.
+LogICUInternationalization: ICU TimeZone Detection - Raw Offset: +8:00, Platform Override: ''
+LogCompile: Error: Failed to initialize the engine (PreInit failed).
+LogExit: Preparing to exit.
+LogExit: Exiting.
+Log file closed, 11/04/21 17:45:44

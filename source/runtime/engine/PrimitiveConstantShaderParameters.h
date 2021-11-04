@@ -10,9 +10,9 @@ namespace Air
 	BEGIN_GLOBAL_SHADER_PARAMETER_STRUCT(PrimitiveConstantShaderParameters, ENGINE_API)
 		SHADER_PARAMETER(Matrix, LocalToWorld)
 		SHADER_PARAMETER(Matrix, WorldToLocal)
-		SHADER_PARAMETER_EX(float, LocalToWorldDeterminantSign, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float4, ObjectWorldPositionAndRadius)
 		SHADER_PARAMETER(float3, ObjectBounds)
+		SHADER_PARAMETER_EX(float, LocalToWorldDeterminantSign, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float3, ActorWorldPosition)
 		SHADER_PARAMETER_EX(float, DecalReceiverMask, EShaderPrecisionModifier::Half)
 		SHADER_PARAMETER(float4, ObjectOrientation, EShaderPrecisionModifier::Half)
@@ -77,7 +77,7 @@ namespace Air
 
 	struct PrimitiveSceneShaderData
 	{
-		enum {PrimitiveDataStrideInFloat4s = 35};
+		enum {PrimitiveDataStrideInFloat4s = 14};
 
 		float4 mData[PrimitiveDataStrideInFloat4s];
 

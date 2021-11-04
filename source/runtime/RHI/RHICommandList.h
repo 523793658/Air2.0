@@ -1,20 +1,22 @@
 #pragma once
 #include "RHIConfig.h"
-#include "RHIResource.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "boost/noncopyable.hpp"
 #include "Template/AlignOf.h"
 #include "Misc/MemStack.h"
-#include "DynamicRHI.h"
 #include "Math/Float16Color.h"
 #include "Containers/StaticArray.h"
+#include "Containers/ArrayView.h"
+#include "Template/RefCounting.h"
+#include "RHIResource.h"
 #include "RHIContext.h"
-#include "PipelineStateCache.h"
+#include "DynamicRHI.h"
 namespace Air
 {
 	class IRHICommandContext;
 	class IRHIComputeContext;
 	class GraphicsPipelineState;
+	class RHIGraphicsPipelineState;
 	struct RHICommandBase;
 
 	enum class ECmdList
@@ -34,9 +36,11 @@ namespace Air
 		virtual void executeAndDestruct(RHICommandListBase& cmdList, RHICommandListDebugContext& debugContext) = 0;
 
 	};
+	extern RHI_API RHIGraphicsPipelineState* executeSetGraphicsPipelineState(GraphicsPipelineState*);
 
+	StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo);
 
-	
+	FORCEINLINE Texture2DRHIRef RHICreateTexture2D(uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamplers, uint32 flags, RHIResourceCreateInfo& createInfo);
 
 
 	class RHI_API RHICommandListBase : public boost::noncopyable
@@ -255,6 +259,16 @@ namespace Air
 
 		void *mRenderThreadContext[(int32)ERenderThreadContext::Num];
 
+
+		FORCEINLINE bool isAsyncCompute() const
+		{
+			return mContext == nullptr && mComputeContext != nullptr;
+		}
+
+		FORCEINLINE ERHIPipeline getPipeline() const
+		{
+			return isAsyncCompute() ? ERHIPipeline::AsyncCompute : ERHIPipeline::Graphics;
+		}
 	protected:
 		uint32 mNumCommands{ 0 };
 		RHICommandBase* mRoot;
@@ -303,9 +317,12 @@ namespace Air
 		CommonData mData;
 	};
 
-	
+	struct UnnameedRHICommand
+	{
+		static const TCHAR* TStr() { return TEXT("UnnameedRHICommand"); }
+	};
 
-	template <typename TCmd>
+	template <typename TCmd, typename NameType = UnnameedRHICommand>
 	struct RHICommand : public RHICommandBase
 	{
 		void executeAndDestruct(RHICommandListBase& cmdList, RHICommandListDebugContext& context) override final
@@ -370,57 +387,7 @@ namespace Air
 
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
-
-	struct RHICommandTransitionTexturesArray : public RHICommand<RHICommandTransitionTexturesArray>
-	{
-		TArray<RHITexture*>& mTextures;
-		EResourceTransitionAccess mTransitionType;
-		FORCEINLINE_DEBUGGABLE RHICommandTransitionTexturesArray(EResourceTransitionAccess inTransitionType, TArray<RHITexture*>& inTextures)
-			:mTextures(inTextures)
-			, mTransitionType(inTransitionType)
-		{}
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
-
-	struct RHICommandTransitionTextures : public RHICommand<RHICommandTransitionTextures>
-	{
-		static const int32 maxTexturesToTransition = 16;
-		int32 numTextures;
-		RHITexture* textures[maxTexturesToTransition];
-		EResourceTransitionAccess transitionType;
-		FORCEINLINE_DEBUGGABLE RHICommandTransitionTextures(EResourceTransitionAccess inTranstionType, RHITexture** inTextures, int32 inNumTextures)
-			:numTextures(inNumTextures),
-			transitionType(inTranstionType)
-		{
-			for (int32 i = 0; i < numTextures; ++i)
-			{
-				textures[i] = inTextures[i];
-			}
-		}
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
-
-	template<ECmdList CmdListType>
-	struct RHICommandTransitionUAVs final : public RHICommand<RHICommandTransitionUAVs< CmdListType>>
-	{
-		int32 mNumUAVs;
-		RHIUnorderedAccessView** mUAVs;
-		EResourceTransitionAccess mTransitionType;
-		EResourceTransitionPipeline mTransitionPipeline;
-		RHIComputeFence* mWriteFence;
-
-		FORCEINLINE_DEBUGGABLE RHICommandTransitionUAVs(EResourceTransitionAccess inTransitionType, EResourceTransitionPipeline inTransitionPipeline, RHIUnorderedAccessView** inUAVs, int32 inNumUAVs, RHIComputeFence* inWriteFence)
-			:mNumUAVs(inNumUAVs)
-			, mUAVs(inUAVs)
-			, mTransitionType(inTransitionType)
-			, mTransitionPipeline(inTransitionPipeline)
-			, mWriteFence(inWriteFence)
-		{
-
-		}
-
-		RHI_API void execute(RHICommandListBase& cmdList);
-	};
+	
 
 	struct RHICommandBeginDrawingViewport : public RHICommand<RHICommandBeginDrawingViewport>
 	{
@@ -445,13 +412,13 @@ namespace Air
 			bLockToVsync(inbLockToVsync)
 		{}
 
-		RHI_API void execute(RHICommandListBase& CmdList);
+		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 	struct RHICommandBeginScene : public RHICommand<RHICommandBeginScene>
 	{
 		FORCEINLINE_DEBUGGABLE RHICommandBeginScene()
 		{}
-		RHI_API void execute(RHICommandListBase& CmdList);
+		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
 	struct RHICommandEndScene : public RHICommand<RHICommandEndScene>
@@ -993,8 +960,7 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
-	template<ECmdList CmdListType>
-	struct RHICommandSubmitCommandsHint final : public RHICommand<RHICommandSubmitCommandsHint<CmdListType>>
+	struct RHICommandSubmitCommandsHint final : public RHICommand<RHICommandSubmitCommandsHint>
 	{
 		FORCEINLINE_DEBUGGABLE RHICommandSubmitCommandsHint()
 		{}
@@ -1002,11 +968,185 @@ namespace Air
 		RHI_API void execute(RHICommandListBase& cmdList);
 	};
 
+#define RHICOMMAND_MACRO(CommandName) 	\
+struct PREPROCESSOR_JOIN(CommandName##String, __LINE__)			\
+{																\
+	static const TCHAR* TStr(){return TEXT(#CommandName);}		\
+};																\
+struct CommandName final : public RHICommand<CommandName, PREPROCESSOR_JOIN(CommandName##String, __LINE__)>
+
 #define CMD_CONTEXT(Method) getContext().Method
 #define COMPUTE_CONTEXT(Method) getComputeContext().Method
 	
 
-	class RHI_API RHICommandList : public RHICommandListBase
+	RHICOMMAND_MACRO(RHICommandBeginTransitions)
+	{
+		TArrayView<const RHITransition*> mTransitions;
+		RHICommandBeginTransitions(TArrayView<const RHITransition*> inTransitions)
+			:mTransitions(inTransitions)
+		{}
+
+		RHI_API void execute(RHICommandListBase & cmdList);
+	};
+
+	RHICOMMAND_MACRO(RHICommandEndTransitions)
+	{
+		TArrayView<const RHITransition*> mTransitions;
+		RHICommandEndTransitions(TArrayView<const RHITransition*> inTranstions)
+			:mTransitions(inTranstions)
+		{
+
+		}
+
+		RHI_API void execute(RHICommandListBase & cmdList);
+	};
+
+	RHICOMMAND_MACRO(RHICommandResourceTransition)
+	{
+		RHITransition* mTransition;
+		RHICommandResourceTransition(RHITransition * inTransition)
+			:mTransition(inTransition)
+		{}
+
+		RHI_API void execute(RHICommandListBase & cmdList);
+	};
+
+
+	class RHI_API RHIComputeCommandList : public RHICommandListBase
+	{
+	public:
+
+		FORCEINLINE_DEBUGGABLE void BeginTransitions(TArrayView<const RHITransition*> transitions)
+		{
+			if (bypass())
+			{
+				getComputeContext().RHIBeginTransitions(transitions);
+				for (const RHITransition* transition : transitions)
+				{
+					transition->markBegin(getPipeline());
+				}
+			}
+			else
+			{
+				RHITransition** dstTransitionArray = (RHITransition**)alloc(sizeof(RHITransition*) * transitions.size(), alignof(RHITransition*));
+				Memory::memcpy(dstTransitionArray, transitions.getData(), sizeof(RHITransition*) * transitions.size());
+				ALLOC_COMMAND(RHICommandBeginTransitions)(makeArrayView((const RHITransition**)dstTransitionArray, transitions.size()));
+			}
+		}
+
+		FORCEINLINE_DEBUGGABLE void endTransitions(TArrayView<const RHITransition*> transitions)
+		{
+			if (bypass())
+			{
+				getComputeContext().RHIEndTransitions(transitions);
+				for (const RHITransition* transition : transitions)
+				{
+					transition->markEnd(getPipeline());
+				}
+			}
+			else
+			{
+				RHITransition** dstTransitionArray = (RHITransition**)alloc(sizeof(RHITransition*) * transitions.size(), alignof(RHITransition*));
+				Memory::memcpy(dstTransitionArray, transitions.getData(), sizeof(RHITransition*) * transitions.size());
+				ALLOC_COMMAND(RHICommandBeginTransitions)(makeArrayView((const RHITransition**)dstTransitionArray, transitions.size()));
+			}
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResource(ERHIAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView* inUAV, RHIComputeFence* writeFence)
+		{
+			transitionResources(transitionType, transitionPipeline, &inUAV, 1, writeFence);
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResource(ERHIAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView* inUAV)
+		{
+			transitionResource(transitionType, transitionPipeline, inUAV, nullptr);
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResource(FExclusiveDepthStencil depthStencilMode, RHITexture* depthTexture)
+		{
+			BOOST_ASSERT(depthStencilMode.isUsingDepth() || depthStencilMode.isUsingStencil());
+			TArray<RHITransitionInfo, TInlineAllocator<2>> infos;
+			depthStencilMode.enumerateSubresource([&](ERHIAccess newAccess, uint32 planeSlice)
+				{
+					RHITransitionInfo info;
+					info.mType = RHITransitionInfo::EType::Texture;
+					info.mTexture = depthTexture;
+					info.mAccessAfter = newAccess;
+					info.mPlaneSlice = planeSlice;
+					infos.emplace(info);
+				});
+			RHIComputeCommandList::transition(makeArrayView(infos));
+		}
+
+		inline void transition(TArrayView<const RHITransitionInfo> infos)
+		{
+			ERHIPipeline pipeline = getPipeline();
+			if (bypass())
+			{
+				MemStack& memStack = MemStack::get();
+				MemMark mark(memStack);
+				RHITransition* transition = new (memStack.alloc(RHITransition::getTotalAllocationSize(), RHITransition::getAlignment()))RHITransition(pipeline, pipeline);
+				GDynamicRHI->RHICreateTransition(transition, pipeline, pipeline, ERHICreateTransitionFlags::NoSplit, infos);
+				getComputeContext().RHIBeginTransitions(makeArrayView((const RHITransition**)&transition, 1));
+				getComputeContext().RHIEndTransitions(makeArrayView((const RHITransition**)&transition, 1));
+
+				GDynamicRHI->RHIReleaseTransition(transition);
+				transition->~RHITransition();
+			}
+			else
+			{
+				RHITransition* transition = new (alloc(RHITransition::getTotalAllocationSize(), RHITransition::getAlignment()))RHITransition(pipeline, pipeline);
+				GDynamicRHI->RHICreateTransition(transition, pipeline, pipeline, ERHICreateTransitionFlags::NoSplit, infos);
+				ALLOC_COMMAND(RHICommandResourceTransition)(transition);
+			}
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResources(ERHIAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAV, int32 numUAVs, RHIComputeFence* writeFence)
+		{
+			MemMark mark(MemStack::get());
+			TArray<RHITransitionInfo, TMemStackAllocator<>> infos;
+			infos.reserve(numUAVs);
+			for (int32 index = 0; index < numUAVs; ++index)
+			{
+				infos.add(RHITransitionInfo(inUAV[index], ERHIAccess::Unknown, transitionType));
+			}
+			if (writeFence)
+			{
+				ERHIPipeline srcPipeline = isAsyncCompute() ? ERHIPipeline::AsyncCompute : ERHIPipeline::Graphics;
+				ERHIPipeline dstPipeline = isAsyncCompute() ? ERHIPipeline::Graphics : ERHIPipeline::AsyncCompute;
+				writeFence->mTransition = RHICreateTransition(srcPipeline, dstPipeline, ERHICreateTransitionFlags::None, infos);
+				BeginTransitions(makeArrayView(&writeFence->mTransition, 1));
+			}
+			else
+			{
+				transition(infos);
+			}
+		}
+
+		FORCEINLINE_DEBUGGABLE void transitionResources(ERHIAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAV, int32 numUAVs)
+		{
+			transitionResources(transitionType, transitionPipeline, inUAV, numUAVs, nullptr);
+		}
+
+		FORCEINLINE_DEBUGGABLE void submitCommandHint()
+		{
+			if (bypass())
+			{
+				getComputeContext().RHISubmitCommandsHint();
+				return;
+			}
+			ALLOC_COMMAND(RHICommandSubmitCommandsHint)();
+		}
+
+		FORCEINLINE_DEBUGGABLE void waitComputeFence(RHIComputeFence* waitFence)
+		{
+			BOOST_ASSERT(waitFence->mTransition);
+			endTransitions(makeArrayView(&waitFence->mTransition, 1));
+			waitFence->mTransition = nullptr;
+		}
+	};
+
+	class RHI_API RHICommandList : public RHIComputeCommandList
 	{
 	public:	
 		void* operator new(size_t size);
@@ -1064,6 +1204,7 @@ namespace Air
 			if (bypass())
 			{
 				
+
 				RHIGraphicsPipelineState* rhiGraphicsPipelineState = executeSetGraphicsPipelineState(graphicsPipelineState);
 				getContext().RHISetGraphicsPipelineState(rhiGraphicsPipelineState);
 				return;
@@ -1071,15 +1212,7 @@ namespace Air
 			ALLOC_COMMAND(RHICommandSetGraphicsPipelineState)(graphicsPipelineState);
 		}
 		
-		FORCEINLINE_DEBUGGABLE void waitComputeFence(RHIComputeFence* waitFence)
-		{
-			if (bypass())
-			{
-				getContext().RHIWaitComputeFence(waitFence);
-				return;
-			}
-			ALLOC_COMMAND(RHICommandWaitComputeFence<ECmdList::EGfx>)(waitFence);
-		}
+		
 
 		FORCEINLINE_DEBUGGABLE void drawIndexedPrimitive(RHIIndexBuffer* indexBuffer, uint32 primitiveType, int32 baseVertexIndex, int32 firstInstance, uint32 numVertices, uint32 startIndex, uint32 numPrimitive, uint32 numInstances)
 		{
@@ -1101,68 +1234,6 @@ namespace Air
 			new (allocCommand<RHICommandDrawPrimitive>())RHICommandDrawPrimitive(baseVertexIndex, numPrimitives, numInstances);
 		}
 
-		
-		FORCEINLINE_DEBUGGABLE void transitionResourceArrayNoCopy(EResourceTransitionAccess transitionType, TArray<RHITexture*>& inTextures)
-		{
-			if (bypass())
-			{
-				CMD_CONTEXT(RHITransitionResources)(transitionType, &inTextures[0], inTextures.size());
-				return;
-			}
-			new (allocCommand<RHICommandTransitionTexturesArray>()) RHICommandTransitionTexturesArray(transitionType, inTextures);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, RHITexture* inTexture)
-		{
-			RHITexture* texture = inTexture;
-			if (bypass())
-			{
-				CMD_CONTEXT(RHITransitionResources)(transitionType, &texture, 1);
-				return;
-			}
-			new (allocCommand<RHICommandTransitionTextures>())RHICommandTransitionTextures(transitionType, &texture, 1);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView* inUAV, RHIComputeFence* writeFence)
-		{
-			BOOST_ASSERT(inUAV == nullptr || inUAV->isCommitted());
-			RHIUnorderedAccessView* uav = inUAV;
-			if (bypass())
-			{
-				getContext().RHITransitionResources(transitionType, transitionPipeline, &uav, 1, writeFence);
-				return;
-			}
-
-			RHIUnorderedAccessView** uavArray = (RHIUnorderedAccessView * *)alloc(sizeof(RHIUnorderedAccessView*), alignof(RHIUnorderedAccessView*));
-			uavArray[0] = uav;
-			ALLOC_COMMAND(RHICommandTransitionUAVs<ECmdList::EGfx>)(transitionType, transitionPipeline, uavArray, 1, writeFence);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResource(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView* inUAV)
-		{
-			transitionResource(transitionType, transitionPipeline, inUAV, nullptr);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAV, int32 numUAVs, RHIComputeFence* writeFence)
-		{
-			if (bypass())
-			{
-				getContext().RHITransitionResources(transitionType, transitionPipeline, inUAV, numUAVs, writeFence);
-				return;
-			}
-			RHIUnorderedAccessView** uavArray = (RHIUnorderedAccessView * *)alloc(sizeof(RHIUnorderedAccessView*) * numUAVs, alignof(RHIUnorderedAccessView*));
-			for (int32 index = 0; index < numUAVs; ++index)
-			{
-				uavArray[index] = inUAV[index];
-			}
-			ALLOC_COMMAND(RHICommandTransitionUAVs<ECmdList::EGfx>)(transitionType, transitionPipeline, uavArray, numUAVs, writeFence);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAV, int32 numUAVs)
-		{
-			transitionResources(transitionType, transitionPipeline, inUAV, numUAVs, nullptr);
-		}
-
 		FORCEINLINE_DEBUGGABLE void setStreamSource(uint32 streadIndex, RHIVertexBuffer* vertexBuffer, uint32 offset)
 		{
 			if (bypass())
@@ -1173,15 +1244,8 @@ namespace Air
 			new (allocCommand<RHICommandSetStreamSource>())RHICommandSetStreamSource(streadIndex, vertexBuffer, offset);
 		}
 
-		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, RHITexture** inTextures, int32 numTextures)
-		{
-			if (bypass())
-			{
-				CMD_CONTEXT(RHITransitionResources)(transitionType, inTextures, numTextures);
-				return;
-			}
-			new (allocCommand<RHICommandTransitionTextures>())RHICommandTransitionTextures(transitionType, inTextures, numTextures);
-		}
+		using RHIComputeCommandList::transitionResource;
+		using RHIComputeCommandList::transitionResources;
 	
 
 		FORCEINLINE_DEBUGGABLE LocalConstantBuffer buildLocalConstantBuffer(const void* contents, uint32 contentsSize, const RHIConstantBufferLayout& layout)
@@ -1522,7 +1586,7 @@ namespace Air
 		void endScene();
 	};
 
-	class RHI_API RHIAsyncComputeCommandList : public RHICommandListBase
+	class RHI_API RHIAsyncComputeCommandList : public RHIComputeCommandList
 	{
 	public:
 		FORCEINLINE_DEBUGGABLE void setShaderSampler(RHIComputeShader* shader, uint32 samplerIndex, RHISamplerState* state)
@@ -1568,17 +1632,6 @@ namespace Air
 
 		}
 
-		FORCEINLINE_DEBUGGABLE void waitComputeFence(RHIComputeFence* waitFence)
-		{
-			if (bypass())
-			{
-				getComputeContext().RHIWaitComputeFence(waitFence);
-				return;
-			}
-
-			ALLOC_COMMAND(RHICommandWaitComputeFence<ECmdList::ECompute>)(waitFence);
-		}
-
 		FORCEINLINE_DEBUGGABLE void setComputeShader(RHIComputeShader* computeShader)
 		{
 			computeShader->updateStats();
@@ -1597,34 +1650,6 @@ namespace Air
 				getComputeContext().RHIDispatchComputeShader(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
 			}
 			ALLOC_COMMAND(RHICommandDispatchComputeShader<ECmdList::ECompute>)(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
-		}
-
-		FORCEINLINE_DEBUGGABLE void transitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAVs, int32 numUAVs, RHIComputeFence* writeFence)
-		{
-			if (bypass())
-			{
-				getComputeContext().RHITransitionResources(transitionType, transitionPipeline, inUAVs, numUAVs, writeFence);
-				return;
-			}
-
-			RHIUnorderedAccessView** uavArray = (RHIUnorderedAccessView**)alloc(sizeof(RHIUnorderedAccessView*) * numUAVs, alignof(RHIUnorderedAccessView*));
-			for (int32 index = 0; index < numUAVs; ++index)
-			{
-				uavArray[index] = inUAVs[index];
-			}
-
-			ALLOC_COMMAND(RHICommandTransitionUAVs<ECmdList::ECompute>)(transitionType, transitionPipeline, uavArray, numUAVs, writeFence);
-		}
-
-		FORCEINLINE_DEBUGGABLE void submitCommandsHint()
-		{
-			if (bypass())
-			{
-				getComputeContext().RHISubmitCommandsHint();
-				return;
-			}
-
-			ALLOC_COMMAND(RHICommandSubmitCommandsHint<ECmdList::ECompute>)();
 		}
 	};
 
@@ -1676,7 +1701,7 @@ namespace Air
 
 		FORCEINLINE Texture2DRHIRef createTexture2D(uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamplers, uint32 flags, RHIResourceCreateInfo& createInfo)
 		{
-			return GDynamicRHI->RHICreateTexture2D_RenderThread(*this, width, height, format, numMips, numSamplers, flags, createInfo);
+			return RHICreateTexture2D(width, height, format, numMips, numSamplers, flags, createInfo);
 		}
 
 		FORCEINLINE TextureCubeRHIRef createTextureCube(uint32 size, uint8 format, uint32 numMips, uint32 flags, RHIResourceCreateInfo& createInfo)
@@ -1847,7 +1872,7 @@ namespace Air
 
 		FORCEINLINE StructuredBufferRHIRef createStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
 		{
-			return GDynamicRHI->RHICreateStructuredBuffer_RenderThread(*this, stride, size, inUsage, createInfo);
+			return RHICreateStructuredBuffer(stride, size, inUsage, createInfo);
 		}
 
 		FORCEINLINE void discardTransientResource_RenderThread(RHIStructuredBuffer* buffer)
@@ -2229,11 +2254,21 @@ namespace Air
 		return RHICommandListExecutor::getImmediateCommandList().createTextureReference(lastRenderTime);
 	}
 
+	extern RHI_API ERHIAccess RHIGetDefaultResourceState(EBufferUsageFlags inUsage, bool bInHasInitialData);
+
+
+	
+
+	FORCEINLINE StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, ERHIAccess inResourceState, RHIResourceCreateInfo& createInfo)
+	{
+		return GDynamicRHI->RHICreateStructuredBuffer_RenderThread(RHICommandListExecutor::getImmediateCommandList(), stride, size, inUsage, inResourceState, createInfo);
+	}
 	FORCEINLINE StructuredBufferRHIRef RHICreateStructuredBuffer(uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
 	{
-		return RHICommandListExecutor::getImmediateCommandList().createStructuredBuffer(stride, size, inUsage, createInfo);
+		bool bHasInitialData = createInfo.mBulkData != nullptr;
+		ERHIAccess resourceState = RHIGetDefaultResourceState((EBufferUsageFlags)inUsage | BUF_StructuredBuffer, bHasInitialData);
+		return RHICreateStructuredBuffer(stride, size, inUsage, resourceState, createInfo);
 	}
-
 	FORCEINLINE void RHIAcquireTransientResource(RHIStructuredBuffer* resource)
 	{
 		RHICommandListExecutor::getImmediateCommandList().acquireTransientResource_RenderThread(resource);

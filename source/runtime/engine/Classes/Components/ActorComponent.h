@@ -1,6 +1,6 @@
 #pragma once 
 #include "EngineMininal.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "Classes/Engine/EngineBaseTypes.h"
 #include "Classes/Engine/EngineType.h"
 namespace Air
@@ -24,9 +24,9 @@ namespace Air
 	};
 
 	
-	class ENGINE_API ActorComponent : public Object
+	class ENGINE_API ActorComponent : public UObject
 	{
-		GENERATED_RCLASS_BODY(ActorComponent, Object)
+		GENERATED_UCLASS_BODY()
 	public:
 		
 		virtual void postInitProperties() override;

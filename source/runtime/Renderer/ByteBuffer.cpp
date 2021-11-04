@@ -2,56 +2,9 @@
 #include "RHICommandList.h"
 #include "GlobalShader.h"
 #include "ShaderParameterUtils.h"
-#include "RHIUtilities.h"
 namespace Air
 {
-	class ScatterCopyCS : public GlobalShader
-	{
-		DECLARE_SHADER_TYPE(ScatterCopyCS, Global)
-
-		ScatterCopyCS() {}
-
-		static bool shouldCompilePermutation(const GlobalShaderPermutationParameters& parameters)
-		{
-			return RHISupportsComputeShaders(parameters.mPlatform);
-		}
-
-		static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment)
-		{
-			GlobalShader::modifyCompilationEnvironment(parameters, outEnvironment);
-			outEnvironment.setDefine(TEXT("THREADGROUP_SIZE"), ThreadGroupSize);
-		}
-
-	public:
-
-		enum {ThreadGroupSize = 64};
-
-		ShaderParameter	mNumScatters;
-		ShaderResourceParameter mScatterBuffer;
-		ShaderResourceParameter mUploadBuffer;
-		ShaderResourceParameter mDstBuffer;
-
-		ScatterCopyCS(const ShaderMetaType::CompiledShaderInitializerType& initializer)
-			:GlobalShader(initializer)
-		{
-			mNumScatters.bind(initializer.mParameterMap, TEXT("NumScatters"));
-			mScatterBuffer.bind(initializer.mParameterMap, TEXT("ScatterBuffer"));
-			mUploadBuffer.bind(initializer.mParameterMap, TEXT("UploadBuffer"));
-			mDstBuffer.bind(initializer.mParameterMap, TEXT("DstBuffer"));
-		}
-
-		virtual bool serialize(Archive& ar) override
-		{
-			bool bShaderHasOutdatedParameters = GlobalShader::serialize(ar);
-			ar << mNumScatters;
-			ar << mScatterBuffer;
-			ar << mUploadBuffer;
-			ar << mDstBuffer;
-			return bShaderHasOutdatedParameters;
-		}
-	};
-
-
+	
 	void ScatterUploadBuilder::uploadTo(RHICommandList& RHICmdList, RWBufferStructured& dstBuffer)
 	{
 		RHIUnlockVertexBuffer(mScatterBuffer.mBuffer);

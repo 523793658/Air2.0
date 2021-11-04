@@ -1,7 +1,7 @@
 #pragma once
 #include "EngineMininal.h"
 #include "Classes/Engine/EngineBaseTypes.h"
-#include "Object.h"
+#include "UObject/Object.h"
 namespace Air
 {
 	class World;

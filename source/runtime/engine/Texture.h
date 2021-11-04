@@ -2,7 +2,7 @@
 #include "EngineMininal.h"
 #include "RenderResource.h"
 #include "ResLoader/ResLoader.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "Containers/IndirectArray.h"
 #include "TextureResource.h"
 #include "MaterialShared.h"

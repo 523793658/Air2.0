@@ -1,9 +1,8 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "RHI.h"
+#include "RHIResource.h"
 #include "PackedNormal.h"
 #include "RenderCore.h"
-#include "RHIResource.h"
 namespace Air
 {
 
@@ -43,11 +42,13 @@ namespace Air
 
 	RENDER_CORE_API SIZE_T calcTextureMipHeightInBlocks(uint32 height, EPixelFormat format, uint32 MipIndex);
 
-	RENDER_CORE_API SIZE_T CalcTextureMipMapSize(uint32 width, uint32 height, EPixelFormat format, uint32 mipIndex);
+	RENDER_CORE_API SIZE_T calcTextureMipMapSize(uint32 width, uint32 height, EPixelFormat format, uint32 mipIndex);
 
 	RENDER_CORE_API SIZE_T calcTextureSize(uint32 sizeX, uint32 sizeY, EPixelFormat format, uint32 MipCount);
 
 	RENDER_CORE_API SIZE_T calcTextureSize3D(uint32 width, uint32 height, uint32 depth, EPixelFormat format, uint32 mipCount);
+
+	RENDER_CORE_API bool GPUSceneUseTexture2D(const StaticShaderPlatform platform);
 
 	inline bool isForwardShadingEnabled(EShaderPlatform platform)
 	{

@@ -9,6 +9,8 @@
 #include "Containers/EnumAsByte.h"
 #include "Containers/ContainerAllocationPolicies.h"
 #include "Containers/StaticArray.h"
+#include "Containers/FString.h"
+#include "Containers/ArrayView.h"
 namespace Air
 {
 	
@@ -22,11 +24,7 @@ namespace Air
 
 static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignment of pointer needs to match the largest pointer.");
 
-	extern RHI_API void RHIInit(bool bHasEditorToken);
 
-	extern RHI_API void RHIPostInit();
-
-	extern RHI_API void RHIExit();
 
 	RHI_API bool RHISupportsTessellation(const EShaderPlatform platform);
 
@@ -137,6 +135,7 @@ static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignmen
 
 	extern RHI_API EShaderPlatform GMaxRHIShaderPlatform;
 
+	extern RHI_API int64 GMaxBufferDimensions;
 
 	FORCEINLINE uint32 getMax2DTextureDemension()
 	{
@@ -147,6 +146,11 @@ static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignmen
 	FORCEINLINE uint32 getMaxTextureArrayLayers()
 	{
 		return GMaxTextureArrayLayers;
+	}
+
+	FORCEINLINE uint64 GetMaxBufferDimension()
+	{
+		return GMaxBufferDimensions;
 	}
 
 	RHI_API bool isRHIDeviceIntel();
@@ -173,18 +177,43 @@ static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignmen
 #define WITH_SLI	(0)
 #define GNumActiveGPUsForRendering (1)
 #endif
-
-	enum class EResourceTransitionAccess
+	enum class ERHIAccess
 	{
-		EReadable, //transition from write-> read
-		EWritable, //transition from read -> write	
-		ERWBarrier, // Mostly for UAVs.  Transition to read/write state and always insert a resource barrier.
-		ERWNoBarrier, //Mostly UAVs.  Indicates we want R/W access and do not require synchronization for the duration of the RW state.  The initial transition from writable->RWNoBarrier and readable->RWNoBarrier still requires a sync
-		ERWSubResBarrier, //For special cases where read/write happens to different subresources of the same resource in the same call.  Inserts a barrier, but read validation will pass.  Temporary until we pass full subresource info to all transition calls.
-		EMetaData,		  // For transitioning texture meta data, for example for making readable in shaders
-		EMaxAccess,
+		Unknown = 0,
+		CPURead = 1 << 0,
+		Present = 1 << 1,
+		IndirectArgs = 1 << 2,
+		VertexOrIndexBuffer = 1 << 3,
+		SRVCompute = 1 << 4,
+		SRVGraphics = 1 << 5,
+		CopySrc = 1 << 6,
+		ResolveSrc = 1 << 7,
+		DSVRead = 1 << 8,
+
+		UAVCompute = 1 << 9,
+		UAVGraphics = 1 << 10,
+		RTV = 1 << 11,
+		CopyDest = 1 << 12,
+		ResolveDst = 1 << 13,
+		DSVWrite = 1 << 14,
+
+		Last = DSVWrite,
+		None = Unknown,
+		Mask = (Last << 1) - 1,
+		SRVMask = SRVCompute | SRVGraphics,
+		UAVMask = UAVCompute | UAVGraphics,
+		ReadOnlyExclusiveMask = CPURead | Present | IndirectArgs | VertexOrIndexBuffer | SRVGraphics | SRVCompute | CopySrc | ResolveSrc,
+
+		ReadOnlyMask = ReadOnlyExclusiveMask | DSVRead,
+		ReadableMask = ReadOnlyMask | UAVMask,
+		WriteOnlyExclusiveMask = RTV | CopyDest | ResolveDst,
+		WriteOnlyMask = WriteOnlyExclusiveMask | DSVWrite,
+		WritableMask = WriteOnlyMask | UAVMask,
+
+
 	};
 
+	ENUM_CLASS_FLAGS(ERHIAccess);
 
 	enum class EResourceTransitionPipeline
 	{
@@ -359,6 +388,151 @@ static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignmen
 		return GShaderPlatformForFeatureLevel[inFeatureLevel];
 	}
 
+	struct RHISubresourceRange
+	{
+		static const uint32 kDepthPlaneSlice = 0;
+		static const uint32 kStencilPlaneSlice = 0;
+		static const uint32 kAllSubresources = std::numeric_limits<uint32>::max();
+
+		uint32 mMipIndex = kAllSubresources;
+		uint32 mArraySlice = kAllSubresources;
+		uint32 mPlaneSlice = kAllSubresources;
+
+		RHISubresourceRange() = default;
+		RHISubresourceRange(
+			uint32 inMipIndex,
+			uint32 inArraySlice,
+			uint32 inPlaneSlice
+		)
+			:mMipIndex(inMipIndex)
+			, mArraySlice(inArraySlice)
+			, mPlaneSlice(inPlaneSlice)
+		{}
+
+		inline bool isAllMips() const
+		{
+			return mMipIndex == kAllSubresources;
+		}
+
+		inline bool isAllArraySlices() const
+		{
+			return mArraySlice == kAllSubresources;
+		}
+
+		inline bool isAllPlaneSlices() const
+		{
+			return mPlaneSlice == kAllSubresources;
+		}
+
+		inline bool isWhooleResource() const
+		{
+			return isAllMips() && isAllArraySlices() && isAllPlaneSlices();
+		}
+
+		inline bool ignoreDepthPlane() const
+		{
+			return mPlaneSlice == kDepthPlaneSlice;
+		}
+
+		inline bool ignoreStencilPlane() const
+		{
+			return mPlaneSlice == kStencilPlaneSlice;
+		}
+
+		inline bool operator == (RHISubresourceRange const& RHS) const
+		{
+			return mMipIndex == RHS.mMipIndex
+				&& mPlaneSlice == RHS.mPlaneSlice
+				&& mArraySlice == RHS.mArraySlice;
+		}
+		inline bool operator != (RHISubresourceRange const& RHS) const
+		{
+			return !(this->operator==(RHS));
+		}
+
+
+	};
+
+	enum class EResourceTransitionFlags
+	{
+		None			= 0,
+		MaintainCompression = 1 << 0,
+		Last = MaintainCompression,
+		Mask = (Last << 1) - 1
+	};
+	ENUM_CLASS_FLAGS(EResourceTransitionFlags);
+
+	struct RHITransitionInfo : public RHISubresourceRange
+	{
+		union
+		{
+			class RHIResource* mResource = nullptr;
+			class RHITexture* mTexture;
+			class RHIVertexBuffer* mVertexBuffer;
+			class RHIIndexBuffer* mIndexBuffer;
+			class RHIStructuredBuffer* mStructuredBuffer;
+			class RHIUnorderedAccessView* mUAV;
+		};
+
+		enum class EType : uint8
+		{
+			Unknown,
+			Texture,
+			VertexBuffer,
+			IndexBuffer,
+			StructuredBuffer,
+			UAV
+		}mType = EType::Unknown;
+
+		ERHIAccess mAccessBefore = ERHIAccess::Unknown;
+		ERHIAccess mAccessAfter = ERHIAccess::Unknown;
+		EResourceTransitionFlags mFlags = EResourceTransitionFlags::None;
+
+		RHITransitionInfo() = default;
+
+		RHITransitionInfo(class RHITexture* inTexture,
+			ERHIAccess inPreviousState,
+			ERHIAccess inNewState,
+			EResourceTransitionFlags inFlags = EResourceTransitionFlags::None,
+			uint32 inMipIndex = kAllSubresources,
+			uint32 inArraySlice = kAllSubresources,
+			uint32 inPlaneSlice = kAllSubresources)
+			:RHISubresourceRange(inMipIndex, inArraySlice, inPlaneSlice)
+			, mTexture(inTexture)
+			, mType(EType::Texture)
+			, mAccessBefore(inPreviousState)
+			, mAccessAfter(inNewState)
+			, mFlags(inFlags)
+		{
+
+		}
+
+
+		RHITransitionInfo(class RHIUnorderedAccessView* inUAV, ERHIAccess inPreviousState, ERHIAccess inNewState, EResourceTransitionFlags inFlags = EResourceTransitionFlags::None)
+			:mUAV(inUAV)
+			, mType(EType::UAV)
+			, mAccessAfter(inNewState)
+			, mAccessBefore(inPreviousState)
+			, mFlags(inFlags)
+		{
+
+		}
+
+		inline bool operator == (RHITransitionInfo const& rhs) const
+		{
+			return mResource == rhs.mResource
+				&& mType == rhs.mType
+				&& mAccessBefore == rhs.mAccessBefore
+				&& mAccessAfter == rhs.mAccessAfter
+				&& mFlags == rhs.mFlags
+				&& RHISubresourceRange::operator==(rhs);
+		}
+
+		inline bool operator != (RHITransitionInfo const& rhs) const
+		{
+			return !(this->operator==(rhs));
+		}
+	};
 	
 
 	struct RHIResourceCreateInfo
@@ -756,5 +930,110 @@ static_assert(sizeof(void*) <= SHADER_PARAMETER_POINTER_ALIGNMENT, "the alignmen
 	};
 
 	extern RHI_API class VertexElementTypeSupportInfo GVertexElementTypeSupport;
+	
+	
+	enum class ERHIPipeline : uint8
+	{
+		Graphics = 1 << 0,
+		AsyncCompute = 1 << 1,
+		All = Graphics | AsyncCompute,
+		Num = 2
+	};
+
+	extern RHI_API uint64 GRHITransitionPrivateData_SizeInBytes;
+	extern RHI_API uint64 GRHITransitionPrivateData_AlignInBytes;
+
+
+	enum class ERHICreateTransitionFlags
+	{
+		None = 0,
+		NoFence = 1 << 0,
+		NoSplit = 1 << 1,
+	};
+
+	struct RHITransition
+	{
+	public:
+		template <typename T>
+		inline T* getPrivateData()
+		{
+			BOOST_ASSERT(sizeof(T) == GRHITransitionPrivateData_SizeInBytes && GRHITransitionPrivateData_AlignInBytes != 0);
+			uintptr_t addr = align(uintptr_t(this + 1), GRHITransitionPrivateData_AlignInBytes);
+			BOOST_ASSERT(addr + GRHITransitionPrivateData_SizeInBytes - (uintptr_t)this == getTotalAllocationSize());
+			return reinterpret_cast<T*>(addr);
+		}
+		template<typename T>
+		inline const T* getPrivateData() const
+		{
+			return const_cast<RHITransition*>(this)->getPrivateData<T>();
+		}
+
+	private:
+		RHITransition(const RHITransition&) = delete;
+		RHITransition(RHITransition&&) = delete;
+		RHITransition(ERHIPipeline srcPipelines, ERHIPipeline dstPipelines)
+			:mState(int8(srcPipelines) | (int8(dstPipelines) << int32(ERHIPipeline::Num)))
+		{
+
+		}
+		~RHITransition()
+		{}
+
+		friend const RHITransition* RHICreateTransition(ERHIPipeline srcPipeline, ERHIPipeline dstPipelines, ERHICreateTransitionFlags createFlags, TArrayView<const RHITransitionInfo> infos);
+
+		friend class RHIComputeCommandList;
+		friend struct RHICommandBeginTransitions;
+		friend struct RHICommandEndTransitions;
+		friend struct RHICommandResourceTransition;
+
+
+		static uint64 getTotalAllocationSize()
+		{
+			return align(sizeof(RHITransition), Math::max(GRHITransitionPrivateData_AlignInBytes, 1ull)) + GRHITransitionPrivateData_SizeInBytes;
+		}
+
+		static uint64 getAlignment()
+		{
+			return Math::max((uint64)alignof(RHITransition), GRHITransitionPrivateData_AlignInBytes);
+		}
+
+		inline void markBegin(ERHIPipeline pipeline) const
+		{
+			//BOOST_ASSERT(enumHasAllFlags(pipeline, allowe))
+
+			int8 mask = int8(pipeline);
+			int8 previousValue = PlatformAtomics::interlockedAnd(&mState, ~mask);
+			if (previousValue == mask)
+			{
+				cleanup();
+			}
+		}
+
+		inline void markEnd(ERHIPipeline pipeline) const
+		{
+			int8 mask = int8(pipeline) << int32(ERHIPipeline::Num);
+			int8 previousValue = PlatformAtomics::interlockedAnd(&mState, ~mask);
+			if (previousValue == mask)
+			{
+				cleanup();
+			}
+		}
+
+		void cleanup() const;
+
+
+	private:
+		mutable int8 mState;
+		static_assert((int32(ERHIPipeline::Num) * 2) < (sizeof(mState) * 8), "Not enough bits to hold pipeline state.");
+
+
+	};
+
+	extern RHI_API void RHIInit(bool bHasEditorToken);
+
+	extern RHI_API void RHIPostInit();
+
+	extern RHI_API void RHIExit();
+	
 	
 }

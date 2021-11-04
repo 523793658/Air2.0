@@ -24,7 +24,11 @@ namespace Air
 		return TEXT("GlobalShaderCache-") + legacyShaderPlatformToShaderFormat(platform) + TEXT(".bin");
 	}
 
-	
+	GlobalShader::GlobalShader(const ShaderMetaType::CompiledShaderInitializerType& initializer)
+		:Shader(initializer)
+	{
+
+	}
 	
 	
 
@@ -172,11 +176,4 @@ namespace Air
 	}
 
 	
-	
-
-	GlobalShader::GlobalShader(const ShaderMetaType::CompiledShaderInitializerType& initializer)
-		:Shader(initializer)
-	{
-
-	}
 }

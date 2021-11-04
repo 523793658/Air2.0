@@ -1,6 +1,7 @@
 #include "BoundShaderStateCache.h"
 #include "HAL/CriticalSection.h"
 #include "Misc/ScopeLock.h"
+#include "RHI.h"
 namespace Air
 {
 

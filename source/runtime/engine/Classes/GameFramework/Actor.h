@@ -1,5 +1,5 @@
 #pragma once
-#include "Object.h"
+#include "UObject/Object.h"
 #include "EngineMininal.h"
 #include "ObjectGlobals.h"
 #include "Containers/Set.h"

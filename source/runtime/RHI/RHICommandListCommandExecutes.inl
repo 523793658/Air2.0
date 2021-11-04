@@ -7,39 +7,44 @@
 #endif
 
 #if !defined(INTERNAL_DECORATOR_CONTEXT_PARAM1)
-#define INTERNAL_DECORATOR_CONTEXT(Method) IRHIComputeContext& context = (CmdListType == ECmdList::EGfx) ? cmdList.getContext() : cmdList.getComputeContext() ; context.Method
+#define INTERNAL_DECORATOR_CONTEXT(Method) cmdList.getComputeContext().Method
 #endif
 
-
-template<ECmdList CmdListType>
-void RHICommandWaitComputeFence<CmdListType>::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR_CONTEXT(RHIWaitComputeFence)(mWaitFence);
-}
-
-template struct RHICommandWaitComputeFence<ECmdList::EGfx>;
-template struct RHICommandWaitComputeFence<ECmdList::ECompute>;
-
-
-template struct RHICommandTransitionUAVs<ECmdList::EGfx>;
-template struct RHICommandTransitionUAVs<ECmdList::ECompute>;
-void RHICommandBeginDrawingViewport::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHIBeginDrawingViewport)(mViewport, mRenderTargetRHI);
-}
-
-template<ECmdList CmdListType>
-void RHICommandSubmitCommandsHint<CmdListType>::execute(RHICommandListBase& cmdList)
+void RHICommandSubmitCommandsHint::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR_CONTEXT(RHISubmitCommandsHint)();
 }
 
-template struct RHICommandSubmitCommandsHint<ECmdList::EGfx>;
-template struct RHICommandSubmitCommandsHint<ECmdList::ECompute>;
-
 void RHICommandEndDrawingViewport::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHIEndDrawingViewport)(viewport, bPresent, bLockToVsync);
+}
+
+void RHICommandBeginTransitions::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_COMPUTE(RHIBeginTransitions)(mTransitions);
+	for (const RHITransition* transition : mTransitions)
+	{
+		transition->markBegin(cmdList.getPipeline());
+	}
+}
+
+void RHICommandResourceTransition::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_COMPUTE(RHIBeginTransitions)(makeArrayView((const RHITransition**)&mTransition, 1));
+	INTERNAL_DECORATOR_COMPUTE(RHIEndTransitions)(makeArrayView((const RHITransition**)&mTransition, 1));
+
+	GDynamicRHI->RHIReleaseTransition(mTransition);
+	mTransition->~RHITransition();
+}
+
+void RHICommandEndTransitions::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR_COMPUTE(RHIEndTransitions)(mTransitions);
+	for (const RHITransition* transition : mTransitions)
+	{
+		transition->markEnd(cmdList.getPipeline());
+	}
 }
 
 void RHICommandBeginScene::execute(RHICommandListBase& cmdList)
@@ -60,16 +65,6 @@ void RHICommandBeginFrame::execute(RHICommandListBase& cmdList)
 void RHICommandEndFrame::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHIEndFrame)();
-}
-
-void RHICommandTransitionTextures::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHITransitionResources)(transitionType, &textures[0], numTextures);
-}
-
-void RHICommandTransitionTexturesArray::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHITransitionResources)(mTransitionType, &mTextures[0], mTextures.size());
 }
 
 void RHICommandSetRenderTargetsAndClear::execute(RHICommandListBase& cmdList)
@@ -109,12 +104,6 @@ void RHICommandSetViewport::execute(RHICommandListBase& cmdList)
 void RHICommandSetBlendFactor::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR(RHISetBlendFactor)(mBlendFactor);
-}
-
-template<ECmdList CmdListType>
-void RHICommandTransitionUAVs<CmdListType>::execute(RHICommandListBase& cmdList)
-{
-	INTERNAL_DECORATOR(RHITransitionResources)(mTransitionType, mTransitionPipeline, mUAVs, mNumUAVs, mWriteFence);
 }
 
 
@@ -226,6 +215,7 @@ void RHICommandSetStreamSource::execute(RHICommandListBase& cmdList)
 
 void RHICommandSetGraphicsPipelineState::execute(RHICommandListBase& cmdList)
 {
+	extern RHIGraphicsPipelineState* executeSetGraphicsPipelineState(GraphicsPipelineState * graphicsPipelineState);
 	RHIGraphicsPipelineState* RHiGraphicsPipelineState = executeSetGraphicsPipelineState(mGraphicsPipelineState);
 	INTERNAL_DECORATOR(RHISetGraphicsPipelineState)(RHiGraphicsPipelineState);
 }
@@ -319,4 +309,9 @@ template<typename TRHIShader, ECmdList CmdListType>
 void RHICommandSetUAVParameter_InitialCount<TRHIShader, CmdListType>::execute(RHICommandListBase& cmdList)
 {
 	INTERNAL_DECORATOR_CONTEXT(RHISetUAVParameter)(mShader, mUAVIndex, mUAV, mInitialCount);
+}
+
+void RHICommandBeginDrawingViewport::execute(RHICommandListBase& cmdList)
+{
+	INTERNAL_DECORATOR(RHIBeginDrawingViewport)(mViewport, mRenderTargetRHI);
 }

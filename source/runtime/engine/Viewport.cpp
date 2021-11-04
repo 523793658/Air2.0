@@ -4,12 +4,10 @@
 #include "RenderingThread.h"
 #include "Classes/Engine/LocalPlayer.h"
 #include "Classes/Engine/Engine.h"
-#include "DynamicRHI.h"
 #include "HAL/PlatformTime.h"
 #include "CanvasType.h"
 #include "RHI.h"
 #include "RenderResource.h"
-#include "DynamicRHI.h"
 namespace Air
 {
 	struct EndDrawingCommandParams

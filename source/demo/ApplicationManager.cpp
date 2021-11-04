@@ -1,7 +1,7 @@
 #include "ApplicationManager.h"
 #include <iostream>
 #include "Demos/initEngine/InitEngine.h"
-namespace Demo
+namespace Air
 {
 	TArray<string> ApplicationManager::mApplicationList;
 

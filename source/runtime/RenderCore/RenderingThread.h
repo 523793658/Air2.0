@@ -41,7 +41,7 @@ namespace Air
 	class RENDER_CORE_API DeferredCleanupInterface
 	{
 	public:
-		virtual void finishCleanup() = 0;
+		virtual void finishCleanup() final {};
 		virtual ~DeferredCleanupInterface() {}
 	};
 

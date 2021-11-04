@@ -11,11 +11,8 @@
 #include "Classes/Materials/MaterialInstanceDynamic.h"
 #include "Classes/Engine/SkyLight.h"
 #include "TextureCube.h"
-namespace Demo
+namespace Air
 {
-	using namespace Air;
-
-
 
 	DemoInitEngine::DemoInitEngine(const Air::ObjectInitializer& objectInitalizer)
 	{

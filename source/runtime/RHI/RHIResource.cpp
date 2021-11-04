@@ -1,5 +1,6 @@
+#include "RHI.h"
 #include "RHIResource.h"
-
+#include "PipelineStateCache.h"
 namespace Air
 {
 	void RHIRenderPassInfo::convertToRenderTargetsInfo(RHISetRenderTargetsInfo& outRTInfo) const
@@ -53,5 +54,11 @@ namespace Air
 			}
 			outRTInfo.mNumUAVs = mNumUAVs;
 		}
+	}
+
+
+	void RHIComputeShader::updateStats()
+	{
+		PipelineStateStats::updateStats(mStats);
 	}
 }

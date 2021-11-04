@@ -1,0 +1,6 @@
+#pragma once
+#ifdef INPUTCORE_SOURCE
+#define INPUTCORE_API DLLEXPORT
+#else
+#define INPUTCORE_API DLLIMPORT
+#endif

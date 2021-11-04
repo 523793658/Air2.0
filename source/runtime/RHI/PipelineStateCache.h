@@ -10,7 +10,6 @@ namespace Air
 	class RHICommandList;
 	class GraphicsPipelineStateInitializer;
 
-	extern RHI_API RHIGraphicsPipelineState* executeSetGraphicsPipelineState(GraphicsPipelineState* graphicsPipelineState);
 
 	enum class EApplyRendertargetOption : int
 	{

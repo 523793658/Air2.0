@@ -1,8 +1,32 @@
 #pragma once
+#include "CoreMinimal.h"
+#include "Containers/ArrayView.h"
+#include "RHIResource.h"
 namespace Air
 {
+	class RHIVertexDeclaration;
+	class RHIComputeShader;
+	class RHITexture;
+	class RHITexture;
+	class RHISamplerState;
+	class RHIUnorderedAccessView;
+	class RHIShaderResourceView;
+	class RHIBoundShaderState;
+	class RHIVertexShader;
+	class RHIHullShader;
+	class RHIDomainShader;
+	class RHIGeometryShader;
+	class RHIPixelShader;
+	class RHIComputeFence;
+	class RHIViewport;
+	struct RHITransition;
+	class RHIVertexBuffer;
+	class RHIDepthRenderTargetView;
+	class RHIRenderTargetView;
+	struct ResolveParams;
+	typedef TRefCountPtr<RHIBoundShaderState> BoundShaderStateRHIRef;
 
-	FORCEINLINE BoundShaderStateRHIRef RHICreateBoundShaderState(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShaderRHI, RHIHullShader* hullShaderRHI, RHIDomainShader* domainShaderRHI, RHIGeometryShader* geometryShaderRHI, RHIPixelShader* pixelShaderRHI);
+	BoundShaderStateRHIRef RHICreateBoundShaderState(RHIVertexDeclaration* vertexDeclaration, RHIVertexShader* vertexShaderRHI, RHIHullShader* hullShaderRHI, RHIDomainShader* domainShaderRHI, RHIGeometryShader* geometryShaderRHI, RHIPixelShader* pixelShaderRHI);
 
 	class IRHIComputeContext
 	{
@@ -26,10 +50,12 @@ namespace Air
 		virtual void RHISetShaderResourceViewParameter(RHIComputeShader* computeShader, uint32 samplerIndex, RHIShaderResourceView* srv) = 0;
 
 		virtual void RHIWaitComputeFence(RHIComputeFence* inFence) = 0;
-
-		virtual void RHITransitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAVs, int32 numUAVs, RHIComputeFence* writeComputeFence) = 0;
-
+		
 		virtual void RHISubmitCommandsHint() = 0;
+
+		virtual void RHIBeginTransitions(TArrayView<const RHITransition*> transitions) = 0;
+
+		virtual void RHIEndTransitions(TArrayView<const RHITransition*> transitions) = 0;
 	};
 
 	class IRHICommandContext : public IRHIComputeContext
@@ -133,32 +159,6 @@ namespace Air
 
 		virtual void RHISetStreamSource(uint32 streamIndex, RHIVertexBuffer* vertexBuffer, uint32 offset) = 0;
 
-		virtual void RHITransitionResources(EResourceTransitionAccess transitionType, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** InUAVs, int32 numUAVs, RHIComputeFence* writeComputeFence)
-		{
-			if (writeComputeFence)
-			{
-				writeComputeFence->writeFence();
-			}
-		}
-
-		void RHITransitionResources(EResourceTransitionAccess transitionAccess, EResourceTransitionPipeline transitionPipeline, RHIUnorderedAccessView** inUAVs, int32 numUAVs)
-		{
-			RHITransitionResources(transitionAccess, transitionPipeline, inUAVs, numUAVs, nullptr);
-		}
-
-
-		virtual void RHITransitionResources(EResourceTransitionAccess transitionType, RHITexture** inTexture, int32 numTextures)
-		{
-			if (transitionType == EResourceTransitionAccess::EReadable)
-			{
-				const ResolveParams resolveParams;
-				for (int32 i = 0; i < numTextures; ++i)
-				{
-					RHICopyToResolveTarget(inTexture[i], inTexture[i], resolveParams);
-				}
-			}
-		}
-
 		virtual void RHISetShaderConstantBuffer(RHIVertexShader* vertexShader, uint32 bufferIndex, RHIConstantBuffer* buffer) = 0;
 
 		virtual void RHISetShaderConstantBuffer(RHIHullShader* hullShader, uint32 bufferIndex, RHIConstantBuffer* buffer) = 0;
@@ -189,54 +189,9 @@ namespace Air
 
 		virtual void RHISetBlendFactor(const LinearColor& blendFactor) {}
 
-		virtual void RHIBeginRenderPass(const RHIRenderPassInfo& inInfo, const TCHAR* inName)
-		{
-			if (inInfo.bGeneratingMips)
-			{
-				RHITexture* textures[MaxSimultaneousRenderTargets];
-				RHITexture** lastTexture = textures;
-				for (int32 index = 0; index < MaxSimultaneousRenderTargets; ++index)
-				{
-					if (!inInfo.mColorRenderTargets[index].mRenderTarget)
-					{
-						break;
-					}
-					*lastTexture = inInfo.mColorRenderTargets[index].mRenderTarget;
-					++lastTexture;
-				}
+		virtual void RHIBeginRenderPass(const RHIRenderPassInfo& inInfo, const TCHAR* inName) = 0;
 
-				int32 numTextures = (int32)(lastTexture - textures);
-				if (numTextures)
-				{
-					RHITransitionResources(EResourceTransitionAccess::ERWSubResBarrier, textures, numTextures);
-				}
-			}
-
-			RHISetRenderTargetsInfo RTInfo;
-			inInfo.convertToRenderTargetsInfo(RTInfo);
-			RHISetRenderTargetsAndClear(RTInfo);
-
-			mRenderPassInfo = inInfo;
-		}
-
-		virtual void RHIEndRenderPass()
-		{
-			for (int32 index = 0; index < MaxSimultaneousRenderTargets; ++index)
-			{
-				if (!mRenderPassInfo.mColorRenderTargets[index].mRenderTarget)
-				{
-					break;
-				}
-				if (mRenderPassInfo.mColorRenderTargets[index].mResolveTarget)
-				{
-					RHICopyToResolveTarget(mRenderPassInfo.mColorRenderTargets[index].mRenderTarget, mRenderPassInfo.mColorRenderTargets[index].mResolveTarget, mRenderPassInfo.mResolveParameters);
-				}
-			}
-			if (mRenderPassInfo.mDepthStencilRenderTarget.mDepthStencilTarget && mRenderPassInfo.mDepthStencilRenderTarget.mResolveTarget)
-			{
-				RHICopyToResolveTarget(mRenderPassInfo.mDepthStencilRenderTarget.mDepthStencilTarget, mRenderPassInfo.mDepthStencilRenderTarget.mResolveTarget, mRenderPassInfo.mResolveParameters);
-			}
-		}
+		virtual void RHIEndRenderPass() = 0;
 
 	protected:
 		RHIRenderPassInfo mRenderPassInfo;

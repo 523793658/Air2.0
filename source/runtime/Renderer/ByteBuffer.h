@@ -1,7 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "RHI.h"
-#include "RHIUtilities.h"
 namespace Air
 {
 	void memcpyBuffer(RHICommandList& RHICmdList, const RWBufferStructured& srcBuffer, const RWBufferStructured& dstBuffer, uint32 numFloat4s, uint2 srcOffset = 0, uint2 dstOffset = 0);

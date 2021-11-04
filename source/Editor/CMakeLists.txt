@@ -1,0 +1,3 @@
+ADD_SUBDIRECTORY("AirEngineEditor")
+ADD_SUBDIRECTORY("AssetsImporter")
+ADD_SUBDIRECTORY("FBXFactory")

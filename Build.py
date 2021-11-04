@@ -30,6 +30,17 @@ class BuildInfo:
         target = ""
         
         argc = len(argv)
+        if argc > base + 1:
+            project = argv[base + 1]
+        if argc > base + 2:
+            compiler = argv[base + 2]
+        if argc > base + 3:
+            archs = (argv[base + 3], )
+        if argc > base + 4:
+            cfg = (argv[base + 4], )
+        if argc > base + 5:
+            target = argv[base + 5]
+        
         return BuildInfo(project, compiler, archs, cfg, target)
         
     def __init__(self, project, compiler, archs, cfg, target):
@@ -181,7 +192,10 @@ class BuildInfo:
                 if 0 == target_platform.find("win"):
                     progam_files_folder = self.findProgramFilesFolder()
                     
-                    if len(self.findVS2019Folder(progam_files_folder)) > 0:
+                    if len(self.findVS2022Folder(progam_files_folder)) > 0:
+                        project_type = "vs2022"
+                        compiler = "vc143"
+                    elif len(self.findVS2019Folder(progam_files_folder)) > 0:
                         project_type = "vs2019"
                         compiler = "vc142"
                     elif len(self.findVS2017Folder(progam_files_folder))> 0:
@@ -207,7 +221,9 @@ class BuildInfo:
                 if cfg_build.compiler != "auto":
                     compiler = cfg_build.compiler
         if(project_type != "") and (compiler == ""):
-            if project_type == "vs2019":
+            if project_type == "vs2022":
+                compiler = "vc143"
+            elif project_type == "vs2019":
                 compiler = "vc142"
             elif project_type == "vs2017":
                 compiler = "vc141"
@@ -218,7 +234,18 @@ class BuildInfo:
         
         if 0 == target_platform.find("win"):
             program_files_folder = self.findProgramFilesFolder()
-            if "vc142" == compiler:
+            if "vc143" == compiler:
+                if project_type == "vs2022":
+                    try_folder = self.findVS2022Folder(program_files_folder)
+                    if len(try_folder) > 0:
+                        compiler_root = try_folder
+                        vcvarsall_path = "VCVARSALL.BAT"
+                        vcvarsall_options = "amd64_arm64 -vcvars_ver=14.3"
+                    else:
+                        LogError("Could not find vc142 compiler toolset for vs2019.\n")
+                else:
+                    LogError("Could NOT find vc142 compiler.\n")
+            elif "vc142" == compiler:
                 if project_type == "vs2019":
                     print("5555555555555")
                     try_folder = self.findVS2019Folder(program_files_folder)
@@ -310,8 +337,28 @@ class BuildInfo:
                 
         multi_config = False
         compilers = []
-        if "vs2019" == project_type:
-            print("22222222222--%s" % compiler)
+        if "vs2022" == project_type:
+            self.vs_version = 17
+            if "vc143" == compiler:
+                compiler_name = "vc"
+                compiler_version = 143
+            elif "vc142" == compiler:
+                print("3333333333")
+                compiler_name = "vc"
+                compiler_version = 142
+            elif "vc141" == compiler:
+                compiler_name = "vc"
+                compiler_version = 141
+            elif "vc140" == compiler:
+                compiler_name = "vc"
+                compiler_version = 140
+            else:
+                LogError("Wrong combination of project %s and compiler %s.\n" %(project_type, compiler))
+            multi_config = True
+            for arch in archs:
+                print("4444444444--%s" % vcvarsall_options)
+                compilers.append(CompilerInfo(arch, "Visual Studio 17", compiler_root, vcvarsall_path, vcvarsall_options))
+        elif "vs2019" == project_type:
             self.vs_version = 16
             if "vc142" == compiler:
                 print("3333333333")
@@ -453,7 +500,9 @@ class BuildInfo:
             print("\tOculus LibOVR path: %s" % self.libovr_path)
         print("")
         sys.stdout.flush()
-                    
+    def findVS2022Folder(self, progam_files_folder):
+        return self.findVS2017PlusFolder(progam_files_folder, 17, "2019")
+        
     def findVS2019Folder(self, progam_files_folder):
         return self.findVS2017PlusFolder(progam_files_folder, 16, "2019")
         
@@ -650,7 +699,7 @@ def buildAProject(name, build_path, build_info, compiler_info, additional_option
                 if 0 == build_info.project_type.find("vs"):
                     cmake_cmd.addCommand('@CALL "%s%s" %s' % (compiler_info.compiler_root, compiler_info.vcvarsall_path, compiler_info.vcvarsall_options))
                     cmake_cmd.addCommand('@CD /d "%s"' % build_dir)
-            cmake_cmd.addCommand('"%s" -G "%s" %s %s ../CMake' % (build_info.cmake_path, compiler_info.generator, toolset_name, additional_options))
+            cmake_cmd.addCommand('"%s" -G "%s" %s %s ../../' % (build_info.cmake_path, compiler_info.generator, toolset_name, additional_options))
             print("11111111111111111")
             if cmake_cmd.execute() != 0:
                 LogWarning("Config %s failed, retry 1...\n" % name)
@@ -735,7 +784,7 @@ def buildAProject(name, build_path, build_info, compiler_info, additional_option
                     cmake_cmd.addCommand('@CALL "%s%s" %s' % (compiler_info.compiler_root, compiler_info.vcvarsall_path, vc_option))
                     cmake_cmd.addCommand('@CD /d "%s"' % build_dir)
                     additional_options += " -DCMAKE_C_COMPILER=cl.exe -DCMAKE_CXX_COMPILER=cl.exe"
-                cmake_cmd.addCommand('"%s" -G "%s" %s ../CMake' % (build_info.cmake_path, compiler_info.generator, additional_options))
+                cmake_cmd.addCommand('"%s" -G "%s" %s ../../' % (build_info.cmake_path, compiler_info.generator, additional_options))
                 
                 if cmake_cmd.execute() != 0:
                     LogWarning("Config %s failed, retry 1...\n" %name)

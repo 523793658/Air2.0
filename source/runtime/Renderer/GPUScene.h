@@ -1,5 +1,4 @@
 #pragma once
-#include "RHIUtilities.h"
 #include "Containers/BitArray.h"
 namespace Air
 {
@@ -61,6 +60,8 @@ namespace Air
 		TBitArray<> mPrimitivesMarkedToUpdate;
 
 		RWBufferStructured mPrimitiveBuffer;
+		TextureRWBuffer2D mPrimitiveTexture;
+		
 
 		GrowOnlySpanAllocator mLightmapDataAllocator;
 
@@ -69,7 +70,7 @@ namespace Air
 		RWBufferStructured mLightmapDataBuffer;
 	};
 
-	extern void updateGPUScene(RHICommandList& RHICmdList, Scene& scene);
+	extern void updateGPUScene(RHICommandListImmediate& RHICmdList, Scene& scene);
 	extern void addPrimitiveToUpdateGPU(Scene& scene, int32 primitiveId);
 	extern void uploadDynamicPrimitiveShaderDataForView(RHICommandList& RHICmdList, Scene& scene, ViewInfo& view);
 }

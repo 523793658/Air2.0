@@ -701,9 +701,9 @@ namespace Air
 
 	private:
 #if !(BUILD_SHIPPING || BUILD_TEST)
-		mutable int32 bIsStaticDrawListReferenced : 1;
+		mutable uint32 bIsStaticDrawListReferenced : 1;
 #endif
-		mutable int32 mDeletedFlag : 1;
+		mutable uint32 mDeletedFlag : 1;
 		bool bSelected : 1;
 		bool bHovered : 1;
 

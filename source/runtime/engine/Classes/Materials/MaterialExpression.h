@@ -1,7 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "EngineMininal.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "rapidxml/src/rapidxml.hpp" 
 #include "misc/Guid.h"
 #include "MaterialExpressionIO.h"

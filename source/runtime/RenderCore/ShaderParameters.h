@@ -3,7 +3,6 @@
 #include "ShaderCore.h"
 #include "Misc/App.h"
 #include "ShaderParameterMap.h"
-#include "RHIUtilities.h"
 namespace Air
 {
 	enum EShaderParameterFlags
@@ -11,6 +10,8 @@ namespace Air
 		SPF_Optional,
 		SPF_Mandatory
 	};
+
+	struct RWBuffer;
 
 	class ShaderParameter
 	{

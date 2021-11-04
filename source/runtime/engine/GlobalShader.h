@@ -9,58 +9,14 @@ namespace Air
 {
 	class ShaderCompileJob;
 	class ShaderCommonCompileJob;
-
+	using GlobalShaderPermutationParameters = ShaderPermutationParameters;
 	extern ENGINE_API const int32 mGlobalShaderMapId;
 
-#define DECLARE_GLOBAL_SHADER(ShaderClass) \
-	public:\
-	\
-	using ShaderMetaType = GlobalShaderType;\
-	\
-	static ShaderMetaType mStaticType;\
-	\
-	static Shader* constructSerializedInstance() {return new ShaderClass();}\
-	\
-	static Shader* constructCompiledInstance(const ShaderMetaType::CompiledShaderInitializerType& initializer)\
-	{\
-		return new ShaderClass(initializer);\
-	}\
-	virtual uint32 getTypeSize() const override{return sizeof(*this);}\
-	static void modifyCompilationEnvironmentImpl(\
-		const GlobalShaderPermutationParameters& parameters,\
-		ShaderCompilerEnvironment& outEnvironment)\
-	{\
-		PermutationDomain permutationVector(parameters.mPermutationId);\
-		permutationVector.modifyCompilationEnvironment(outEnvironment);\
-		ShaderClass::modifyCompilationEnvironment(parameters, outEnvironment);\
-	}
+#define DECLARE_GLOBAL_SHADER(ShaderClass) DECLARE_SHADER_TYPE(ShaderClass, Global)
 
-#define IMPLEMENT_GLOBAL_SHADER(ShaderClass, SourceFilename, FunctionName, Frequency)\
-	ShaderClass::ShaderMetaType ShaderClass::mStaticType(\
-		TEXT(#ShaderClass),\
-		TEXT(SourceFilename),\
-		TEXT(FunctionName),\
-		Frequency,\
-		ShaderClass::PermutationDomain::mPermutationCount,\
-		ShaderClass::constructSerializedInstance,\
-		ShaderClass::constructCompiledInstance,\
-		ShaderClass::modifyCompilationEnvironmentImpl,\
-		ShaderClass::shouldCompilePermutation,\
-		ShaderClass::validateCompiledResult,\
-		ShaderClass::getStreamOutElements,\
-		ShaderClass::getRootParametersMetadata()\
-	)
+#define IMPLEMENT_GLOBAL_SHADER(ShaderClass, SourceFilename, FunctionName, Frequency) IMPLEMENT_SHADER_TYPE(, ShaderClass, TEXT(SourceFilename), TEXT(FunctionName), Frequency)
 
 
-	struct GlobalShaderPermutationParameters
-	{
-		const EShaderPlatform mPlatform;
-		const int32 mPermutationId;
-		GlobalShaderPermutationParameters(EShaderPlatform inPlatform, int32 inPermutationId)
-			:mPlatform(inPlatform)
-			,mPermutationId(inPermutationId)
-		{}
-	};
 
 	class GlobalShaderType : public ShaderType
 	{
@@ -117,6 +73,17 @@ namespace Air
 		ModifyCompilationEvironmentType mModifyCompilationEnvironmentRef;
 	};
 
+
+	class RENDER_CORE_API GlobalShaderMap
+	{
+	public:
+		explicit GlobalShaderMap(EShaderPlatform inPlatform);
+		~GlobalShaderMap();
+
+		TShaderRef
+	};
+
+
 	class GlobalShader : public Shader
 	{
 		DECLARE_SHADER_TYPE(GlobalShader, Global);
@@ -131,12 +98,6 @@ namespace Air
 			
 			setConstantBufferParameter(RHICmdList, shaderRHI, viewConstantBufferParameter, viewConstantBuffer);
 		}
-
-		typedef void(*ModifyCompilationEnvironmentType)(EShaderPlatform, ShaderCompilerEnvironment);
-
-		ENGINE_API static void modifyCompilationEnvironment(const GlobalShaderPermutationParameters& parameters, ShaderCompilerEnvironment& outEnvironment) {}
-
-		ENGINE_API static bool validateCompiledResult(EShaderPlatform platform, const ShaderParameterMap& parameterMap, TArray<wstring>& outErrors) { return true; }
 	};
 
 

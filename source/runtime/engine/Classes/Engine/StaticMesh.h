@@ -1,7 +1,7 @@
 #pragma once
 #include "EngineMininal.h"
 #include "ObjectMacros.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "RawMesh.h"
 #include "Components.h"
 #include "Classes/Engine/EngineType.h"

@@ -2,7 +2,6 @@
 #include "SlateRHIRendererConfig.h"
 #include "Rendering/SlateRenderer.h"
 #include "RenderResource.h"
-#include "RHIResource.h"
 #include "Widgets/SWindow.h"
 #include "RHICommandList.h"
 #include <map>

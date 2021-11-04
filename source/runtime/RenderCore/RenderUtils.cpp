@@ -1,8 +1,6 @@
-#include "RHIResource.h"
 
 #include "RenderUtils.h"
 #include "RenderResource.h"
-#include "DynamicRHI.h"
 #include "RHICommandList.h"
 #include "PackedNormal.h"
 namespace Air
@@ -349,4 +347,21 @@ namespace Air
 
 	RENDER_CORE_API uint64 GSelectiveBasePassOutputsPlatformMask = 0;
 	static_assert(SP_NumPlatforms <= sizeof(GSelectiveBasePassOutputsPlatformMask) * 8, "GSelectiveBasePassOutputsPlatformMask must be large enough to support all shader platform");
+
+	RENDER_CORE_API bool GPUSceneUseTexture2D(const StaticShaderPlatform platform)
+	{
+		if (isMobilePlatform(platform))
+		{
+			static TConsoleVariableData<int32>* CVar = IConsoleManager::get().FindTConsoleVariableDataInt(TEXT("r.Mobile.UseGPUSceneTexture"));
+			if (platform == SP_OPENGL_ES3_1_ANDROID)
+			{
+				return true;
+			}
+			else
+			{
+				return (CVar && CVar->getValueOnAnyThread() != 0) ? true : false;
+			}
+		}
+		return false;
+	}
 }

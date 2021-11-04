@@ -3,6 +3,14 @@
 #include "RHIResource.h"
 namespace Air
 {
+
+	class RHIVertexDeclaration;
+	class RHIVertexShader;
+	class RHIPixelShader;
+	class RHIHullShader;
+	class RHIDomainShader;
+	class RHIGeometryShader;
+
 	class BoundShaderStateKey
 	{
 	public:

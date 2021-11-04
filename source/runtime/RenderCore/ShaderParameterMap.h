@@ -312,9 +312,27 @@ namespace Air
 		{
 			return (EShaderPlatform)mPlatform;
 		}
+
+		EShaderFrequency getFrequency() const
+		{
+			return (EShaderFrequency)mFrequency;
+		}
 	};
 
+	struct ParameterAllocation
+	{
+		uint16 mBufferIndex;
+		uint16 mBaseIndex;
+		uint16 mSize;
+		mutable bool bBound;
+		ParameterAllocation()
+			:bBound(false) {}
 
+		friend Archive& operator << (Archive& ar, ParameterAllocation& allocation)
+		{
+			return ar << allocation.mBufferIndex << allocation.mBaseIndex << allocation.mSize << allocation.bBound;
+		}
+	};
 	class ShaderParameterMap
 	{
 	public:
@@ -341,20 +359,7 @@ namespace Air
 		}
 
 	private:
-		struct ParameterAllocation
-		{
-			uint16 mBufferIndex;
-			uint16 mBaseIndex;
-			uint16 mSize;
-			mutable bool bBound;
-			ParameterAllocation()
-				:bBound(false) {}
-
-			friend Archive& operator << (Archive& ar, ParameterAllocation& allocation)
-			{
-				return ar << allocation.mBufferIndex << allocation.mBaseIndex << allocation.mSize << allocation.bBound;
-			}
-		};
+		
 		TMap<wstring, ParameterAllocation> mParameterMap;
 	};
 
@@ -606,8 +611,7 @@ namespace Air
 	extern RENDER_CORE_API void getShaderIncludes(const TCHAR* filename, TArray<wstring>& includeFilenames, uint32 depthLimits = 7);
 	extern RENDER_CORE_API const SHAHash& getShaderFileHash(const TCHAR* filename, EShaderPlatform shaderPlatform);
 	extern RENDER_CORE_API const class SHAHash& getShaderFilesHash(const TArray<wstring>& filenames);
-	extern void generateReferencedConstantBuffers(const TCHAR* sourceFile, const TCHAR* shaderTypeName, const TMap<wstring, TArray<const TCHAR*>>& shaderFileToConstantBufferVaribles, TMap<const TCHAR*, CachedConstantBufferDeclaration>& constantBufferEntries);
-
+	
 	extern RENDER_CORE_API void serializeConstantBufferInfo(class ShaderSaveArchive& ar, const TMap<const TCHAR*, CachedConstantBufferDeclaration>& constantBufferEntries);
 
 	extern RENDER_CORE_API bool loadShaderSourceFile(const TCHAR* filename, wstring& outFileContents);

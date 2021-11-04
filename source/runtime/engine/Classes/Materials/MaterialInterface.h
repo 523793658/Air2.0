@@ -1,6 +1,6 @@
 #pragma once
 #include "EngineMininal.h"
-#include "Object.h"
+#include "UObject/Object.h"
 #include "SceneTypes.h"
 #include "RHIDefinitions.h"
 #include "Classes/Engine/EngineType.h"

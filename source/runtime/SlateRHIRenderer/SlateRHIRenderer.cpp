@@ -3,7 +3,6 @@
 #include "Rendering/ElementBatcher.h"
 #include "RenderingThread.h"
 #include "SlateRHIRenderingPolicy.h"
-#include "DynamicRHI.h"
 
 namespace Air
 {

@@ -2,6 +2,7 @@
 #include "GenericPlatform/genericPlatformDriver.h"
 #include "RHIResource.h"
 #include "RHICommandList.h"
+#include "DynamicRHI.h"
 #include "RHIShaderFormatDefinitions.inl"
 namespace Air
 {
@@ -16,7 +17,6 @@ namespace Air
 		TEXT("SM4"),
 		TEXT("SM5")
 	};
-
 
 	RHI_API int32 volatile GCurrentTextureMemorySize = 0;
 	RHI_API int32 volatile GCurrentRendertargetMemorySize = 0;
@@ -90,6 +90,8 @@ namespace Air
 
 	int32 GMaxTextureArrayLayers = 256;
 
+	int64 GMaxBufferDimensions = 2 << 27;
+
 	RHI_API ERHIFeatureLevel::Type GMaxRHIFeatureLevel = ERHIFeatureLevel::SM5;
 
 #if WITH_SLI
@@ -129,13 +131,17 @@ namespace Air
 	{
 		return RHIV_NVIDIA == GRHIVendorId;
 	}
-
+	inline bool IsVulkanSM5Platform(const StaticShaderPlatform Platform)
+	{
+		return Platform == SP_VULKAN_SM5 || Platform == SP_VULKAN_SM5_LUMIN || Platform == SP_VULKAN_SM5_ANDROID;
+	}
 	RHI_API bool RHISupportsTessellation(const EShaderPlatform platform)
 	{
-		if (isFeatureLevelSupported(platform, ERHIFeatureLevel::SM5) && !isMetalPlatform(platform))
+		if (isFeatureLevelSupported(platform, ERHIFeatureLevel::SM5))
 		{
-			return (platform == SP_PCD3D_SM5) || (platform == SP_XBOXONE_D3D12) || (platform == SP_OPENGL_SM5) || (platform == SP_OPENGL_ES31_EXT) || (platform == SP_VULKAN_SM5);
+			return (platform == SP_PCD3D_SM5) || (platform == SP_XBOXONE_D3D12) || (platform == SP_METAL_SM5) || (IsVulkanSM5Platform(platform));
 		}
+		return false;
 	}
 
 	RHI_API int32 GNumDrawCallsRHI = 0;
@@ -157,76 +163,24 @@ namespace Air
 
 	wstring legacyShaderPlatformToShaderFormat(EShaderPlatform platform)
 	{
-		switch (platform)
-		{
-		case Air::SP_PCD3D_SM5:
-			return NAME_PCD3D_SM5;
-		case Air::SP_OPENGL_SM4:
-			return NAME_GLSL_150;
-		case Air::SP_PS4:
-			return NAME_SF_PS4;
-		case Air::SP_OPENGL_PCES2:
-		{
-			return NAME_GLSL_150_ES2;
-		}
-		case Air::SP_XBOXONE_D3D12:
-			return NAME_SF_XBOXONE_D3D12;
-		case Air::SP_PCD3D_SM4:
-			return NAME_PCD3D_SM4;
-		case Air::SP_OPENGL_SM5:
-			return NAME_GLSL_430;
-		case Air::SP_PCD3D_ES2:
-			return NAME_PCD3D_ES2;
-		case Air::SP_OPENGL_ES2_ANDROID:
-			return NAME_GLSL_ES2;
-		case Air::SP_OPENGL_ES2_WEBGL:
-			return NAME_GLSL_ES2_WEBGL;
-		case Air::SP_OPENGL_ES2_IOS:
-			return NAME_GLSL_ES2_IOS;
-		case Air::SP_METAL:
-			return NAME_SF_METAL;
-		case Air::SP_OPENGL_SM4_MAC:
-			return NAME_GLSL_150_MAC;
-		case Air::SP_METAL_MRT:
-			return NAME_SF_MATAL_MRT;
-		case Air::SP_OPENGL_ES31_EXT:
-			return NAME_GLSL_310_ES_EXT;
-		case Air::SP_PCD3D_ES3_1:
-			return NAME_PCD3D_ES3_1;
-		case Air::SP_OPENGL_PCES3_1:
-			return NAME_GLSL_150_ES31;
-		case Air::SP_METAL_SM5:
-			return NAME_SF_MATAL_SM5;
-		case Air::SP_VULKAN_PCES3_1:
-			return NAME_VULKAN_ES3_1;
-		case Air::SP_METAL_SM4:
-			return NAME_SF_METAL_SM4;
-		case Air::SP_VULKAN_SM4:
-			return NAME_VULKAN_SM4;
-		case Air::SP_VULKAN_SM5:
-			return NAME_VULKAN_SM5;
-		case Air::SP_VULKAN_ES3_1_ANDROID:
-			return NAME_VULKAN_ES3_1_ANDROID;
-		case Air::SP_METAL_MACES3_1:
-			return NAME_SF_METAL_MACES3_1;
-		case Air::SP_METAL_MACES2:
-			return NAME_SF_METAL_MACES2;
-		case Air::SP_OPENGL_ES3_1_ANDROID:
-			return NAME_GLSL_ES3_1_ANDROID;
-		case Air::SP_SWITCH:
-			return NAME_GLSL_SWITCH;
-		case Air::SP_SWITCH_FORWARD:
-			return NAME_GLSL_SWITCH_FORWARD;
-		default:
-			BOOST_ASSERT(false);
-			return NAME_PCD3D_SM5;
-		}
+		return shaderPlatformToShaderFormatName(platform);
 	}
 
 	void RHIResource::flushPendingDeletes()
 	{
+
+		BOOST_ASSERT(isInRenderingThread());
+		RHICommandListImmediate& RHICmdList = RHICommandListExecutor::getImmediateCommandList();
+		if (GDynamicRHI)
+		{
+			RHICmdList.submitCommandHint();
+		}
+		RHICmdList.immediateFlush(EImmediateFlushType::FlushRHIThread);
 		RHICommandListExecutor::checkNoOutstandingCmdLists();
-		RHICommandListExecutor::getImmediateCommandList().immediateFlush(EImmediateFlushType::FlushRHIThread);
+		if (GDynamicRHI)
+		{
+			GDynamicRHI->RHIPerFrameRHIFlushComplete();
+		}
 
 		auto Delete = [](TArray<RHIResource*>& toDelete)
 		{
@@ -243,6 +197,7 @@ namespace Air
 				else
 				{
 					ref->mMarkedForDelete = 0;
+					PlatformMisc::memoryBarrier();
 				}
 			}
 		};
@@ -307,5 +262,24 @@ namespace Air
 	const ClearValueBinding ClearValueBinding::DepthFar((float)ERHIZBuffer::FarPlane, 0);
 	const ClearValueBinding ClearValueBinding::Green(LinearColor(0.0f, 1.0f, 0.0f, 1.0f));
 	const ClearValueBinding ClearValueBinding::MidGray(LinearColor(0.5f, 0.5f, 0.5f, 1.0f));
+	const wstring LANGUAGE_D3D(TEXT("D3D"));
+	const wstring LANGUAGE_Metal(TEXT("Metal"));
+	const wstring LANGUAGE_OpenGL(TEXT("OpenGL"));
+	const wstring LANGUAGE_Vulkan(TEXT("Vulkan"));
+	const wstring LANGUAGE_Sony(TEXT("Sony"));
+	const wstring LANGUAGE_Nintendo(TEXT("Nintendo"));
+	RHI_API uint64 GRHITransitionPrivateData_SizeInBytes = 0;
+	RHI_API uint64 GRHITransitionPrivateData_AlignInBytes = 0;
 
+
+	RHI_API FGenericDataDrivenShaderPlatformInfo FGenericDataDrivenShaderPlatformInfo::Infos[SP_NumPlatforms];
+
+	void RHITransition::cleanup() const
+	{
+		RHITransition* transition = const_cast<RHITransition*>(this);
+		RHIReleaseTransition(transition);
+		transition->~RHITransition();
+		Memory::free(transition);
+	}
+	
 }

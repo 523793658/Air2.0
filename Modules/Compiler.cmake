@@ -1,0 +1,11 @@
+IF(CMAKE_C_COMPILER_ID MATCHES MSVC)
+    SET(CMAKE_CXX_FLAGS "/MP /W4 /EHsc /WX- /bigobj /wd4201 /wd4204 /wd4100 /wd4152 /wd4200 /wd4505 /wd4800")
+ENDIF()
+
+IF(MSVC_VERSION GREATER_EQUAL 1920)
+    add_compile_options(/std:c++17)
+ELSEIF(MSVC_VERSION GREATER_EQUAL 1910)
+    add_compile_options(/std:c++14)
+ELSE()
+    add_compile_options(/std:c++11)
+ENDIF()

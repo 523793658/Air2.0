@@ -2,7 +2,6 @@
 
 #include "RenderResource.h"
 #include "RHIUtilities.h"
-
 namespace Air
 {
 

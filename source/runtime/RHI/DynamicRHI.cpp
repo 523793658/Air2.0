@@ -1,6 +1,6 @@
 #include "DynamicRHI.h"
 #include "RHICommandList.h"
-#include "RHI.h"
+#include "DynamicRHI.h"
 namespace Air
 {
 	DynamicRHI* GDynamicRHI = nullptr;
@@ -86,10 +86,10 @@ namespace Air
 	void DynamicRHI::enableIdealGPUCaptureOptions(bool enable)
 	{
 	}
-	Texture2DRHIRef DynamicRHI::RHICreateTexture2D_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamples, uint32 flags, RHIResourceCreateInfo& createInfo)
+	Texture2DRHIRef DynamicRHI::RHICreateTexture2D_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 width, uint32 height, uint8 format, uint32 numMips, uint32 numSamples, uint32 flags, ERHIAccess resourceState, RHIResourceCreateInfo& createInfo)
 	{
 		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
-		return GDynamicRHI->RHICreateTexture2D(width, height, format, numMips, numSamples, flags, createInfo);
+		return GDynamicRHI->RHICreateTexture2D(width, height, format, numMips, numSamples, flags, resourceState, createInfo);
 	}
 
 	TextureCubeRHIRef DynamicRHI::RHICreateTextureCube_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 size, uint8 format, uint32 numMips, uint32 flags, RHIResourceCreateInfo& createInfo)
@@ -103,7 +103,7 @@ namespace Air
 		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
 		return GDynamicRHI->RHICreateShaderResourceView(texture, createInfo);
 	}
-	StructuredBufferRHIRef DynamicRHI::RHICreateStructuredBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 stride, uint32 size, uint32 inUsage, RHIResourceCreateInfo& createInfo)
+	StructuredBufferRHIRef DynamicRHI::RHICreateStructuredBuffer_RenderThread(class RHICommandListImmediate& RHICmdList, uint32 stride, uint32 size, uint32 inUsage, ERHIAccess inResourceState, RHIResourceCreateInfo& createInfo)
 	{
 		ScopedRHIThreadStaller stallRHIThread(RHICmdList);
 		return GDynamicRHI->RHICreateStructuredBuffer(stride, size, inUsage, createInfo);

@@ -4,7 +4,7 @@
 #include "InputCoreType.h"
 #include "Framework/Commands/InputChord.h"
 #include "Classes/Components/InputComponent.h"
-#include "Object.h"
+#include "UObject/Object.h"
 namespace Air
 {
 	class InputComponent;

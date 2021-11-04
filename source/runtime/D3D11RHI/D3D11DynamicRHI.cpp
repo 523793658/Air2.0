@@ -17,7 +17,6 @@
 #include "GenericPlatform/genericPlatformDriver.h"
 #include "D3D11Util.h"
 #include "RHICommandList.h"
-#include "RHIUtilities.h"
 #include "D3D11RHI.h"
 #include "NVIDIA/nvapi/nvapi.h"
 #include "Template/AirTemplate.h"

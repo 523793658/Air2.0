@@ -1,7 +1,6 @@
 #include "PipelineStateCache.h"
 #include "HAL/CriticalSection.h"
 #include "Misc/ScopeLock.h"
-#include "RHIResource.h"
 #include "RHICommandList.h"
 namespace Air
 {
@@ -27,7 +26,7 @@ namespace Air
 	{
 		return (getTypeHash(initializer.mBoundShaderState) | (initializer.mNumSamples << 28)) ^ ((uint32)initializer.mPrimitiveType << 24) ^ getTypeHash(initializer.mBlendState) ^ initializer.mRenderTargetsEnabled ^ getTypeHash(initializer.mRasterizerState) ^ getTypeHash(initializer.mDepthStencilState);
 	}
-	
+	extern RHI_API RHIGraphicsPipelineState* executeSetGraphicsPipelineState(GraphicsPipelineState* graphicsPipelineState);
 
 
 	class PipelineState
@@ -307,7 +306,7 @@ namespace Air
 		}
 		return outCachedState;
 	}
-
+	
 	RHIGraphicsPipelineState* executeSetGraphicsPipelineState(GraphicsPipelineState* graphicsPipelineState)
 	{
 		RHIGraphicsPipelineState* rhiPipeline = graphicsPipelineState->mRHIPipeline;
@@ -317,6 +316,7 @@ namespace Air
 		int32 result = graphicsPipelineState->mInUseCount.decrement();
 		BOOST_ASSERT(result >= 0);
 #endif
+
 		return rhiPipeline;
 	}
 
